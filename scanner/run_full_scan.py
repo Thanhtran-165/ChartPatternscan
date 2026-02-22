@@ -14,6 +14,7 @@ import argparse
 import hashlib
 import json
 import os
+import random
 import sqlite3
 import traceback
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -61,6 +62,12 @@ def _parse_patterns(s: Optional[str], available: Sequence[str]) -> List[str]:
     return parts
 
 
+def _parse_csv_set(s: Optional[str]) -> set[str]:
+    if not s:
+        return set()
+    return {p.strip() for p in s.split(",") if p.strip()}
+
+
 def _load_symbols(conn: sqlite3.Connection, min_rows: int, limit: Optional[int]) -> List[str]:
     df = pd.read_sql_query(
         """
@@ -88,6 +95,49 @@ def _load_symbol_df(conn: sqlite3.Connection, symbol: str) -> pd.DataFrame:
     )
     df["date"] = pd.to_datetime(df["date"])
     return df
+
+
+def _stable_detection_key(d: Any) -> Tuple[Any, ...]:
+    # Used to make sampling deterministic/reproducible across runs when desired.
+    return (
+        str(getattr(d, "breakout_date", "") or ""),
+        -int(getattr(d, "confidence_score", 0) or 0),
+        str(getattr(d, "pattern_name", "") or ""),
+        str(getattr(d, "pattern_id", "") or ""),
+    )
+
+
+def _select_for_eval(
+    detections: Sequence[Any],
+    *,
+    max_n: Optional[int],
+    mode: str,
+    rng: random.Random,
+) -> List[Any]:
+    if max_n is None:
+        return list(detections)
+    max_n = int(max_n)
+    if max_n <= 0:
+        return []
+    if len(detections) <= max_n:
+        return list(detections)
+
+    dets = list(detections)
+    if mode == "first":
+        return sorted(dets, key=_stable_detection_key)[:max_n]
+    if mode == "top_confidence":
+        return sorted(
+            dets,
+            key=lambda d: (
+                -int(getattr(d, "confidence_score", 0) or 0),
+                str(getattr(d, "breakout_date", "") or ""),
+                str(getattr(d, "pattern_id", "") or ""),
+            ),
+        )[:max_n]
+    if mode == "random":
+        dets = sorted(dets, key=_stable_detection_key)
+        return rng.sample(dets, k=max_n)
+    raise ValueError(f"Unknown eval selection mode: {mode}")
 
 
 def _compute_run_statistics(conn: sqlite3.Connection, run_id: str) -> Dict[str, Any]:
@@ -240,6 +290,46 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=None, help="Limit symbols (for testing).")
     parser.add_argument("--commit-every", type=int, default=25, help="Commit every N symbols.")
     parser.add_argument("--notes", default=None, help="Optional notes saved with the run.")
+    parser.add_argument(
+        "--skip-eval",
+        action="store_true",
+        help="Skip post-breakout evaluation (persist detections only). Useful for high-frequency patterns.",
+    )
+    parser.add_argument(
+        "--skip-eval-patterns",
+        default=None,
+        help="Comma-separated list of patterns to skip post-breakout evaluation for (still detects/persists).",
+    )
+    parser.add_argument(
+        "--eval-lookahead",
+        type=int,
+        default=252,
+        help="Look-ahead bars for post-breakout evaluation metrics (default: 252).",
+    )
+    parser.add_argument(
+        "--eval-max-per-symbol",
+        type=int,
+        default=None,
+        help="Max number of confirmed breakouts to evaluate per symbol (after skip pattern filter).",
+    )
+    parser.add_argument(
+        "--eval-max-per-symbol-per-pattern",
+        type=int,
+        default=None,
+        help="Max number of confirmed breakouts to evaluate per symbol per pattern (useful for high-frequency patterns).",
+    )
+    parser.add_argument(
+        "--eval-selection",
+        choices=["random", "first", "top_confidence"],
+        default="random",
+        help="How to select detections when caps are applied (default: random).",
+    )
+    parser.add_argument(
+        "--eval-sample-seed",
+        type=int,
+        default=0,
+        help="Random seed for deterministic sampling when eval caps are applied (default: 0).",
+    )
     args = parser.parse_args()
 
     source_db_path = os.path.abspath(args.db)
@@ -250,8 +340,13 @@ def main() -> None:
     available_patterns = list(scanner.scanners.keys())
     patterns = _parse_patterns(args.patterns, available_patterns)
 
+    skip_eval_patterns = _parse_csv_set(args.skip_eval_patterns)
+    unknown_skip = sorted([p for p in skip_eval_patterns if p not in available_patterns])
+    if unknown_skip:
+        raise SystemExit(f"Unknown --skip-eval-patterns: {unknown_skip}. Available: {sorted(available_patterns)}")
+
     eval_config = EvaluationConfig(
-        lookahead_bars=252,
+        lookahead_bars=int(args.eval_lookahead),
         reversal_threshold_pct=20.0,
         throwback_tolerance_pct=1.0,
         invalidation_return_threshold_pct=3.0,
@@ -262,10 +357,17 @@ def main() -> None:
         variant_eve_min_peak_width_bars=7,
     )
     evaluator = PostBreakoutEvaluator(eval_config)
+    rng = random.Random(int(args.eval_sample_seed))
 
     run_config: Dict[str, Any] = {
         "scanner_config": scanner.config.__dict__,
         "evaluation_config": eval_config.__dict__,
+        "evaluation_enabled": (not bool(args.skip_eval)),
+        "skip_eval_patterns": sorted(skip_eval_patterns),
+        "eval_max_per_symbol": args.eval_max_per_symbol,
+        "eval_max_per_symbol_per_pattern": args.eval_max_per_symbol_per_pattern,
+        "eval_selection": args.eval_selection,
+        "eval_sample_seed": int(args.eval_sample_seed),
         "min_rows": int(args.min_rows),
         "patterns": patterns,
         "pivot_min_spacing_bars": 10,
@@ -344,10 +446,42 @@ def main() -> None:
                     detections_total += insert_detections(res_conn, run_id=run_id, detections=detections_pd)
 
                 # Evaluate confirmed breakouts only (look-ahead metrics)
-                confirmed = [d for d in detections_pd if d.breakout_date is not None and d.breakout_price is not None]
-                if confirmed:
-                    results = [evaluator.evaluate(d, df_norm) for d in confirmed]
-                    eval_total += insert_post_breakout_results(res_conn, run_id=run_id, results=results)
+                if not bool(args.skip_eval):
+                    confirmed = [
+                        d
+                        for d in detections_pd
+                        if d.breakout_date is not None
+                        and d.breakout_price is not None
+                        and d.pattern_name not in skip_eval_patterns
+                    ]
+
+                    # Optional caps/sampling (to keep high-frequency runs manageable).
+                    if args.eval_max_per_symbol_per_pattern is not None:
+                        by_pat: Dict[str, List[Any]] = {}
+                        for d in confirmed:
+                            by_pat.setdefault(d.pattern_name, []).append(d)
+                        limited: List[Any] = []
+                        for pat in sorted(by_pat.keys()):
+                            limited.extend(
+                                _select_for_eval(
+                                    by_pat[pat],
+                                    max_n=args.eval_max_per_symbol_per_pattern,
+                                    mode=args.eval_selection,
+                                    rng=rng,
+                                )
+                            )
+                        confirmed = limited
+
+                    confirmed = _select_for_eval(
+                        confirmed,
+                        max_n=args.eval_max_per_symbol,
+                        mode=args.eval_selection,
+                        rng=rng,
+                    )
+
+                    if confirmed:
+                        results = [evaluator.evaluate(d, df_norm) for d in confirmed]
+                        eval_total += insert_post_breakout_results(res_conn, run_id=run_id, results=results)
 
                 scanned += 1
 
