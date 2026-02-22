@@ -205,8 +205,11 @@ class PostBreakoutEvaluator:
             return self._empty_result(detection)
 
         # Get evaluation window
-        window_end = min(breakout_idx + self.config.lookahead_bars, len(df_full))
-        future_df = df_full.iloc[breakout_idx:window_end].copy()
+        # IMPORTANT: post-breakout metrics must use bars AFTER the breakout bar,
+        # otherwise throwback/pullback and bust can be trivially triggered on the breakout bar itself.
+        start_idx = breakout_idx + 1
+        window_end = min(start_idx + self.config.lookahead_bars, len(df_full))
+        future_df = df_full.iloc[start_idx:window_end].copy()
 
         if len(future_df) < 2:
             return self._empty_result(detection)
@@ -257,17 +260,9 @@ class PostBreakoutEvaluator:
 
         # === FAILURE ANALYSIS ===
         # Definition 1: Bust failure (reversal from breakout)
-        cumulative_high = future_df['high'].expanding().max()
-        height_abs = None
-        if pattern_height is not None:
-            try:
-                height_abs = float(pattern_height)
-            except Exception:
-                height_abs = None
-        if height_abs is not None and np.isfinite(height_abs) and height_abs > 0:
-            bust_pct = (cumulative_high - breakout_price) / height_abs * 100
-        else:
-            bust_pct = (cumulative_high - breakout_price) / breakout_price * 100
+        # Use CLOSE-based bust to match typical Bulkowski-style definitions (avoid wick noise).
+        cumulative_close_high = future_df['close'].expanding().max()
+        bust_pct = (cumulative_close_high - breakout_price) / breakout_price * 100
 
         bust_5pct = bool((bust_pct >= 5.0).any())
         bust_10pct = bool((bust_pct >= 10.0).any())
@@ -318,19 +313,33 @@ class PostBreakoutEvaluator:
         retested_boundary = None
 
         tolerance = self.config.throwback_tolerance_pct / 100
+        # Breakout level for throwback should be the *pattern boundary* at breakout (e.g., trough/neckline),
+        # not the breakout close. Using the close makes throwback almost always true.
+        throw_level = breakout_price
+        if boundary_price is not None:
+            try:
+                bp = float(boundary_price)
+            except Exception:
+                bp = None
+            if bp is not None and np.isfinite(bp) and bp > 0:
+                throw_level = bp
+
         breakout_retest_mask = future_df['high'] >= breakout_price * (1 - tolerance)
-        throwback_occurred = bool(breakout_retest_mask.any())
+        boundary_retest_mask = future_df['high'] >= throw_level * (1 - tolerance)
+
+        throwback_occurred = bool(boundary_retest_mask.any())
 
         if throwback_occurred:
-            first_throwback_idx = breakout_retest_mask[breakout_retest_mask].index[0]
+            first_throwback_idx = boundary_retest_mask[boundary_retest_mask].index[0]
             throwback_date = str(future_df.loc[first_throwback_idx, 'date'].date()) if 'date' in future_df.columns else None
             days_to_throwback = first_throwback_idx - breakout_idx
-            retested_breakout = True
+            retested_breakout = bool(breakout_retest_mask.any())
+            retested_boundary = True
 
         # Also check boundary retest
-        if boundary_price is not None:
-            boundary_retest_mask = future_df['high'] >= boundary_price * (1 - tolerance)
-            retested_boundary = bool(boundary_retest_mask.any())
+        if not throwback_occurred:
+            retested_breakout = bool(breakout_retest_mask.any()) if breakout_retest_mask is not None else None
+            retested_boundary = bool(boundary_retest_mask.any()) if boundary_retest_mask is not None else None
 
         # === TARGET ACHIEVEMENT ===
         target_achieved_intraday = None
@@ -407,17 +416,8 @@ class PostBreakoutEvaluator:
 
         # === FAILURE ANALYSIS ===
         # Definition 1: Bust failure (reversal from breakout)
-        cumulative_low = future_df['low'].expanding().min()
-        height_abs = None
-        if pattern_height is not None:
-            try:
-                height_abs = float(pattern_height)
-            except Exception:
-                height_abs = None
-        if height_abs is not None and np.isfinite(height_abs) and height_abs > 0:
-            bust_pct = (breakout_price - cumulative_low) / height_abs * 100
-        else:
-            bust_pct = (breakout_price - cumulative_low) / breakout_price * 100
+        cumulative_close_low = future_df['close'].expanding().min()
+        bust_pct = (breakout_price - cumulative_close_low) / breakout_price * 100
 
         bust_5pct = bool((bust_pct >= 5.0).any())
         bust_10pct = bool((bust_pct >= 10.0).any())
@@ -459,7 +459,18 @@ class PostBreakoutEvaluator:
 
         # === PULLBACK ===
         tolerance = self.config.throwback_tolerance_pct / 100
-        pullback_mask = future_df['low'] <= breakout_price * (1 + tolerance)
+        pull_level = breakout_price
+        if boundary_price is not None:
+            try:
+                bp = float(boundary_price)
+            except Exception:
+                bp = None
+            if bp is not None and np.isfinite(bp) and bp > 0:
+                pull_level = bp
+
+        breakout_retest_mask = future_df['low'] <= breakout_price * (1 + tolerance)
+        boundary_retest_mask = future_df['low'] <= pull_level * (1 + tolerance)
+        pullback_mask = boundary_retest_mask
         pullback_occurred = bool(pullback_mask.any())
 
         pullback_date = None
@@ -471,11 +482,12 @@ class PostBreakoutEvaluator:
             first_pullback_idx = pullback_mask[pullback_mask].index[0]
             pullback_date = str(future_df.loc[first_pullback_idx, 'date'].date()) if 'date' in future_df.columns else None
             days_to_pullback = first_pullback_idx - breakout_idx
-            retested_breakout = True
+            retested_breakout = bool(breakout_retest_mask.any())
+            retested_boundary = True
 
-        if boundary_price is not None:
-            boundary_retest_mask = future_df['low'] <= boundary_price * (1 + tolerance)
-            retested_boundary = bool(boundary_retest_mask.any())
+        if not pullback_occurred:
+            retested_breakout = bool(breakout_retest_mask.any()) if breakout_retest_mask is not None else None
+            retested_boundary = bool(boundary_retest_mask.any()) if boundary_retest_mask is not None else None
 
         # === TARGET ACHIEVEMENT ===
         target_achieved_intraday = None
