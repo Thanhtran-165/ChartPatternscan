@@ -140,6 +140,18 @@ def _select_for_eval(
     raise ValueError(f"Unknown eval selection mode: {mode}")
 
 
+PIVOT_MIN_SPACING_OVERRIDES: Dict[str, int] = {
+    # Shorter-duration pivot patterns need a tighter pivot spacing than the global default
+    # (otherwise width_max_bars becomes impossible with min_spacing=10).
+    "flags": 2,
+    "pennants": 2,
+    "horn_bottoms_tops": 2,
+    "diamond_top": 3,
+    "diamond_bottom": 3,
+    "rounding_bottoms_tops": 4,
+}
+
+
 def _compute_run_statistics(conn: sqlite3.Connection, run_id: str) -> Dict[str, Any]:
     stats: Dict[str, Any] = {"run_id": run_id}
 
@@ -330,6 +342,30 @@ def main() -> None:
         default=0,
         help="Random seed for deterministic sampling when eval caps are applied (default: 0).",
     )
+    parser.add_argument(
+        "--detect-max-per-symbol",
+        type=int,
+        default=None,
+        help="Max number of detections to persist per symbol (all patterns). Useful for high-frequency runs.",
+    )
+    parser.add_argument(
+        "--detect-max-per-symbol-per-pattern",
+        type=int,
+        default=None,
+        help="Max number of detections to persist per symbol per pattern.",
+    )
+    parser.add_argument(
+        "--detect-selection",
+        choices=["random", "first", "top_confidence"],
+        default="random",
+        help="How to select detections when detection caps are applied (default: random).",
+    )
+    parser.add_argument(
+        "--detect-sample-seed",
+        type=int,
+        default=0,
+        help="Random seed for deterministic detection sampling when caps are applied (default: 0).",
+    )
     args = parser.parse_args()
 
     source_db_path = os.path.abspath(args.db)
@@ -358,6 +394,7 @@ def main() -> None:
     )
     evaluator = PostBreakoutEvaluator(eval_config)
     rng = random.Random(int(args.eval_sample_seed))
+    detect_rng = random.Random(int(args.detect_sample_seed))
 
     run_config: Dict[str, Any] = {
         "scanner_config": scanner.config.__dict__,
@@ -368,9 +405,14 @@ def main() -> None:
         "eval_max_per_symbol_per_pattern": args.eval_max_per_symbol_per_pattern,
         "eval_selection": args.eval_selection,
         "eval_sample_seed": int(args.eval_sample_seed),
+        "detect_max_per_symbol": args.detect_max_per_symbol,
+        "detect_max_per_symbol_per_pattern": args.detect_max_per_symbol_per_pattern,
+        "detect_selection": args.detect_selection,
+        "detect_sample_seed": int(args.detect_sample_seed),
         "min_rows": int(args.min_rows),
         "patterns": patterns,
-        "pivot_min_spacing_bars": 10,
+        "pivot_min_spacing_default_bars": 10,
+        "pivot_min_spacing_overrides": dict(PIVOT_MIN_SPACING_OVERRIDES),
     }
     run_config_hash = _md5_json(run_config)
 
@@ -419,14 +461,16 @@ def main() -> None:
                     continue
 
                 raw_pivots = scanner.pivot_detector.detect_pivots(df_norm, scanner.config.pivot_type)
-                pivots = scanner.pivot_detector.get_filtered_pivots(raw_pivots, min_spacing=10)
-                if len(pivots) < 3:
-                    scanned += 1
-                    continue
+                pivots_by_spacing: Dict[int, List[Any]] = {}
+                pivots_by_spacing[10] = scanner.pivot_detector.get_filtered_pivots(raw_pivots, min_spacing=10)
 
                 detections = []
                 for p in patterns:
                     s = scanner.scanners[p]
+                    spacing = int(PIVOT_MIN_SPACING_OVERRIDES.get(p, 10))
+                    if spacing not in pivots_by_spacing:
+                        pivots_by_spacing[spacing] = scanner.pivot_detector.get_filtered_pivots(raw_pivots, min_spacing=spacing)
+                    pivots = pivots_by_spacing[spacing]
                     try:
                         detections.extend(
                             s.scan(
@@ -440,8 +484,34 @@ def main() -> None:
                         # Legacy signature
                         detections.extend(s.scan(symbol, df_norm, pivots, raw_pivots))
 
-                detections_pd = [scanner._to_detection(d) for d in detections]
-                if detections:
+                detections_pd_all = [scanner._to_detection(d) for d in detections]
+                detections_pd = detections_pd_all
+
+                # Optional detection caps/sampling (persist layer + eval depend on these IDs).
+                if args.detect_max_per_symbol_per_pattern is not None:
+                    by_pat: Dict[str, List[Any]] = {}
+                    for d in detections_pd:
+                        by_pat.setdefault(d.pattern_name, []).append(d)
+                    limited: List[Any] = []
+                    for pat in sorted(by_pat.keys()):
+                        limited.extend(
+                            _select_for_eval(
+                                by_pat[pat],
+                                max_n=args.detect_max_per_symbol_per_pattern,
+                                mode=args.detect_selection,
+                                rng=detect_rng,
+                            )
+                        )
+                    detections_pd = limited
+
+                detections_pd = _select_for_eval(
+                    detections_pd,
+                    max_n=args.detect_max_per_symbol,
+                    mode=args.detect_selection,
+                    rng=detect_rng,
+                )
+
+                if detections_pd:
                     # Ensure PatternDetection objects for persistence layer.
                     detections_total += insert_detections(res_conn, run_id=run_id, detections=detections_pd)
 

@@ -497,6 +497,18 @@ class PatternScanner:
                 'head_and_shoulders_top': HeadAndShouldersScanner(self.config)
             }
 
+        # Some digitized patterns are short-duration and require a tighter pivot spacing than the
+        # default (min_spacing=10). If we keep spacing too large, some patterns become impossible
+        # to match given width_max constraints (e.g., flags/pennants).
+        self._pivot_min_spacing_overrides: Dict[str, int] = {
+            "flags": 2,
+            "pennants": 2,
+            "horn_bottoms_tops": 2,
+            "diamond_top": 3,
+            "diamond_bottom": 3,
+            "rounding_bottoms_tops": 4,
+        }
+
     def _to_detection(self, d: Any) -> PatternDetection:
         if isinstance(d, PatternDetection):
             return d
@@ -523,12 +535,10 @@ class PatternScanner:
         # Detect pivots
         raw_pivots = self.pivot_detector.detect_pivots(df_norm, self.config.pivot_type)
 
-        # Get filtered pivots with minimum spacing for pattern detection
-        # Use spacing of 10 bars to ensure pivots are meaningful for chart patterns
-        pivots = self.pivot_detector.get_filtered_pivots(raw_pivots, min_spacing=10)
-
-        if len(pivots) < 5:
-            return []
+        # Default filtered pivots with minimum spacing for most chart patterns.
+        pivots_by_spacing: Dict[int, List[Pivot]] = {
+            10: self.pivot_detector.get_filtered_pivots(raw_pivots, min_spacing=10)
+        }
 
         # Scan for each pattern
         patterns = patterns or list(self.scanners.keys())
@@ -538,6 +548,10 @@ class PatternScanner:
             if pattern_name not in self.scanners:
                 continue
             scanner = self.scanners[pattern_name]
+            spacing = int(self._pivot_min_spacing_overrides.get(pattern_name, 10))
+            if spacing not in pivots_by_spacing:
+                pivots_by_spacing[spacing] = self.pivot_detector.get_filtered_pivots(raw_pivots, min_spacing=spacing)
+            pivots = pivots_by_spacing[spacing]
 
             # Support both legacy scanners and digitized scanners.
             try:

@@ -13,6 +13,7 @@ Notes:
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -527,6 +528,304 @@ class PivotSequenceScanner(BaseDigitizedScanner):
                     "created_at": datetime.now().isoformat(),
                 }
             )
+
+        return out
+
+
+class RoundingBottomsTopsScanner(BaseDigitizedScanner):
+    """
+    The digitized spec contains both rounding bottoms and rounding tops in one file.
+    Mandatory pivots are annotated with `variant` ("bottom"/"top"), but the generic
+    PivotSequenceScanner does not interpret that field. This wrapper instantiates
+    two PivotSequenceScanners (bottom + top) using filtered mandatory pivots and
+    an inverted pivot sequence for the top variant.
+    """
+
+    def __init__(self, key: str, spec: Dict[str, Any]):
+        super().__init__(key, spec)
+
+        ds = spec.get("detection_signature", {}) or {}
+        base_seq = (ds.get("pivot_sequence") or []) if isinstance(ds.get("pivot_sequence"), list) else []
+        base_mps = (ds.get("mandatory_pivots") or []) if isinstance(ds.get("mandatory_pivots"), list) else []
+
+        def _invert_seq(seq: List[Any]) -> List[Any]:
+            out: List[Any] = []
+            for t in seq:
+                if t == "H":
+                    out.append("L")
+                elif t == "L":
+                    out.append("H")
+                else:
+                    out.append(t)
+            return out
+
+        bottom_spec = copy.deepcopy(spec)
+        bottom_spec["pattern_type"] = "reversal_bullish"
+        bottom_spec.setdefault("detection_signature", {})
+        bottom_spec["detection_signature"]["pivot_sequence"] = list(base_seq)
+        bottom_spec["detection_signature"]["mandatory_pivots"] = [
+            mp for mp in base_mps if not isinstance(mp, dict) or (mp.get("variant") in (None, "", "bottom"))
+        ]
+        self._bottom = PivotSequenceScanner(key, bottom_spec)
+
+        top_spec = copy.deepcopy(spec)
+        top_spec["pattern_type"] = "reversal_bearish"
+        top_spec.setdefault("detection_signature", {})
+        top_spec["detection_signature"]["pivot_sequence"] = _invert_seq(list(base_seq))
+        top_spec["detection_signature"]["mandatory_pivots"] = [
+            mp for mp in base_mps if not isinstance(mp, dict) or (mp.get("variant") in (None, "", "top"))
+        ]
+        self._top = PivotSequenceScanner(key, top_spec)
+
+    def scan(
+        self,
+        *,
+        symbol: str,
+        df: pd.DataFrame,
+        pivots_filtered: List[Pivot],
+        pivots_raw: List[Pivot],
+    ) -> List[Dict[str, Any]]:
+        out: List[Dict[str, Any]] = []
+
+        for row in self._bottom.scan(symbol=symbol, df=df, pivots_filtered=pivots_filtered, pivots_raw=pivots_raw):
+            row["pattern_id"] = f"{row['pattern_id']}_bottom"
+            row["pattern_type"] = "reversal_bullish"
+            out.append(row)
+
+        for row in self._top.scan(symbol=symbol, df=df, pivots_filtered=pivots_filtered, pivots_raw=pivots_raw):
+            row["pattern_id"] = f"{row['pattern_id']}_top"
+            row["pattern_type"] = "reversal_bearish"
+            out.append(row)
+
+        return out
+
+
+class CupWithHandleScanner(BaseDigitizedScanner):
+    """
+    Cup-with-handle is fundamentally a curved formation; a strict 6-pivot template is brittle.
+    This scanner uses a pragmatic approach:
+    - Identify candidate cup rims (two highs) separated by the cup width
+    - Find the cup bottom between rims
+    - Verify depth + handle constraints from digitized spec
+    - Confirm breakout above handle resistance with optional volume requirement
+
+    The goal is coverage on real-world OHLCV while staying anchored to digitized constraints.
+    """
+
+    def __init__(self, key: str, spec: Dict[str, Any]):
+        super().__init__(key, spec)
+        self.geom = spec.get("geometry_constraints", {}) or {}
+        self.prior = spec.get("prior_trend_requirements", {}) or {}
+        self.bo = spec.get("breakout_confirmation", {}) or {}
+
+        self.width_min = int(self.geom.get("width_min_bars") or 84)
+        self.width_max = int(self.geom.get("width_max_bars") or 504)
+        self.depth_min = float(self.geom.get("height_ratio_min") or 15.0)
+        self.depth_max = float(self.geom.get("height_ratio_max") or 33.0)
+
+        handle = self.geom.get("handle_constraints", {}) or {}
+        self.handle_min_bars = 5
+        self.handle_max_bars = 20
+        self.handle_pos_min_pct = float(handle.get("handle_position_min_pct") or 67.0)
+        self.handle_min_decline_pct = float(handle.get("handle_min_decline_pct") or 2.0)
+        self.handle_max_decline_pct = float(handle.get("handle_max_decline_pct") or 12.0)
+
+        # Rims "near equal" is very strict in some digitizations; treat the digitized tolerance
+        # as "ideal" and apply a looser hard cap for coverage. Confidence scoring rewards tight rims.
+        self.rim_tol_ideal = float(self.geom.get("near_equal_tolerance_pct") or 2.0)
+        self.rim_tol_hard = max(self.rim_tol_ideal, 10.0)
+
+        self.breakout_thr = float(self.bo.get("breakout_threshold_pct") or 1.0) / 100.0
+        self.confirm_bars = int(self.bo.get("confirmation_bars") or 1)
+        self.close_beyond = bool(self.bo.get("close_beyond_required") if self.bo.get("close_beyond_required") is not None else True)
+        self.vol_required = bool(self.bo.get("volume_required") or False)
+        self.vol_mult_min = float(self.bo.get("volume_multiplier_min") or 1.3)
+
+        # Bound breakout search to keep scans fast.
+        self.breakout_search_bars = int(self.geom.get("breakout_search_bars") or 60)
+
+    def _prior_trend_ok(self, df: pd.DataFrame, start_idx: int) -> bool:
+        direction = str(self.prior.get("direction") or "up").lower()
+        min_bars = int(self.prior.get("min_period_bars") or 0)
+        min_change = float(self.prior.get("min_change_pct") or 0.0)
+        if min_bars <= 0 or min_change <= 0:
+            return True
+        if start_idx < min_bars:
+            return False
+        p0 = _safe_float(df.iloc[start_idx - min_bars].get("close"))
+        p1 = _safe_float(df.iloc[start_idx].get("close"))
+        if p0 is None or p1 is None or p0 <= 0:
+            return False
+        change_pct = (p1 - p0) / p0 * 100.0
+        if direction == "up":
+            return change_pct >= min_change
+        if direction == "down":
+            return change_pct <= -min_change
+        return abs(change_pct) >= min_change
+
+    def _breakout_ok(self, df: pd.DataFrame, idx0: int, level: float) -> Tuple[Optional[int], Optional[float], bool]:
+        """
+        Find breakout above `level` starting at idx0. Returns (breakout_idx, breakout_price, vol_ok).
+        """
+        end = min(len(df), idx0 + self.breakout_search_bars)
+        thr = level * (1.0 + self.breakout_thr)
+        for i in range(idx0, end):
+            close = _safe_float(df.iloc[i].get("close"))
+            if close is None:
+                continue
+            if close <= thr:
+                continue
+
+            # Confirmation bars: require consecutive closes beyond threshold.
+            if self.confirm_bars > 1:
+                j_end = min(len(df), i + self.confirm_bars)
+                all_ok = True
+                for j in range(i, j_end):
+                    c = _safe_float(df.iloc[j].get("close"))
+                    if c is None or c <= thr:
+                        all_ok = False
+                        break
+                if not all_ok:
+                    continue
+
+            vr = df.iloc[i].get("volume_ratio", np.nan)
+            vol_ok = bool(pd.notna(vr) and np.isfinite(vr) and float(vr) >= self.vol_mult_min)
+            if self.vol_required and not vol_ok:
+                continue
+            return i, close, vol_ok
+
+        return None, None, False
+
+    def scan(
+        self,
+        *,
+        symbol: str,
+        df: pd.DataFrame,
+        pivots_filtered: List[Pivot],
+        pivots_raw: List[Pivot],
+    ) -> List[Dict[str, Any]]:
+        pivots = pivots_filtered
+        highs = [p for p in pivots if p.type == PivotType.HIGH]
+        if len(highs) < 2:
+            return []
+
+        out: List[Dict[str, Any]] = []
+
+        for i in range(len(highs) - 1):
+            left = highs[i]
+            if left.idx + self.width_min >= len(df):
+                continue
+            if not self._prior_trend_ok(df, int(left.idx)):
+                continue
+
+            for j in range(i + 1, len(highs)):
+                right = highs[j]
+                width = int(right.idx) - int(left.idx)
+                if width < self.width_min:
+                    continue
+                if width > self.width_max:
+                    break
+
+                # Rim similarity (hard cap for coverage; scoring uses ideal tolerance).
+                rim_diff = _pct_diff(float(left.price), float(right.price))
+                if rim_diff > self.rim_tol_hard:
+                    continue
+
+                seg = df.iloc[int(left.idx) : int(right.idx) + 1]
+                if len(seg) < 3:
+                    continue
+                bottom_low = _safe_float(seg["low"].min())
+                if bottom_low is None or bottom_low <= 0:
+                    continue
+
+                # Depth % (cup depth vs average rim)
+                rim_avg = (float(left.price) + float(right.price)) / 2.0
+                if rim_avg <= 0:
+                    continue
+                depth_pct = (rim_avg - bottom_low) / rim_avg * 100.0
+                if depth_pct < self.depth_min or depth_pct > self.depth_max:
+                    continue
+
+                # Handle search window
+                handle_start = int(right.idx) + 1
+                if handle_start + self.handle_min_bars >= len(df):
+                    continue
+                handle_end_max = min(len(df) - 1, handle_start + self.handle_max_bars - 1)
+
+                for handle_end in range(handle_start + self.handle_min_bars - 1, handle_end_max + 1):
+                    hseg = df.iloc[handle_start : handle_end + 1]
+                    if len(hseg) == 0:
+                        continue
+                    handle_low = _safe_float(hseg["low"].min())
+                    if handle_low is None:
+                        continue
+                    handle_decline = (rim_avg - handle_low) / rim_avg * 100.0
+                    if handle_decline < self.handle_min_decline_pct or handle_decline > self.handle_max_decline_pct:
+                        continue
+
+                    # Handle must be in upper third of cup depth (position % from bottom -> rim).
+                    denom = rim_avg - bottom_low
+                    if denom <= 0:
+                        continue
+                    handle_pos_pct = (handle_low - bottom_low) / denom * 100.0
+                    if handle_pos_pct < self.handle_pos_min_pct:
+                        continue
+
+                    handle_res = _safe_float(hseg["high"].max())
+                    if handle_res is None or handle_res <= 0:
+                        continue
+                    if _pct_diff(handle_res, rim_avg) > self.rim_tol_hard:
+                        continue
+
+                    breakout_idx, breakout_price, vol_ok = self._breakout_ok(df, handle_end + 1, handle_res)
+                    if breakout_idx is None or breakout_price is None:
+                        continue
+
+                    # Target/stop (pragmatic): depth in absolute price units.
+                    depth_abs = max(0.0, rim_avg - bottom_low)
+                    target = breakout_price + depth_abs
+                    stop = float(handle_low)
+
+                    confidence = 60
+                    if rim_diff <= self.rim_tol_ideal:
+                        confidence += 10
+                    elif rim_diff <= 5.0:
+                        confidence += 5
+                    if vol_ok:
+                        confidence += 10
+                    confidence += 10  # breakout found
+                    confidence = int(min(100, confidence))
+
+                    # Use positional indices (pivot engine works on iloc positions).
+                    bottom_idx = int(left.idx) + int(np.argmin(seg["low"].to_numpy()))
+                    handle_low_idx = int(handle_start) + int(np.argmin(hseg["low"].to_numpy()))
+
+                    pattern_id = f"{symbol}_{self.key}_{int(left.idx)}_{int(handle_end)}"
+                    out.append(
+                        {
+                            "pattern_id": pattern_id,
+                            "symbol": symbol,
+                            "pattern_name": self.key,
+                            "pattern_type": self.pattern_type,
+                            "formation_start": str(df.iloc[int(left.idx)]["date"].date()) if "date" in df.columns else str(int(left.idx)),
+                            "formation_end": str(df.iloc[int(handle_end)]["date"].date()) if "date" in df.columns else str(int(handle_end)),
+                            "breakout_date": str(df.iloc[int(breakout_idx)]["date"].date()) if "date" in df.columns else None,
+                            "breakout_idx": int(breakout_idx),
+                            "breakout_direction": "up",
+                            "breakout_price": float(breakout_price),
+                            "target_price": float(target),
+                            "stop_loss_price": float(stop),
+                            "confidence_score": confidence,
+                            "volume_confirmed": bool(vol_ok),
+                            "pattern_height_pct": round(float(depth_pct), 2),
+                            "pattern_width_bars": int(handle_end) - int(left.idx),
+                            "touch_count": 6,
+                            "pivot_indices": [int(left.idx), bottom_idx, int(right.idx), handle_low_idx, int(handle_end)],
+                            "config_hash": self.config_hash,
+                            "created_at": datetime.now().isoformat(),
+                        }
+                    )
+                    break  # stop at first valid handle+breakout for this rim pair
 
         return out
 
@@ -1274,6 +1573,13 @@ def build_digitized_scanners(
     for key in library.list_keys():
         spec = library.load(key)
         ds = spec.get("detection_signature", {}) or {}
+
+        if key == "rounding_bottoms_tops":
+            scanners[key] = RoundingBottomsTopsScanner(key, spec)
+            continue
+        if key == "cup_with_handle":
+            scanners[key] = CupWithHandleScanner(key, spec)
+            continue
 
         if key == "triple_bottoms_tops":
             scanners[key] = TripleBottomsTopsScanner(key, spec)
