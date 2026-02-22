@@ -1,18 +1,33 @@
 """
-MVP Pattern Scanner
-Implements pattern detection for double_tops and head_and_shoulders_top
+Pattern Scanner
+---------------
+Coordinates OHLCV normalization, pivot detection, and pattern scanning.
+
+If local digitized specs exist at `extraction_phase_1/digitization/patterns_digitized/`,
+this module will load a spec-driven scanner set that covers all digitized patterns.
+If specs are missing (public repo), it falls back to the legacy MVP scanners.
 """
 
+import logging
 import pandas as pd
 import numpy as np
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Iterable
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 import json
 import hashlib
 
-from pivot_detector import PivotDetector, Pivot, PivotType, PivotConfig
-from ohlcv_normalizer import OHLCVNormalizer, NormalizationConfig
+logger = logging.getLogger(__name__)
+
+try:
+    # Package imports (preferred)
+    from .pivot_detector import PivotDetector, Pivot, PivotType, PivotConfig
+    from .ohlcv_normalizer import OHLCVNormalizer, NormalizationConfig
+    from .digitized_pattern_engine import DigitizedPatternLibrary, build_digitized_scanners
+except ImportError:  # pragma: no cover - support running as a script from scanner/
+    from pivot_detector import PivotDetector, Pivot, PivotType, PivotConfig
+    from ohlcv_normalizer import OHLCVNormalizer, NormalizationConfig
+    from digitized_pattern_engine import DigitizedPatternLibrary, build_digitized_scanners
 
 
 @dataclass
@@ -47,6 +62,7 @@ class PatternDetection:
 
     # Metadata
     config_hash: str
+    breakout_idx: Optional[int] = None
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
     def to_dict(self) -> dict:
@@ -130,7 +146,7 @@ class DoubleTopScanner:
         self.pattern_type = "reversal_bearish"
 
     def scan(self, symbol: str, df: pd.DataFrame,
-             pivots: List[Pivot]) -> List[PatternDetection]:
+             pivots: List[Pivot], pivots_raw: Optional[List[Pivot]] = None) -> List[PatternDetection]:
         """
         Scan for double top patterns.
 
@@ -214,7 +230,8 @@ class DoubleTopScanner:
                 breakout_idx = idx
                 breakout_price = close
                 # Check volume
-                if df.iloc[idx]['volume_ratio'] and df.iloc[idx]['volume_ratio'] >= self.config.volume_threshold:
+                vr = df.iloc[idx].get('volume_ratio', np.nan)
+                if pd.notna(vr) and np.isfinite(vr) and float(vr) >= self.config.volume_threshold:
                     volume_confirmed = True
                 break
 
@@ -250,7 +267,8 @@ class DoubleTopScanner:
             pattern_width_bars=pattern_width,
             touch_count=3,
             pivot_indices=[p1.idx, trough.idx, p2.idx],
-            config_hash=config_hash
+            config_hash=config_hash,
+            breakout_idx=breakout_idx,
         )
 
     def _calculate_confidence(self, df: pd.DataFrame,
@@ -299,7 +317,7 @@ class HeadAndShouldersScanner:
         self.pattern_type = "reversal_bearish"
 
     def scan(self, symbol: str, df: pd.DataFrame,
-             pivots: List[Pivot]) -> List[PatternDetection]:
+             pivots: List[Pivot], pivots_raw: Optional[List[Pivot]] = None) -> List[PatternDetection]:
         """Scan for head and shoulders top patterns."""
         detections = []
 
@@ -372,7 +390,8 @@ class HeadAndShouldersScanner:
             if close < neckline_price * (1 - self.config.breakout_threshold_pct/100):
                 breakout_idx = idx
                 breakout_price = close
-                if df.iloc[idx]['volume_ratio'] and df.iloc[idx]['volume_ratio'] >= self.config.volume_threshold:
+                vr = df.iloc[idx].get('volume_ratio', np.nan)
+                if pd.notna(vr) and np.isfinite(vr) and float(vr) >= self.config.volume_threshold:
                     volume_confirmed = True
                 break
 
@@ -405,7 +424,8 @@ class HeadAndShouldersScanner:
             pattern_width_bars=pattern_width,
             touch_count=5,
             pivot_indices=[ls.idx, nl1.idx, head.idx, nl2.idx, rs.idx],
-            config_hash=config_hash
+            config_hash=config_hash,
+            breakout_idx=breakout_idx,
         )
 
     def _calculate_confidence(self, df: pd.DataFrame,
@@ -459,10 +479,30 @@ class PatternScanner:
         self.pivot_detector = PivotDetector()
 
         # Initialize pattern scanners
-        self.scanners = {
-            'double_tops': DoubleTopScanner(self.config),
-            'head_and_shoulders_top': HeadAndShouldersScanner(self.config)
-        }
+        # Prefer digitized scanners when specs are available locally.
+        self.scanners: Dict[str, Any] = {}
+        try:
+            lib = DigitizedPatternLibrary()
+            digitized = build_digitized_scanners(lib)
+            if digitized:
+                self.scanners.update(digitized)
+        except Exception:
+            # Fallback to built-in MVP scanners
+            logger.exception("Failed to load digitized scanners; falling back to MVP scanners.")
+            self.scanners = {}
+
+        if not self.scanners:
+            self.scanners = {
+                'double_tops': DoubleTopScanner(self.config),
+                'head_and_shoulders_top': HeadAndShouldersScanner(self.config)
+            }
+
+    def _to_detection(self, d: Any) -> PatternDetection:
+        if isinstance(d, PatternDetection):
+            return d
+        if isinstance(d, dict):
+            return PatternDetection(**d)
+        raise TypeError(f"Unsupported detection type: {type(d)}")
 
     def scan_symbol(self, symbol: str, df: pd.DataFrame,
                     patterns: Optional[List[str]] = None) -> List[PatternDetection]:
@@ -495,10 +535,23 @@ class PatternScanner:
         all_detections = []
 
         for pattern_name in patterns:
-            if pattern_name in self.scanners:
-                scanner = self.scanners[pattern_name]
-                detections = scanner.scan(symbol, df_norm, pivots)
-                all_detections.extend(detections)
+            if pattern_name not in self.scanners:
+                continue
+            scanner = self.scanners[pattern_name]
+
+            # Support both legacy scanners and digitized scanners.
+            try:
+                detections_any = scanner.scan(
+                    symbol=symbol,
+                    df=df_norm,
+                    pivots_filtered=pivots,
+                    pivots_raw=raw_pivots,
+                )
+            except TypeError:
+                # Legacy signature
+                detections_any = scanner.scan(symbol, df_norm, pivots, raw_pivots)
+
+            all_detections.extend(self._to_detection(x) for x in detections_any)
 
         return all_detections
 
@@ -571,8 +624,8 @@ class PatternScanner:
                         self._persist_detections(batch_detections, output_db)
                         batch_detections = []
 
-            except Exception as e:
-                print(f"Error scanning {symbol}: {e}")
+            except Exception:
+                logger.exception("Error scanning symbol=%s", symbol)
 
         # Persist remaining
         if persist and batch_detections:

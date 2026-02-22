@@ -13,6 +13,7 @@ from dataclasses import dataclass
 class NormalizationConfig:
     """Configuration for OHLCV normalization"""
     remove_null_rows: bool = True
+    remove_nonpositive_prices: bool = True
     fix_high_low_inversion: bool = True
     fix_open_close_out_of_range: bool = True
     volume_zero_as_missing: bool = True
@@ -36,6 +37,7 @@ class OHLCVNormalizer:
         self.stats = {
             'rows_input': 0,
             'rows_removed_null': 0,
+            'rows_removed_nonpositive': 0,
             'rows_fixed_hl_inversion': 0,
             'rows_fixed_oc_range': 0,
             'volume_zero_count': 0
@@ -52,6 +54,7 @@ class OHLCVNormalizer:
             Tuple of (normalized_df, stats_dict)
         """
         self.stats = {'rows_input': len(df), 'rows_removed_null': 0,
+                      'rows_removed_nonpositive': 0,
                       'rows_fixed_hl_inversion': 0, 'rows_fixed_oc_range': 0,
                       'volume_zero_count': 0}
 
@@ -90,6 +93,14 @@ class OHLCVNormalizer:
             df.loc[open_too_low, 'open'] = df.loc[open_too_low, 'low']
             df.loc[close_too_high, 'close'] = df.loc[close_too_high, 'high']
             df.loc[close_too_low, 'close'] = df.loc[close_too_low, 'low']
+
+        # 3b. Remove rows with non-positive OHLC (defensive; avoids divide-by-zero / inf downstream)
+        if self.config.remove_nonpositive_prices:
+            cols = ['open', 'high', 'low', 'close']
+            nonpos_mask = (df[cols] <= 0).any(axis=1) | (~np.isfinite(df[cols])).any(axis=1)
+            self.stats['rows_removed_nonpositive'] = int(nonpos_mask.sum())
+            if nonpos_mask.any():
+                df = df[~nonpos_mask].copy()
 
         # 4. Count volume zeros
         if self.config.volume_zero_as_missing:

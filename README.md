@@ -18,8 +18,9 @@ Nghiên cứu và quét (scan) mô hình giá trên dữ liệu **OHLCV** quy m�
 ## Kiến trúc
 
 - `scanner/ohlcv_normalizer.py`: làm sạch OHLCV (NULL, high/low đảo, clamp open/close, loại bỏ giá <=0), tạo cột dẫn xuất (ATR, volume_ma, volume_ratio…)
-- `scanner/pivot_detector.py`: phát hiện pivot highs/lows + lọc spacing để giảm nhiễu, đảm bảo chuỗi pivot alternating
-- `scanner/pattern_scanner.py`: scanner MVP cho một số pattern (hiện có: `double_tops`, `head_and_shoulders_top`)
+- `scanner/pivot_detector.py`: phát hiện pivot highs/lows + lọc spacing để giảm nhiễu
+- `scanner/digitized_pattern_engine.py`: **spec-driven** scanners đọc từ `extraction_phase_1/digitization/patterns_digitized/*_digitized.json` (nếu có) để cover **26/26** patterns
+- `scanner/pattern_scanner.py`: orchestrator (normalize → pivots → scan). Nếu thiếu digitized specs (repo public), fallback về legacy MVP scanners
 - `scanner/post_breakout_analyzer.py`: đo thống kê hậu breakout (look-ahead 252 bars) + variant `AA/AE/EA/EE` cho Double Tops
 - `scanner/results_db.py`: persist kết quả ra **DB riêng** (không ghi vào DB giá nguồn) + `run_id` + index
 - `scanner/run_full_scan.py`: chạy scan full DB và lưu kết quả + thống kê tổng hợp
@@ -90,5 +91,5 @@ Mỗi lần chạy tạo `run_id` và lưu:
 
 ## Giới hạn hiện tại
 
-- Scanner MVP hiện mới cover một phần pattern (ưu tiên chất lượng pipeline + persist + thống kê). Có thể mở rộng dần theo bộ digitized specs.
-
+- Repo public **không** đi kèm `extraction_phase_1/` (digitized specs + dữ liệu trích xuất) vì lý do bản quyền.
+- Nếu bạn có bộ digitized specs ở local: scanner sẽ tự động load và scan **26/26** patterns.

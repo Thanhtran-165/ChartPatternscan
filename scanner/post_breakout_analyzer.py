@@ -57,6 +57,7 @@ from typing import List, Optional, Dict, Any, Tuple
 from enum import Enum
 import pandas as pd
 import numpy as np
+import json
 
 
 class FailureType(Enum):
@@ -127,6 +128,11 @@ class PostBreakoutResult:
     max_favorable_excursion_pct: Optional[float]  # Max % in expected direction
     max_adverse_excursion_pct: Optional[float]    # Max % against expected
 
+    # === VARIANT METRICS (Double Tops) ===
+    variant: Optional[str] = None  # 'AA', 'AE', 'EA', 'EE' (Adam/Eve)
+    peak1_width_bars: Optional[int] = None
+    peak2_width_bars: Optional[int] = None
+
     # Analysis metadata
     evaluation_window_bars: int = 252
     evaluation_date: str = field(default_factory=lambda: datetime.now().isoformat())
@@ -149,6 +155,16 @@ class EvaluationConfig:
 
     # Throwback/Pullback settings
     throwback_tolerance_pct: float = 1.0  # Within 1% of breakout = retest
+
+    # Boundary invalidation gating (to reduce "any-time" false invalidations)
+    invalidation_return_threshold_pct: float = 3.0
+    invalidation_within_bars: int = 10
+
+    # Variant classification (double tops) - Adam/Eve by peak width
+    variant_peak_width_tolerance_pct: float = 2.0
+    variant_peak_width_window_bars: int = 15
+    variant_adam_max_peak_width_bars: int = 3
+    variant_eve_min_peak_width_bars: int = 7
 
     # Target settings
     target_method: TargetMethod = TargetMethod.INTRADAY
@@ -196,19 +212,39 @@ class PostBreakoutEvaluator:
             return self._empty_result(detection)
 
         breakout_price = detection.breakout_price or df_full.iloc[breakout_idx]['close']
+        try:
+            breakout_price = float(breakout_price)
+        except Exception:
+            return self._empty_result(detection)
+        if not np.isfinite(breakout_price) or breakout_price <= 0:
+            return self._empty_result(detection)
+
         direction = detection.breakout_direction or self._infer_direction(detection)
 
-        # Evaluate based on pattern type
+        # Infer boundary/height when not supplied by the caller.
+        if pattern_boundary_price is None:
+            pattern_boundary_price = self._infer_boundary_price(detection, df_full)
+        if pattern_height is None:
+            pattern_height = self._infer_pattern_height(detection, breakout_price)
+
+        variant, peak1_w, peak2_w = self._classify_double_top_variant(detection, df_full)
+
+        # Evaluate based on breakout direction
         if direction == 'down' or detection.pattern_type == 'reversal_bearish':
-            return self._evaluate_bearish(
+            res = self._evaluate_bearish(
                 detection, future_df, breakout_idx, breakout_price,
                 pattern_boundary_price, pattern_height
             )
         else:
-            return self._evaluate_bullish(
+            res = self._evaluate_bullish(
                 detection, future_df, breakout_idx, breakout_price,
                 pattern_boundary_price, pattern_height
             )
+
+        res.variant = variant
+        res.peak1_width_bars = peak1_w
+        res.peak2_width_bars = peak2_w
+        return res
 
     def _evaluate_bearish(self,
                           detection: Any,
@@ -222,7 +258,16 @@ class PostBreakoutEvaluator:
         # === FAILURE ANALYSIS ===
         # Definition 1: Bust failure (reversal from breakout)
         cumulative_high = future_df['high'].expanding().max()
-        bust_pct = (cumulative_high - breakout_price) / breakout_price * 100
+        height_abs = None
+        if pattern_height is not None:
+            try:
+                height_abs = float(pattern_height)
+            except Exception:
+                height_abs = None
+        if height_abs is not None and np.isfinite(height_abs) and height_abs > 0:
+            bust_pct = (cumulative_high - breakout_price) / height_abs * 100
+        else:
+            bust_pct = (cumulative_high - breakout_price) / breakout_price * 100
 
         bust_5pct = bool((bust_pct >= 5.0).any())
         bust_10pct = bool((bust_pct >= 10.0).any())
@@ -240,12 +285,25 @@ class PostBreakoutEvaluator:
         boundary_invalidated = None
         boundary_invalidation_date = None
         if boundary_price is not None:
-            # For bearish: price rises back above boundary (trough/neckline)
-            boundary_mask = future_df['high'] >= boundary_price
-            boundary_invalidated = bool(boundary_mask.any())
-            if boundary_invalidated:
-                first_invalid_idx = boundary_mask[boundary_mask].index[0]
-                boundary_invalidation_date = str(future_df.loc[first_invalid_idx, 'date'].date()) if 'date' in future_df.columns else None
+            # For bearish: invalidation when close returns above boundary by a threshold,
+            # within a limited time window (to avoid "any-time" invalidations).
+            try:
+                bp = float(boundary_price)
+            except Exception:
+                bp = None
+            if bp is None or not np.isfinite(bp) or bp <= 0:
+                bp = None
+            if bp is None:
+                pass
+            else:
+                thr = bp * (1.0 + self.config.invalidation_return_threshold_pct / 100.0)
+                within = max(1, int(self.config.invalidation_within_bars))
+                subset = future_df.iloc[: min(len(future_df), within + 1)]
+                boundary_mask = subset['close'] >= thr
+                boundary_invalidated = bool(boundary_mask.any())
+                if boundary_invalidated:
+                    first_invalid_idx = boundary_mask[boundary_mask].index[0]
+                    boundary_invalidation_date = str(subset.loc[first_invalid_idx, 'date'].date()) if 'date' in subset.columns else None
 
         # === ULTIMATE LOW ===
         ultimate_price, ultimate_date, days_to_ultimate, stop_reason = \
@@ -261,7 +319,7 @@ class PostBreakoutEvaluator:
 
         tolerance = self.config.throwback_tolerance_pct / 100
         breakout_retest_mask = future_df['high'] >= breakout_price * (1 - tolerance)
-        throwback_occurred = bool(breaktest_mask.any()) if (breaktest_mask := breakout_retest_mask).any() else False
+        throwback_occurred = bool(breakout_retest_mask.any())
 
         if throwback_occurred:
             first_throwback_idx = breakout_retest_mask[breakout_retest_mask].index[0]
@@ -350,7 +408,16 @@ class PostBreakoutEvaluator:
         # === FAILURE ANALYSIS ===
         # Definition 1: Bust failure (reversal from breakout)
         cumulative_low = future_df['low'].expanding().min()
-        bust_pct = (breakout_price - cumulative_low) / breakout_price * 100
+        height_abs = None
+        if pattern_height is not None:
+            try:
+                height_abs = float(pattern_height)
+            except Exception:
+                height_abs = None
+        if height_abs is not None and np.isfinite(height_abs) and height_abs > 0:
+            bust_pct = (breakout_price - cumulative_low) / height_abs * 100
+        else:
+            bust_pct = (breakout_price - cumulative_low) / breakout_price * 100
 
         bust_5pct = bool((bust_pct >= 5.0).any())
         bust_10pct = bool((bust_pct >= 10.0).any())
@@ -367,12 +434,24 @@ class PostBreakoutEvaluator:
         boundary_invalidated = None
         boundary_invalidation_date = None
         if boundary_price is not None:
-            # For bullish: price falls back below boundary (peak/neckline)
-            boundary_mask = future_df['low'] <= boundary_price
-            boundary_invalidated = bool(boundary_mask.any())
-            if boundary_invalidated:
-                first_invalid_idx = boundary_mask[boundary_mask].index[0]
-                boundary_invalidation_date = str(future_df.loc[first_invalid_idx, 'date'].date()) if 'date' in future_df.columns else None
+            try:
+                bp = float(boundary_price)
+            except Exception:
+                bp = None
+            if bp is None or not np.isfinite(bp) or bp <= 0:
+                bp = None
+            if bp is None:
+                pass
+            else:
+                thr = bp * (1.0 - self.config.invalidation_return_threshold_pct / 100.0)
+                within = max(1, int(self.config.invalidation_within_bars))
+                subset = future_df.iloc[: min(len(future_df), within + 1)]
+                # For bullish: invalidation when close returns below boundary by a threshold.
+                boundary_mask = subset['close'] <= thr
+                boundary_invalidated = bool(boundary_mask.any())
+                if boundary_invalidated:
+                    first_invalid_idx = boundary_mask[boundary_mask].index[0]
+                    boundary_invalidation_date = str(subset.loc[first_invalid_idx, 'date'].date()) if 'date' in subset.columns else None
 
         # === ULTIMATE HIGH ===
         ultimate_price, ultimate_date, days_to_ultimate, stop_reason = \
@@ -533,10 +612,27 @@ class PostBreakoutEvaluator:
 
     def _find_breakout_index(self, detection: Any, df: pd.DataFrame) -> Optional[int]:
         """Find the index of breakout in the DataFrame"""
+        bi = getattr(detection, "breakout_idx", None)
+        if bi is not None:
+            try:
+                bi_int = int(bi)
+            except Exception:
+                bi_int = None
+            if bi_int is not None and 0 <= bi_int < len(df):
+                return bi_int
+
         if detection.breakout_date and 'date' in df.columns:
-            for i, (idx, row) in enumerate(df.iterrows()):
-                if str(row['date'].date()) == detection.breakout_date:
-                    return idx
+            try:
+                s = df["date"].dt.date.astype(str)
+                mask = s == str(detection.breakout_date)
+                if bool(mask.any()):
+                    # Index is a RangeIndex in our pipeline; cast defensively.
+                    return int(mask[mask].index[0])
+            except Exception:
+                # Fallback: slow path
+                for _, (idx, row) in enumerate(df.iterrows()):
+                    if str(row['date'].date()) == detection.breakout_date:
+                        return int(idx) if isinstance(idx, (int, np.integer)) else None
         return None
 
     def _infer_direction(self, detection: Any) -> str:
@@ -546,6 +642,161 @@ class PostBreakoutEvaluator:
         elif detection.pattern_type == 'reversal_bullish':
             return 'up'
         return 'down'
+
+    def _infer_boundary_price(self, detection: Any, df_full: pd.DataFrame) -> Optional[float]:
+        """
+        Infer a reasonable "pattern boundary" price level for boundary invalidation / retest metrics.
+
+        We prefer using pivot_indices + breakout_direction so this works for both legacy and
+        digitized scanners without needing extra fields persisted in detections.
+        """
+        pattern_name = str(getattr(detection, "pattern_name", "") or "")
+
+        piv = getattr(detection, "pivot_indices", None)
+        if isinstance(piv, str):
+            try:
+                piv = json.loads(piv)
+            except Exception:
+                piv = None
+        pivots: List[int] = []
+        if isinstance(piv, (list, tuple)):
+            for x in piv:
+                try:
+                    xi = int(x)
+                except Exception:
+                    continue
+                if 0 <= xi < len(df_full):
+                    pivots.append(xi)
+
+        bdir = getattr(detection, "breakout_direction", None) or self._infer_direction(detection)
+
+        try:
+            if pattern_name == "double_tops" and len(pivots) >= 2:
+                return float(df_full.iloc[pivots[1]]["low"])
+            if pattern_name == "double_bottoms" and len(pivots) >= 2:
+                return float(df_full.iloc[pivots[1]]["high"])
+            if pattern_name == "head_and_shoulders_top" and len(pivots) >= 4:
+                nl1 = float(df_full.iloc[pivots[1]]["low"])
+                nl2 = float(df_full.iloc[pivots[3]]["low"])
+                return (nl1 + nl2) / 2.0
+            if pattern_name == "head_and_shoulders_bottom" and len(pivots) >= 4:
+                nl1 = float(df_full.iloc[pivots[1]]["high"])
+                nl2 = float(df_full.iloc[pivots[3]]["high"])
+                return (nl1 + nl2) / 2.0
+        except Exception:
+            # Fall back to generic logic below.
+            pass
+
+        try:
+            if pivots and bdir == "down":
+                vals = [float(df_full.iloc[i]["low"]) for i in pivots]
+                return float(min(vals)) if vals else None
+            if pivots and bdir == "up":
+                vals = [float(df_full.iloc[i]["high"]) for i in pivots]
+                return float(max(vals)) if vals else None
+        except Exception:
+            pass
+
+        # Last resort: use stop_loss_price if it's available and sane.
+        stop = getattr(detection, "stop_loss_price", None)
+        try:
+            stop_f = float(stop) if stop is not None else None
+        except Exception:
+            stop_f = None
+        if stop_f is not None and np.isfinite(stop_f) and stop_f > 0:
+            return stop_f
+        return None
+
+    def _infer_pattern_height(self, detection: Any, breakout_price: float) -> Optional[float]:
+        """
+        Infer pattern height in *price units*.
+
+        Prefer using target_price when available: height_abs = |target - breakout|.
+        """
+        tp = getattr(detection, "target_price", None)
+        if tp is None:
+            return None
+        try:
+            tp_f = float(tp)
+        except Exception:
+            return None
+        height = abs(tp_f - float(breakout_price))
+        return height if np.isfinite(height) and height > 0 else None
+
+    def _peak_width_bars(self, df: pd.DataFrame, peak_idx: int, peak_price: float) -> Optional[int]:
+        if peak_idx < 0 or peak_idx >= len(df):
+            return None
+        if peak_price <= 0 or not np.isfinite(peak_price):
+            return None
+
+        tol = float(self.config.variant_peak_width_tolerance_pct) / 100.0
+        window = max(1, int(self.config.variant_peak_width_window_bars))
+        thr = peak_price * (1.0 - tol)
+
+        left = peak_idx
+        for k in range(1, window + 1):
+            j = peak_idx - k
+            if j < 0:
+                break
+            if float(df.iloc[j]["high"]) >= thr:
+                left = j
+            else:
+                break
+
+        right = peak_idx
+        for k in range(1, window + 1):
+            j = peak_idx + k
+            if j >= len(df):
+                break
+            if float(df.iloc[j]["high"]) >= thr:
+                right = j
+            else:
+                break
+
+        return int(right - left + 1)
+
+    def _classify_double_top_variant(
+        self, detection: Any, df_full: pd.DataFrame
+    ) -> Tuple[Optional[str], Optional[int], Optional[int]]:
+        if str(getattr(detection, "pattern_name", "") or "") != "double_tops":
+            return None, None, None
+
+        piv = getattr(detection, "pivot_indices", None)
+        if not isinstance(piv, (list, tuple)) or len(piv) < 3:
+            return None, None, None
+
+        try:
+            peak1_idx = int(piv[0])
+            peak2_idx = int(piv[2])
+        except Exception:
+            return None, None, None
+
+        if not (0 <= peak1_idx < len(df_full) and 0 <= peak2_idx < len(df_full)):
+            return None, None, None
+
+        try:
+            peak1_price = float(df_full.iloc[peak1_idx]["high"])
+            peak2_price = float(df_full.iloc[peak2_idx]["high"])
+        except Exception:
+            return None, None, None
+
+        w1 = self._peak_width_bars(df_full, peak1_idx, peak1_price)
+        w2 = self._peak_width_bars(df_full, peak2_idx, peak2_price)
+
+        def _ae(width: Optional[int]) -> Optional[str]:
+            if width is None:
+                return None
+            if width <= int(self.config.variant_adam_max_peak_width_bars):
+                return "A"
+            if width >= int(self.config.variant_eve_min_peak_width_bars):
+                return "E"
+            return None
+
+        t1 = _ae(w1)
+        t2 = _ae(w2)
+        if t1 and t2:
+            return f"{t1}{t2}", w1, w2
+        return None, w1, w2
 
     def _empty_result(self, detection: Any) -> PostBreakoutResult:
         """Return empty result when evaluation cannot be performed"""
@@ -557,7 +808,29 @@ class PostBreakoutEvaluator:
             breakout_price=detection.breakout_price,
             breakout_direction=detection.breakout_direction,
             target_price=detection.target_price,
-            stop_loss_price=detection.stop_loss_price
+            stop_loss_price=detection.stop_loss_price,
+            bust_failure_5pct=None,
+            bust_failure_10pct=None,
+            bust_failure_date=None,
+            bust_failure_pct=None,
+            boundary_invalidated=None,
+            boundary_invalidation_date=None,
+            ultimate_price=None,
+            ultimate_date=None,
+            days_to_ultimate=None,
+            ultimate_stop_reason=None,
+            throwback_pullback_occurred=None,
+            throwback_pullback_date=None,
+            days_to_throwback_pullback=None,
+            retested_breakout_level=None,
+            retested_boundary_level=None,
+            target_achieved_intraday=None,
+            target_achieved_close=None,
+            target_achievement_date=None,
+            days_to_target=None,
+            max_favorable_excursion_pct=None,
+            max_adverse_excursion_pct=None,
+            evaluation_window_bars=self.config.lookahead_bars,
         )
 
 
@@ -645,6 +918,34 @@ class StatisticsAggregator:
             pattern_results = [r for r in with_breakout if r.pattern_name == pattern_name]
             by_pattern[pattern_name] = self._aggregate_pattern(pattern_results)
         stats['by_pattern'] = by_pattern
+
+        # === DOUBLE TOPS VARIANTS (AA/AE/EA/EE) ===
+        dt = [r for r in with_breakout if r.pattern_name == "double_tops"]
+        if dt:
+            unknown = 0
+            by_var: Dict[str, Dict[str, Any]] = {}
+            for r in dt:
+                if not r.variant:
+                    unknown += 1
+                    continue
+                v = str(r.variant)
+                bucket = by_var.setdefault(v, {"count": 0, "mfe": [], "mae": []})
+                bucket["count"] += 1
+                if r.max_favorable_excursion_pct is not None and np.isfinite(r.max_favorable_excursion_pct):
+                    bucket["mfe"].append(float(r.max_favorable_excursion_pct))
+                if r.max_adverse_excursion_pct is not None and np.isfinite(r.max_adverse_excursion_pct):
+                    bucket["mae"].append(float(r.max_adverse_excursion_pct))
+
+            if by_var:
+                stats["double_tops_variant_unknown_count"] = unknown
+                stats["double_tops_by_variant"] = {
+                    v: {
+                        "count": int(b["count"]),
+                        "avg_mfe_pct": float(np.mean(b["mfe"])) if b["mfe"] else None,
+                        "avg_mae_pct": float(np.mean(b["mae"])) if b["mae"] else None,
+                    }
+                    for v, b in sorted(by_var.items())
+                }
 
         return stats
 

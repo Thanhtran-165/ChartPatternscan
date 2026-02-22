@@ -324,13 +324,27 @@ def main() -> None:
 
                 detections = []
                 for p in patterns:
-                    detections.extend(scanner.scanners[p].scan(symbol, df_norm, pivots))
+                    s = scanner.scanners[p]
+                    try:
+                        detections.extend(
+                            s.scan(
+                                symbol=symbol,
+                                df=df_norm,
+                                pivots_filtered=pivots,
+                                pivots_raw=raw_pivots,
+                            )
+                        )
+                    except TypeError:
+                        # Legacy signature
+                        detections.extend(s.scan(symbol, df_norm, pivots, raw_pivots))
 
+                detections_pd = [scanner._to_detection(d) for d in detections]
                 if detections:
-                    detections_total += insert_detections(res_conn, run_id=run_id, detections=detections)
+                    # Ensure PatternDetection objects for persistence layer.
+                    detections_total += insert_detections(res_conn, run_id=run_id, detections=detections_pd)
 
                 # Evaluate confirmed breakouts only (look-ahead metrics)
-                confirmed = [d for d in detections if d.breakout_date is not None and d.breakout_price is not None]
+                confirmed = [d for d in detections_pd if d.breakout_date is not None and d.breakout_price is not None]
                 if confirmed:
                     results = [evaluator.evaluate(d, df_norm) for d in confirmed]
                     eval_total += insert_post_breakout_results(res_conn, run_id=run_id, results=results)
