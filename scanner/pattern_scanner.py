@@ -23,11 +23,27 @@ try:
     # Package imports (preferred)
     from .pivot_detector import PivotDetector, Pivot, PivotType, PivotConfig
     from .ohlcv_normalizer import OHLCVNormalizer, NormalizationConfig
-    from .digitized_pattern_engine import DigitizedPatternLibrary, build_digitized_scanners
+    from .digitized_pattern_engine import (
+        DigitizedPatternLibrary,
+        build_digitized_scanners,
+        build_bulkowski_53_scanners,
+        build_bulkowski_53_strict_scanners,
+        build_bulkowski_strict_ohlcv_scanners,
+        build_bulkowski_55_ohlcv_scanners,
+        build_event_ohlcv_scanners,
+    )
 except ImportError:  # pragma: no cover - support running as a script from scanner/
     from pivot_detector import PivotDetector, Pivot, PivotType, PivotConfig
     from ohlcv_normalizer import OHLCVNormalizer, NormalizationConfig
-    from digitized_pattern_engine import DigitizedPatternLibrary, build_digitized_scanners
+    from digitized_pattern_engine import (
+        DigitizedPatternLibrary,
+        build_digitized_scanners,
+        build_bulkowski_53_scanners,
+        build_bulkowski_53_strict_scanners,
+        build_bulkowski_strict_ohlcv_scanners,
+        build_bulkowski_55_ohlcv_scanners,
+        build_event_ohlcv_scanners,
+    )
 
 
 @dataclass
@@ -191,7 +207,7 @@ class DoubleTopScanner:
             return False
 
         # 3. Pattern width within limits
-        width = p2.idx - p1.idx
+        width = (p2.idx - p1.idx) + 1
         if width < self.config.min_pattern_bars or width > self.config.max_pattern_bars:
             return False
 
@@ -216,7 +232,7 @@ class DoubleTopScanner:
         # Calculate features
         avg_peak = (p1.price + p2.price) / 2
         pattern_height = (avg_peak - trough.price) / avg_peak * 100
-        pattern_width = p2.idx - p1.idx
+        pattern_width = (p2.idx - p1.idx) + 1
 
         # Check for breakout
         breakout_idx = None
@@ -354,7 +370,7 @@ class HeadAndShouldersScanner:
             return False
 
         # 3. Pattern width within limits
-        width = rs.idx - ls.idx
+        width = (rs.idx - ls.idx) + 1
         if width < 42 or width > 270:
             return False
 
@@ -378,7 +394,7 @@ class HeadAndShouldersScanner:
         # Calculate neckline
         neckline_price = (nl1.price + nl2.price) / 2
         pattern_height = (head.price - neckline_price) / head.price * 100
-        pattern_width = rs.idx - ls.idx
+        pattern_width = (rs.idx - ls.idx) + 1
 
         # Check for breakout
         breakout_idx = None
@@ -473,17 +489,29 @@ class PatternScanner:
     Main pattern scanner that coordinates multiple pattern detectors.
     """
 
-    def __init__(self, config: Optional[ScannerConfig] = None):
+    def __init__(self, config: Optional[ScannerConfig] = None, *, pattern_set: str = "digitized"):
         self.config = config or ScannerConfig()
         self.normalizer = OHLCVNormalizer()
         self.pivot_detector = PivotDetector()
+        self.pattern_set = str(pattern_set or "digitized")
 
         # Initialize pattern scanners
         # Prefer digitized scanners when specs are available locally.
         self.scanners: Dict[str, Any] = {}
         try:
             lib = DigitizedPatternLibrary()
-            digitized = build_digitized_scanners(lib)
+            if self.pattern_set == "bulkowski_53":
+                digitized = build_bulkowski_53_scanners(lib)
+            elif self.pattern_set == "bulkowski_53_strict":
+                digitized = build_bulkowski_53_strict_scanners(lib)
+            elif self.pattern_set in ("bulkowski_strict_ohlcv", "bulkowski_49_strict_ohlcv"):
+                digitized = build_bulkowski_strict_ohlcv_scanners(lib)
+            elif self.pattern_set == "bulkowski_55_ohlcv":
+                digitized = build_bulkowski_55_ohlcv_scanners(lib)
+            elif self.pattern_set == "event_ohlcv":
+                digitized = build_event_ohlcv_scanners()
+            else:
+                digitized = build_digitized_scanners(lib)
             if digitized:
                 self.scanners.update(digitized)
         except Exception:
@@ -502,11 +530,18 @@ class PatternScanner:
         # to match given width_max constraints (e.g., flags/pennants).
         self._pivot_min_spacing_overrides: Dict[str, int] = {
             "flags": 2,
+            "flags_high_tight": 2,
             "pennants": 2,
             "horn_bottoms_tops": 2,
+            "horn_bottoms": 2,
+            "horn_tops": 2,
             "diamond_top": 3,
             "diamond_bottom": 3,
+            "diamond_tops": 3,
+            "diamond_bottoms": 3,
             "rounding_bottoms_tops": 4,
+            "rounding_bottoms": 4,
+            "rounding_tops": 4,
         }
 
     def _to_detection(self, d: Any) -> PatternDetection:

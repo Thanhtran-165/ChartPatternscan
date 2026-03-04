@@ -42,6 +42,7 @@ from results_db import (  # noqa: E402
     upsert_run,
     upsert_run_statistics,
 )
+from pattern_set_metadata import build_pattern_metadata  # noqa: E402
 
 
 SOURCE_TABLE = "stock_price_history"
@@ -68,7 +69,75 @@ def _parse_csv_set(s: Optional[str]) -> set[str]:
     return {p.strip() for p in s.split(",") if p.strip()}
 
 
-def _load_symbols(conn: sqlite3.Connection, min_rows: int, limit: Optional[int]) -> List[str]:
+def _interval_for_detection(d: Any) -> Optional[Tuple[int, int]]:
+    piv = getattr(d, "pivot_indices", None)
+    if isinstance(piv, str):
+        try:
+            piv = json.loads(piv)
+        except Exception:
+            piv = None
+    if isinstance(piv, (list, tuple)) and piv:
+        try:
+            xs = [int(x) for x in piv]
+        except Exception:
+            xs = []
+        if xs:
+            return (min(xs), max(xs))
+    return None
+
+
+def _overlaps(a: Tuple[int, int], b: Tuple[int, int]) -> bool:
+    return not (a[1] < b[0] or b[1] < a[0])
+
+
+def _apply_overlap_policy(detections: List[Any], policy: str) -> List[Any]:
+    if policy == "none":
+        return list(detections)
+
+    scored: List[Tuple[Tuple[int, int], int, int, int, str, str, Any]] = []
+    for d in detections:
+        iv = _interval_for_detection(d)
+        if iv is None:
+            # Can't reason about overlap: keep it.
+            iv = (10**12, 10**12)
+        length = int(iv[1] - iv[0] + 1) if iv[0] < 10**11 else 0
+        confirmed = 1 if (getattr(d, "breakout_date", None) is not None and getattr(d, "breakout_price", None) is not None) else 0
+        conf = int(getattr(d, "confidence_score", 0) or 0)
+        scored.append(
+            (
+                iv,
+                length,
+                confirmed,
+                conf,
+                str(getattr(d, "pattern_name", "") or ""),
+                str(getattr(d, "pattern_id", "") or ""),
+                d,
+            )
+        )
+
+    # Bulkowski-style: larger timeframe first; then confirmed; then higher confidence.
+    scored.sort(key=lambda x: (-x[1], -x[2], -x[3], x[4], x[5]))
+
+    kept: List[Any] = []
+    kept_intervals: List[Tuple[int, int]] = []
+    for iv, _, _, _, _, _, d in scored:
+        if iv[0] >= 10**11:
+            kept.append(d)
+            continue
+        if any(_overlaps(iv, k) for k in kept_intervals):
+            continue
+        kept.append(d)
+        kept_intervals.append(iv)
+    return kept
+
+
+def _load_symbols(
+    conn: sqlite3.Connection,
+    *,
+    min_rows: int,
+    limit: Optional[int],
+    universe_index: Optional[str] = None,
+) -> List[str]:
     df = pd.read_sql_query(
         """
         SELECT symbol, COUNT(*) AS cnt
@@ -81,6 +150,27 @@ def _load_symbols(conn: sqlite3.Connection, min_rows: int, limit: Optional[int])
         params=[min_rows],
     )
     symbols = df["symbol"].tolist()
+
+    # Data filtering (Bulkowski-style): exclude index series from the stock sample.
+    # Vietnam DB stores indices (e.g., VN30/VN100) in the same price table.
+    try:
+        idx_df = pd.read_sql_query("SELECT index_code FROM indices", conn)
+        index_symbols = set(str(x) for x in idx_df["index_code"].dropna().tolist())
+    except Exception:
+        index_symbols = set()
+    if index_symbols:
+        symbols = [s for s in symbols if str(s) not in index_symbols]
+
+    if universe_index:
+        idx_codes = {x.strip() for x in str(universe_index).split(",") if x.strip()}
+        if idx_codes:
+            rows = conn.execute(
+                f"SELECT DISTINCT ticker FROM stock_index WHERE index_code IN ({','.join(['?']*len(idx_codes))})",
+                tuple(sorted(idx_codes)),
+            ).fetchall()
+            universe = {str(r[0]) for r in rows if r and r[0] is not None}
+            symbols = [s for s in symbols if str(s) in universe]
+
     if limit is not None:
         symbols = symbols[: int(limit)]
     return symbols
@@ -95,6 +185,94 @@ def _load_symbol_df(conn: sqlite3.Connection, symbol: str) -> pd.DataFrame:
     )
     df["date"] = pd.to_datetime(df["date"])
     return df
+
+
+def _filter_df_by_date_window(
+    df: pd.DataFrame,
+    *,
+    date_from: Optional[str],
+    date_to: Optional[str],
+    warmup_bars: int,
+) -> pd.DataFrame:
+    """
+    Optionally restrict the scan window by date.
+
+    Implementation notes:
+      - If `date_to` is provided, rows after it are dropped (inclusive end).
+      - If `date_from` is provided, the scan keeps up to `warmup_bars` rows *before*
+        the first row >= date_from (for indicators/pivots), and everything after.
+    """
+    if df.empty:
+        return df
+
+    g = df.copy()
+    g = g.sort_values("date").reset_index(drop=True)
+
+    if date_to:
+        dt_to = pd.to_datetime(date_to, errors="coerce")
+        if pd.notna(dt_to):
+            g = g[g["date"] <= dt_to].copy()
+
+    if date_from and not g.empty:
+        dt_from = pd.to_datetime(date_from, errors="coerce")
+        if pd.notna(dt_from):
+            # First position whose date >= dt_from
+            start_pos = int(g["date"].searchsorted(dt_from, side="left"))
+            warmup_start = max(0, start_pos - int(max(0, warmup_bars)))
+            g = g.iloc[warmup_start:].copy().reset_index(drop=True)
+
+    return g
+
+
+def _detection_anchor_date(d: Any, *, anchor: str) -> Optional[pd.Timestamp]:
+    def _to_ts(x: Any) -> Optional[pd.Timestamp]:
+        if x is None:
+            return None
+        try:
+            ts = pd.to_datetime(x, errors="coerce")
+        except Exception:
+            return None
+        return ts if pd.notna(ts) else None
+
+    a = str(anchor or "breakout_or_end").strip()
+    if a == "formation_start":
+        return _to_ts(getattr(d, "formation_start", None))
+    if a == "formation_end":
+        return _to_ts(getattr(d, "formation_end", None))
+    if a == "breakout_date":
+        return _to_ts(getattr(d, "breakout_date", None))
+    # default: breakout_or_end
+    return _to_ts(getattr(d, "breakout_date", None) or getattr(d, "formation_end", None))
+
+
+def _filter_detections_by_date_window(
+    detections: Sequence[Any],
+    *,
+    date_from: Optional[str],
+    date_to: Optional[str],
+    anchor: str,
+) -> List[Any]:
+    if (not date_from) and (not date_to):
+        return list(detections)
+
+    dt_from = pd.to_datetime(date_from, errors="coerce") if date_from else None
+    if dt_from is not None and pd.isna(dt_from):
+        dt_from = None
+    dt_to = pd.to_datetime(date_to, errors="coerce") if date_to else None
+    if dt_to is not None and pd.isna(dt_to):
+        dt_to = None
+
+    out: List[Any] = []
+    for d in detections:
+        ts = _detection_anchor_date(d, anchor=str(anchor))
+        if ts is None:
+            continue
+        if dt_from is not None and ts < dt_from:
+            continue
+        if dt_to is not None and ts > dt_to:
+            continue
+        out.append(d)
+    return out
 
 
 def _stable_detection_key(d: Any) -> Tuple[Any, ...]:
@@ -144,11 +322,18 @@ PIVOT_MIN_SPACING_OVERRIDES: Dict[str, int] = {
     # Shorter-duration pivot patterns need a tighter pivot spacing than the global default
     # (otherwise width_max_bars becomes impossible with min_spacing=10).
     "flags": 2,
+    "flags_high_tight": 2,
     "pennants": 2,
     "horn_bottoms_tops": 2,
+    "horn_bottoms": 2,
+    "horn_tops": 2,
     "diamond_top": 3,
     "diamond_bottom": 3,
+    "diamond_tops": 3,
+    "diamond_bottoms": 3,
     "rounding_bottoms_tops": 4,
+    "rounding_bottoms": 4,
+    "rounding_tops": 4,
 }
 
 
@@ -299,7 +484,48 @@ def main() -> None:
         default=None,
         help="Comma-separated list of patterns to scan (default: all available in scanner).",
     )
+    parser.add_argument(
+        "--pattern-set",
+        choices=[
+            "digitized",
+            "bulkowski_53",
+            "bulkowski_53_strict",
+            "bulkowski_strict_ohlcv",
+            "bulkowski_49_strict_ohlcv",
+            "event_ohlcv",
+            "bulkowski_55_ohlcv",
+        ],
+        default="digitized",
+        help="Which pattern set to load (default: digitized).",
+    )
     parser.add_argument("--limit", type=int, default=None, help="Limit symbols (for testing).")
+    parser.add_argument(
+        "--universe-index",
+        default=None,
+        help="Restrict symbols to those in stock_index for these index_code(s) (comma-separated), e.g. VN30,VN100.",
+    )
+    parser.add_argument(
+        "--date-from",
+        default=None,
+        help="Restrict detections to those with an anchor date >= this (YYYY-MM-DD).",
+    )
+    parser.add_argument(
+        "--date-to",
+        default=None,
+        help="Restrict detections to those with an anchor date <= this (YYYY-MM-DD).",
+    )
+    parser.add_argument(
+        "--date-anchor",
+        choices=["formation_start", "formation_end", "breakout_date", "breakout_or_end"],
+        default="breakout_or_end",
+        help="Which detection date to use for --date-from/--date-to filtering (default: breakout_or_end).",
+    )
+    parser.add_argument(
+        "--warmup-bars",
+        type=int,
+        default=300,
+        help="Extra bars to include before --date-from to stabilize indicators/pivots (default: 300).",
+    )
     parser.add_argument("--commit-every", type=int, default=25, help="Commit every N symbols.")
     parser.add_argument("--notes", default=None, help="Optional notes saved with the run.")
     parser.add_argument(
@@ -343,6 +569,18 @@ def main() -> None:
         help="Random seed for deterministic sampling when eval caps are applied (default: 0).",
     )
     parser.add_argument(
+        "--overlap-policy",
+        choices=["none", "bulkowski"],
+        default="bulkowski",
+        help="How to handle overlapping patterns in evaluation selection (default: bulkowski).",
+    )
+    parser.add_argument(
+        "--min-breakout-price",
+        type=float,
+        default=None,
+        help="Exclude evaluated patterns whose breakout_price is below this threshold (default: None).",
+    )
+    parser.add_argument(
         "--detect-max-per-symbol",
         type=int,
         default=None,
@@ -372,7 +610,7 @@ def main() -> None:
     results_db_path = os.path.abspath(args.results_db)
     run_id = args.run_id or generate_run_id(prefix="scan")
 
-    scanner = PatternScanner(ScannerConfig())
+    scanner = PatternScanner(ScannerConfig(), pattern_set=str(args.pattern_set))
     available_patterns = list(scanner.scanners.keys())
     patterns = _parse_patterns(args.patterns, available_patterns)
 
@@ -385,8 +623,9 @@ def main() -> None:
         lookahead_bars=int(args.eval_lookahead),
         reversal_threshold_pct=20.0,
         throwback_tolerance_pct=1.0,
-        invalidation_return_threshold_pct=3.0,
-        invalidation_within_bars=10,
+        # Bulkowski-style invalidation: close back across boundary (no extra threshold).
+        invalidation_return_threshold_pct=0.0,
+        invalidation_within_bars=0,
         variant_peak_width_tolerance_pct=2.0,
         variant_peak_width_window_bars=15,
         variant_adam_max_peak_width_bars=3,
@@ -396,7 +635,15 @@ def main() -> None:
     rng = random.Random(int(args.eval_sample_seed))
     detect_rng = random.Random(int(args.detect_sample_seed))
 
+    pattern_metadata = build_pattern_metadata(
+        pattern_set=str(args.pattern_set),
+        scanners=scanner.scanners,
+        patterns=list(patterns),
+    )
+
     run_config: Dict[str, Any] = {
+        "pattern_set": str(args.pattern_set),
+        "pattern_metadata": pattern_metadata,
         "scanner_config": scanner.config.__dict__,
         "evaluation_config": eval_config.__dict__,
         "evaluation_enabled": (not bool(args.skip_eval)),
@@ -405,11 +652,19 @@ def main() -> None:
         "eval_max_per_symbol_per_pattern": args.eval_max_per_symbol_per_pattern,
         "eval_selection": args.eval_selection,
         "eval_sample_seed": int(args.eval_sample_seed),
+        "overlap_policy": str(args.overlap_policy),
+        "min_breakout_price": float(args.min_breakout_price) if args.min_breakout_price is not None else None,
         "detect_max_per_symbol": args.detect_max_per_symbol,
         "detect_max_per_symbol_per_pattern": args.detect_max_per_symbol_per_pattern,
         "detect_selection": args.detect_selection,
         "detect_sample_seed": int(args.detect_sample_seed),
         "min_rows": int(args.min_rows),
+        "universe_index": args.universe_index,
+        "limit_symbols": args.limit,
+        "date_from": args.date_from,
+        "date_to": args.date_to,
+        "date_anchor": str(args.date_anchor),
+        "warmup_bars": int(args.warmup_bars),
         "patterns": patterns,
         "pivot_min_spacing_default_bars": 10,
         "pivot_min_spacing_overrides": dict(PIVOT_MIN_SPACING_OVERRIDES),
@@ -422,7 +677,12 @@ def main() -> None:
     res_conn = connect_results_db(results_db_path)
     ensure_schema(res_conn)
 
-    symbols = _load_symbols(src_conn, min_rows=int(args.min_rows), limit=args.limit)
+    symbols = _load_symbols(
+        src_conn,
+        min_rows=int(args.min_rows),
+        limit=args.limit,
+        universe_index=args.universe_index,
+    )
 
     upsert_run(
         res_conn,
@@ -451,6 +711,12 @@ def main() -> None:
 
             try:
                 df = _load_symbol_df(src_conn, symbol)
+                df = _filter_df_by_date_window(
+                    df,
+                    date_from=args.date_from,
+                    date_to=args.date_to,
+                    warmup_bars=int(args.warmup_bars),
+                )
                 if len(df) < int(args.min_rows):
                     continue
 
@@ -485,6 +751,12 @@ def main() -> None:
                         detections.extend(s.scan(symbol, df_norm, pivots, raw_pivots))
 
                 detections_pd_all = [scanner._to_detection(d) for d in detections]
+                detections_pd_all = _filter_detections_by_date_window(
+                    detections_pd_all,
+                    date_from=args.date_from,
+                    date_to=args.date_to,
+                    anchor=str(args.date_anchor),
+                )
                 detections_pd = detections_pd_all
 
                 # Optional detection caps/sampling (persist layer + eval depend on these IDs).
@@ -524,6 +796,11 @@ def main() -> None:
                         and d.breakout_price is not None
                         and d.pattern_name not in skip_eval_patterns
                     ]
+                    if args.min_breakout_price is not None:
+                        confirmed = [d for d in confirmed if float(d.breakout_price) >= float(args.min_breakout_price)]
+
+                    if args.overlap_policy != "none":
+                        confirmed = _apply_overlap_policy(confirmed, str(args.overlap_policy))
 
                     # Optional caps/sampling (to keep high-frequency runs manageable).
                     if args.eval_max_per_symbol_per_pattern is not None:

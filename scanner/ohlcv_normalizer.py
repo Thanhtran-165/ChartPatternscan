@@ -102,6 +102,14 @@ class OHLCVNormalizer:
             if nonpos_mask.any():
                 df = df[~nonpos_mask].copy()
 
+        # After row filtering, ensure chronological ordering and a contiguous positional index.
+        # Many scanners persist/use pivot indices as 0..N-1 bar positions; leaving a "gapped" index
+        # (e.g., after dropping rows) can break `.iloc` usage if a scanner mistakenly treats
+        # label-based indices as positions.
+        if "date" in df.columns:
+            df = df.sort_values("date")
+        df = df.reset_index(drop=True)
+
         # 4. Count volume zeros
         if self.config.volume_zero_as_missing:
             self.stats['volume_zero_count'] = (df['volume'] == 0).sum()

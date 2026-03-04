@@ -4,11 +4,11 @@ Verify Phase 1 extraction completeness.
 """
 
 import json
-import os
+from pathlib import Path
 
 def verify_pattern_file(filepath, filename):
     """Verify a single pattern file."""
-    with open(filepath, 'r') as f:
+    with open(filepath, "r", encoding="utf-8") as f:
         data = json.load(f)
 
     issues = []
@@ -65,7 +65,7 @@ def verify_pattern_file(filepath, filename):
 
 def verify_global_methodology(filepath):
     """Verify global methodology file."""
-    with open(filepath, 'r') as f:
+    with open(filepath, "r", encoding="utf-8") as f:
         data = json.load(f)
 
     issues = []
@@ -86,7 +86,8 @@ def verify_global_methodology(filepath):
     return len(issues) == 0, issues
 
 def main():
-    base_dir = "/Users/bobo/Library/Mobile Documents/com~apple~CloudDocs/main sonet/Nghiên cứu mô hình nến"
+    repo_root = Path(__file__).resolve().parents[2]
+    base_dir = repo_root
 
     print("=" * 60)
     print("PHASE 1 EXTRACTION VERIFICATION")
@@ -96,8 +97,8 @@ def main():
     # Verify global methodology
     print("1. GLOBAL METHODOLOGY")
     print("-" * 60)
-    global_path = os.path.join(base_dir, "extraction_phase_1/global/methodology.json")
-    success, issues = verify_global_methodology(global_path)
+    global_path = base_dir / "extraction_phase_1" / "global" / "methodology.json"
+    success, issues = verify_global_methodology(str(global_path))
     if success:
         print("✅ Global methodology: COMPLETE (14/14 fields)")
     else:
@@ -109,15 +110,15 @@ def main():
     # Verify pattern files
     print("2. PATTERN FILES")
     print("-" * 60)
-    patterns_dir = os.path.join(base_dir, "extraction_phase_1/patterns")
-    pattern_files = [f for f in os.listdir(patterns_dir) if f.endswith('.json')]
+    patterns_dir = base_dir / "extraction_phase_1" / "patterns"
+    pattern_files = [p.name for p in patterns_dir.glob("*.json")]
 
     complete_patterns = []
     incomplete_patterns = []
 
     for filename in sorted(pattern_files):
-        filepath = os.path.join(patterns_dir, filename)
-        success, issues = verify_pattern_file(filepath, filename)
+        filepath = patterns_dir / filename
+        success, issues = verify_pattern_file(str(filepath), filename)
         if success:
             complete_patterns.append(filename)
         else:
@@ -139,9 +140,9 @@ def main():
     # Verify master file
     print("3. MASTER EXTRACTION FILE")
     print("-" * 60)
-    master_path = os.path.join(base_dir, "complete_extraction_phase1.json")
-    if os.path.exists(master_path):
-        with open(master_path, 'r') as f:
+    master_path = base_dir / "artifacts" / "extraction" / "complete_extraction_phase1.json"
+    if master_path.exists():
+        with open(master_path, "r", encoding="utf-8") as f:
             master_data = json.load(f)
         patterns = master_data.get('patterns', [])
         print(f"✅ Master file exists")

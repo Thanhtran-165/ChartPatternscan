@@ -5,6 +5,7 @@ Update all pattern files with complete statistical_spec data.
 
 import json
 import os
+from pathlib import Path
 
 # Base template for statistical_spec that can be adapted per pattern
 base_statistical_spec = {
@@ -211,7 +212,7 @@ pattern_adaptations = {
 def update_pattern_file(filepath, filename):
     """Update a single pattern file with complete statistical_spec."""
     try:
-        with open(filepath, 'r') as f:
+        with open(filepath, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         # Get pattern-specific adaptations or use base
@@ -226,22 +227,23 @@ def update_pattern_file(filepath, filename):
         data['missing_fields'] = []
 
         # Write back
-        with open(filepath, 'w') as f:
-            json.dump(data, f, indent=2)
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
 
         return True, f"Updated {filename}"
     except Exception as e:
         return False, f"Error updating {filename}: {str(e)}"
 
 def main():
-    patterns_dir = "/Users/bobo/Library/Mobile Documents/com~apple~CloudDocs/main sonet/Nghiên cứu mô hình nến/extraction_phase_1/patterns"
+    repo_root = Path(__file__).resolve().parents[2]
+    patterns_dir = repo_root / "extraction_phase_1" / "patterns"
+    if not patterns_dir.exists():
+        raise SystemExit(f"patterns_dir not found: {patterns_dir}")
 
     results = []
-    for filename in os.listdir(patterns_dir):
-        if filename.endswith('.json'):
-            filepath = os.path.join(patterns_dir, filename)
-            success, message = update_pattern_file(filepath, filename)
-            results.append((success, message))
+    for filepath in sorted(patterns_dir.glob("*.json")):
+        success, message = update_pattern_file(str(filepath), filepath.name)
+        results.append((success, message))
 
     # Print results
     print("\n=== Pattern File Update Results ===\n")
