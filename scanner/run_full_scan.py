@@ -425,42 +425,47 @@ def _compute_run_statistics(conn: sqlite3.Connection, run_id: str) -> Dict[str, 
 
     stats["by_pattern"] = by_pattern
 
-    # By variant (double tops)
-    by_variant: Dict[str, Any] = {}
-    for (variant,) in conn.execute(
-        """
-        SELECT DISTINCT variant
-        FROM post_breakout_results
-        WHERE run_id = ? AND pattern_name = 'double_tops' AND variant IS NOT NULL
-        ORDER BY variant
-        """,
-        (run_id,),
-    ).fetchall():
-        row = conn.execute(
+    # By variant (double pattern families + chapter variants)
+    for family in ("double_bottoms", "double_tops"):
+        by_variant: Dict[str, Any] = {}
+        for (variant,) in conn.execute(
             """
-            SELECT
-                COUNT(*) AS n,
-                AVG(CASE WHEN max_favorable_excursion_pct IS NOT NULL AND ABS(max_favorable_excursion_pct) < 1e308 THEN max_favorable_excursion_pct END),
-                AVG(CASE WHEN max_adverse_excursion_pct IS NOT NULL AND ABS(max_adverse_excursion_pct) < 1e308 THEN max_adverse_excursion_pct END),
-                AVG(bust_failure_5pct) * 100.0,
-                AVG(target_achieved_intraday) * 100.0
+            SELECT DISTINCT variant
             FROM post_breakout_results
-            WHERE run_id = ? AND pattern_name = 'double_tops' AND variant = ?
+            WHERE run_id = ?
+              AND pattern_name LIKE ?
+              AND variant IS NOT NULL
+            ORDER BY variant
             """,
-            (run_id, variant),
-        ).fetchone()
-        if not row:
-            continue
-        by_variant[variant] = {
-            "count": int(row[0]),
-            "avg_mfe_pct": float(row[1]) if row[1] is not None else None,
-            "avg_mae_pct": float(row[2]) if row[2] is not None else None,
-            "bust_failure_rate_5pct": float(row[3]) if row[3] is not None else None,
-            "target_achievement_rate_intraday_pct": float(row[4]) if row[4] is not None else None,
-        }
+            (run_id, f"{family}%"),
+        ).fetchall():
+            row = conn.execute(
+                """
+                SELECT
+                    COUNT(*) AS n,
+                    AVG(CASE WHEN max_favorable_excursion_pct IS NOT NULL AND ABS(max_favorable_excursion_pct) < 1e308 THEN max_favorable_excursion_pct END),
+                    AVG(CASE WHEN max_adverse_excursion_pct IS NOT NULL AND ABS(max_adverse_excursion_pct) < 1e308 THEN max_adverse_excursion_pct END),
+                    AVG(bust_failure_5pct) * 100.0,
+                    AVG(target_achieved_intraday) * 100.0
+                FROM post_breakout_results
+                WHERE run_id = ?
+                  AND pattern_name LIKE ?
+                  AND variant = ?
+                """,
+                (run_id, f"{family}%", variant),
+            ).fetchone()
+            if not row:
+                continue
+            by_variant[variant] = {
+                "count": int(row[0]),
+                "avg_mfe_pct": float(row[1]) if row[1] is not None else None,
+                "avg_mae_pct": float(row[2]) if row[2] is not None else None,
+                "bust_failure_rate_5pct": float(row[3]) if row[3] is not None else None,
+                "target_achievement_rate_intraday_pct": float(row[4]) if row[4] is not None else None,
+            }
 
-    if by_variant:
-        stats["double_tops_by_variant"] = by_variant
+        if by_variant:
+            stats[f"{family}_by_variant"] = by_variant
 
     return stats
 

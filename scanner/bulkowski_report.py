@@ -175,9 +175,12 @@ def _apply_overlap_policy(df: pd.DataFrame, policy: str) -> pd.DataFrame:
 
         g["pattern_width_bars"] = pd.to_numeric(g["pattern_width_bars"], errors="coerce").fillna(0)
         g["confidence_score"] = pd.to_numeric(g["confidence_score"], errors="coerce").fillna(0)
+        g["_confirmed"] = (
+            g["breakout_date"].notna() & pd.to_numeric(g["breakout_price"], errors="coerce").notna()
+        ).astype(int)
         g = g.sort_values(
-            by=["pattern_width_bars", "confidence_score", "pattern_name", "pattern_id"],
-            ascending=[False, False, True, True],
+            by=["pattern_width_bars", "_confirmed", "confidence_score", "pattern_name", "pattern_id"],
+            ascending=[False, False, False, True, True],
         )
 
         kept: list[int] = []

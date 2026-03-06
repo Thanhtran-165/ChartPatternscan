@@ -71,6 +71,13 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
             touch_count INTEGER,
             pivot_indices_json TEXT,
             config_hash TEXT,
+            base_pattern_name TEXT,
+            variant_code TEXT,
+            variant_confidence INTEGER,
+            variant_evidence_json TEXT,
+            first_extreme_width_bars INTEGER,
+            second_extreme_width_bars INTEGER,
+            family_metrics_json TEXT,
             created_at TEXT,
             PRIMARY KEY (run_id, pattern_id),
             FOREIGN KEY (run_id) REFERENCES scanner_runs(run_id) ON DELETE CASCADE
@@ -143,6 +150,8 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
             ON pattern_detections(run_id, breakout_date);
         CREATE INDEX IF NOT EXISTS idx_detections_run_confidence
             ON pattern_detections(run_id, confidence_score);
+        CREATE INDEX IF NOT EXISTS idx_detections_run_variant
+            ON pattern_detections(run_id, variant_code);
 
         CREATE INDEX IF NOT EXISTS idx_eval_run_symbol
             ON post_breakout_results(run_id, symbol);
@@ -155,6 +164,30 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
 
         CREATE INDEX IF NOT EXISTS idx_errors_run_symbol
             ON scan_errors(run_id, symbol);
+        """
+    )
+
+    # Older result DBs were created before family/variant metadata existed.
+    # Keep migrations inline so reruns persist the richer detector evidence.
+    def _ensure_column(table: str, column: str, ddl: str) -> None:
+        existing = {
+            str(row[1])
+            for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
+        }
+        if column not in existing:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {ddl}")
+
+    _ensure_column("pattern_detections", "base_pattern_name", "base_pattern_name TEXT")
+    _ensure_column("pattern_detections", "variant_code", "variant_code TEXT")
+    _ensure_column("pattern_detections", "variant_confidence", "variant_confidence INTEGER")
+    _ensure_column("pattern_detections", "variant_evidence_json", "variant_evidence_json TEXT")
+    _ensure_column("pattern_detections", "first_extreme_width_bars", "first_extreme_width_bars INTEGER")
+    _ensure_column("pattern_detections", "second_extreme_width_bars", "second_extreme_width_bars INTEGER")
+    _ensure_column("pattern_detections", "family_metrics_json", "family_metrics_json TEXT")
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_detections_run_variant
+            ON pattern_detections(run_id, variant_code)
         """
     )
 
@@ -247,6 +280,13 @@ def insert_detections(
                 getattr(d, "touch_count", None),
                 json.dumps(pivot_indices) if pivot_indices is not None else None,
                 getattr(d, "config_hash", None),
+                getattr(d, "base_pattern_name", None),
+                getattr(d, "variant_code", None),
+                getattr(d, "variant_confidence", None),
+                getattr(d, "variant_evidence_json", None),
+                getattr(d, "first_extreme_width_bars", None),
+                getattr(d, "second_extreme_width_bars", None),
+                getattr(d, "family_metrics_json", None),
                 getattr(d, "created_at", None),
             )
         )
@@ -262,8 +302,11 @@ def insert_detections(
             breakout_direction, breakout_price, target_price, stop_loss_price,
             confidence_score, volume_confirmed,
             pattern_height_pct, pattern_width_bars, touch_count,
-            pivot_indices_json, config_hash, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            pivot_indices_json, config_hash,
+            base_pattern_name, variant_code, variant_confidence,
+            variant_evidence_json, first_extreme_width_bars, second_extreme_width_bars,
+            family_metrics_json, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         rows,
     )

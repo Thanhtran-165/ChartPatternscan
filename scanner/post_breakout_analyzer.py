@@ -60,6 +60,11 @@ import pandas as pd
 import numpy as np
 import json
 
+try:
+    from .double_pattern_utils import resolve_double_bottom_variant, resolve_double_top_variant  # type: ignore
+except ImportError:  # pragma: no cover
+    from double_pattern_utils import resolve_double_bottom_variant, resolve_double_top_variant  # type: ignore
+
 
 def _safe_float(v: Any) -> Optional[float]:
     try:
@@ -137,8 +142,9 @@ class PostBreakoutResult:
     max_favorable_excursion_pct: Optional[float]  # Max % in expected direction
     max_adverse_excursion_pct: Optional[float]    # Max % against expected
 
-    # === VARIANT METRICS (Double Tops) ===
+    # === VARIANT METRICS (Double patterns) ===
     variant: Optional[str] = None  # 'AA', 'AE', 'EA', 'EE' (Adam/Eve)
+    variant_confidence: Optional[int] = None
     peak1_width_bars: Optional[int] = None
     peak2_width_bars: Optional[int] = None
 
@@ -251,7 +257,7 @@ class PostBreakoutEvaluator:
         if pattern_height is None:
             pattern_height = self._infer_pattern_height(detection, breakout_price)
 
-        variant, peak1_w, peak2_w = self._classify_double_top_variant(detection, df_full)
+        variant, variant_confidence, peak1_w, peak2_w = self._classify_double_pattern_variant(detection, df_full)
 
         # Evaluate based on breakout direction
         if direction == 'down' or detection.pattern_type == 'reversal_bearish':
@@ -266,6 +272,7 @@ class PostBreakoutEvaluator:
             )
 
         res.variant = variant
+        res.variant_confidence = variant_confidence
         res.peak1_width_bars = peak1_w
         res.peak2_width_bars = peak2_w
         res.evaluation_window_bars = int(len(future_df))
@@ -940,21 +947,23 @@ class PostBreakoutEvaluator:
         digitized scanners without needing extra fields persisted in detections.
         """
         pattern_name = str(getattr(detection, "pattern_name", "") or "")
+        double_family = self._double_family_name(detection)
+        hs_family = self._head_shoulders_family_name(detection)
 
         pivots = self._extract_pivot_indices(detection, df_full)
 
         bdir = getattr(detection, "breakout_direction", None) or self._infer_direction(detection)
 
         try:
-            if pattern_name == "double_tops" and len(pivots) >= 2:
+            if double_family == "double_tops" and len(pivots) >= 2:
                 return float(df_full.iloc[pivots[1]]["low"])
-            if pattern_name == "double_bottoms" and len(pivots) >= 2:
+            if double_family == "double_bottoms" and len(pivots) >= 2:
                 return float(df_full.iloc[pivots[1]]["high"])
-            if pattern_name == "head_and_shoulders_top" and len(pivots) >= 4:
+            if hs_family == "head_and_shoulders_top" and len(pivots) >= 4:
                 nl1 = float(df_full.iloc[pivots[1]]["low"])
                 nl2 = float(df_full.iloc[pivots[3]]["low"])
                 return (nl1 + nl2) / 2.0
-            if pattern_name == "head_and_shoulders_bottom" and len(pivots) >= 4:
+            if hs_family == "head_and_shoulders_bottom" and len(pivots) >= 4:
                 nl1 = float(df_full.iloc[pivots[1]]["high"])
                 nl2 = float(df_full.iloc[pivots[3]]["high"])
                 return (nl1 + nl2) / 2.0
@@ -1156,80 +1165,83 @@ class PostBreakoutEvaluator:
         height = abs(tp_f - float(breakout_price))
         return height if np.isfinite(height) and height > 0 else None
 
-    def _peak_width_bars(self, df: pd.DataFrame, peak_idx: int, peak_price: float) -> Optional[int]:
-        if peak_idx < 0 or peak_idx >= len(df):
-            return None
-        if peak_price <= 0 or not np.isfinite(peak_price):
-            return None
+    def _double_family_name(self, detection: Any) -> Optional[str]:
+        base = str(getattr(detection, "base_pattern_name", "") or "")
+        if base in ("double_tops", "double_bottoms"):
+            return base
 
-        tol = float(self.config.variant_peak_width_tolerance_pct) / 100.0
-        window = max(1, int(self.config.variant_peak_width_window_bars))
-        thr = peak_price * (1.0 - tol)
+        pattern_name = str(getattr(detection, "pattern_name", "") or "")
+        if pattern_name == "double_tops" or pattern_name.startswith("double_tops_"):
+            return "double_tops"
+        if pattern_name == "double_bottoms" or pattern_name.startswith("double_bottoms_"):
+            return "double_bottoms"
+        return None
 
-        left = peak_idx
-        for k in range(1, window + 1):
-            j = peak_idx - k
-            if j < 0:
-                break
-            if float(df.iloc[j]["high"]) >= thr:
-                left = j
-            else:
-                break
+    def _head_shoulders_family_name(self, detection: Any) -> Optional[str]:
+        base = str(getattr(detection, "base_pattern_name", "") or "")
+        if base in ("head_and_shoulders_top", "head_and_shoulders_bottom"):
+            return base
 
-        right = peak_idx
-        for k in range(1, window + 1):
-            j = peak_idx + k
-            if j >= len(df):
-                break
-            if float(df.iloc[j]["high"]) >= thr:
-                right = j
-            else:
-                break
+        pattern_name = str(getattr(detection, "pattern_name", "") or "")
+        if pattern_name == "head_and_shoulders_top" or pattern_name.startswith("head_and_shoulders_tops"):
+            return "head_and_shoulders_top"
+        if pattern_name == "head_and_shoulders_bottom" or pattern_name.startswith("head_and_shoulders_bottoms"):
+            return "head_and_shoulders_bottom"
+        return None
 
-        return int(right - left + 1)
-
-    def _classify_double_top_variant(
+    def _classify_double_pattern_variant(
         self, detection: Any, df_full: pd.DataFrame
-    ) -> Tuple[Optional[str], Optional[int], Optional[int]]:
-        if str(getattr(detection, "pattern_name", "") or "") != "double_tops":
-            return None, None, None
+    ) -> Tuple[Optional[str], Optional[int], Optional[int], Optional[int]]:
+        family = self._double_family_name(detection)
+        if family is None:
+            return None, None, None, None
+
+        code = getattr(detection, "variant_code", None)
+        confidence = getattr(detection, "variant_confidence", None)
+        first_width = getattr(detection, "first_extreme_width_bars", None)
+        second_width = getattr(detection, "second_extreme_width_bars", None)
+        if code is not None or first_width is not None or second_width is not None:
+            return (
+                str(code) if code else None,
+                int(confidence) if confidence is not None else None,
+                int(first_width) if first_width is not None else None,
+                int(second_width) if second_width is not None else None,
+            )
 
         piv = getattr(detection, "pivot_indices", None)
         if not isinstance(piv, (list, tuple)) or len(piv) < 3:
-            return None, None, None
+            return None, None, None, None
 
         try:
-            peak1_idx = int(piv[0])
-            peak2_idx = int(piv[2])
+            first_idx = int(piv[0])
+            second_idx = int(piv[2])
         except Exception:
-            return None, None, None
+            return None, None, None, None
 
-        if not (0 <= peak1_idx < len(df_full) and 0 <= peak2_idx < len(df_full)):
-            return None, None, None
+        if not (0 <= first_idx < len(df_full) and 0 <= second_idx < len(df_full)):
+            return None, None, None, None
 
-        try:
-            peak1_price = float(df_full.iloc[peak1_idx]["high"])
-            peak2_price = float(df_full.iloc[peak2_idx]["high"])
-        except Exception:
-            return None, None, None
+        kwargs = {
+            "first_idx": first_idx,
+            "second_idx": second_idx,
+            "adam_max": int(self.config.variant_adam_max_peak_width_bars),
+            "eve_min": int(self.config.variant_eve_min_peak_width_bars),
+            "tol_pct": float(self.config.variant_peak_width_tolerance_pct),
+            "window": max(1, int(self.config.variant_peak_width_window_bars)),
+        }
+        if family == "double_tops":
+            result = resolve_double_top_variant(df_full, **kwargs)
+        else:
+            result = resolve_double_bottom_variant(df_full, **kwargs)
 
-        w1 = self._peak_width_bars(df_full, peak1_idx, peak1_price)
-        w2 = self._peak_width_bars(df_full, peak2_idx, peak2_price)
-
-        def _ae(width: Optional[int]) -> Optional[str]:
-            if width is None:
-                return None
-            if width <= int(self.config.variant_adam_max_peak_width_bars):
-                return "A"
-            if width >= int(self.config.variant_eve_min_peak_width_bars):
-                return "E"
-            return None
-
-        t1 = _ae(w1)
-        t2 = _ae(w2)
-        if t1 and t2:
-            return f"{t1}{t2}", w1, w2
-        return None, w1, w2
+        first = result.get("first_extreme") or {}
+        second = result.get("second_extreme") or {}
+        return (
+            result.get("variant_code"),
+            int(result.get("variant_confidence") or 0),
+            first.get("width_bars"),
+            second.get("width_bars"),
+        )
 
     def _empty_result(self, detection: Any) -> PostBreakoutResult:
         """Return empty result when evaluation cannot be performed"""
@@ -1263,6 +1275,7 @@ class PostBreakoutEvaluator:
             days_to_target=None,
             max_favorable_excursion_pct=None,
             max_adverse_excursion_pct=None,
+            variant_confidence=None,
             evaluation_window_bars=self._pattern_lookahead_bars(str(getattr(detection, "pattern_name", "") or "")),
         )
 
@@ -1352,30 +1365,40 @@ class StatisticsAggregator:
             by_pattern[pattern_name] = self._aggregate_pattern(pattern_results)
         stats['by_pattern'] = by_pattern
 
-        # === DOUBLE TOPS VARIANTS (AA/AE/EA/EE) ===
-        dt = [r for r in with_breakout if r.pattern_name == "double_tops"]
-        if dt:
+        # === DOUBLE PATTERN VARIANTS (AA/AE/EA/EE) ===
+        for family in ("double_bottoms", "double_tops"):
+            family_rows = [
+                r for r in with_breakout
+                if str(getattr(r, "pattern_name", "") or "") == family
+                or str(getattr(r, "pattern_name", "") or "").startswith(f"{family}_")
+            ]
+            if not family_rows:
+                continue
+
             unknown = 0
             by_var: Dict[str, Dict[str, Any]] = {}
-            for r in dt:
+            for r in family_rows:
                 if not r.variant:
                     unknown += 1
                     continue
                 v = str(r.variant)
-                bucket = by_var.setdefault(v, {"count": 0, "mfe": [], "mae": []})
+                bucket = by_var.setdefault(v, {"count": 0, "mfe": [], "mae": [], "confidence": []})
                 bucket["count"] += 1
                 if r.max_favorable_excursion_pct is not None and np.isfinite(r.max_favorable_excursion_pct):
                     bucket["mfe"].append(float(r.max_favorable_excursion_pct))
                 if r.max_adverse_excursion_pct is not None and np.isfinite(r.max_adverse_excursion_pct):
                     bucket["mae"].append(float(r.max_adverse_excursion_pct))
+                if getattr(r, "variant_confidence", None) is not None and np.isfinite(getattr(r, "variant_confidence", None)):
+                    bucket["confidence"].append(float(getattr(r, "variant_confidence")))
 
             if by_var:
-                stats["double_tops_variant_unknown_count"] = unknown
-                stats["double_tops_by_variant"] = {
+                stats[f"{family}_variant_unknown_count"] = unknown
+                stats[f"{family}_by_variant"] = {
                     v: {
                         "count": int(b["count"]),
                         "avg_mfe_pct": float(np.mean(b["mfe"])) if b["mfe"] else None,
                         "avg_mae_pct": float(np.mean(b["mae"])) if b["mae"] else None,
+                        "avg_variant_confidence": float(np.mean(b["confidence"])) if b["confidence"] else None,
                     }
                     for v, b in sorted(by_var.items())
                 }

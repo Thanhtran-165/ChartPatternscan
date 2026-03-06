@@ -26,8 +26,20 @@ import pandas as pd
 
 try:
     # Package import (preferred)
+    from .double_pattern_utils import (
+        classify_double_bottom_variant,
+        classify_double_top_variant,
+        resolve_double_bottom_variant,
+        resolve_double_top_variant,
+    )
     from .pivot_detector import Pivot, PivotDetector, PivotType
 except ImportError:  # pragma: no cover - support running as a script from scanner/
+    from double_pattern_utils import (
+        classify_double_bottom_variant,
+        classify_double_top_variant,
+        resolve_double_bottom_variant,
+        resolve_double_top_variant,
+    )
     from pivot_detector import Pivot, PivotDetector, PivotType
 
 
@@ -533,6 +545,1801 @@ class PivotSequenceScanner(BaseDigitizedScanner):
         return out
 
 
+class _DoublePatternFamilyScanner(PivotSequenceScanner):
+    """
+    Dedicated family scanner for double bottoms/tops.
+
+    The digitized spec for these patterns is structurally simple (3 pivots), but the generic
+    pivot-sequence scanner ignores several family-level semantics that matter for Bulkowski-style
+    fidelity: extreme spacing, neckline depth, near-horizontal extremes, and variant metadata.
+    This wrapper keeps the generic breakout/prior-trend machinery, then post-filters candidates
+    with family-specific checks and attaches variant evidence without letting the variant decide
+    family validity.
+    """
+
+    def __init__(self, key: str, spec: Dict[str, Any], *, is_top: bool):
+        super().__init__(key, spec)
+        self.is_top = bool(is_top)
+        geom = self.geom if isinstance(self.geom, dict) else {}
+
+        ratio_cfg_key = "top_price_ratio" if self.is_top else "bottom_price_ratio"
+        depth_cfg_key = "trough_depth_pct" if self.is_top else "peak_height_pct"
+        spacing_cfg_key = "time_between_tops" if self.is_top else "time_between_bottoms"
+        slope_cfg_key = "tops_max_slope_degrees" if self.is_top else "bottoms_max_slope_degrees"
+
+        ratio_cfg = geom.get(ratio_cfg_key, {}) or {}
+        depth_cfg = geom.get(depth_cfg_key, {}) or {}
+        spacing_cfg = geom.get(spacing_cfg_key, {}) or {}
+        slope_cfg = geom.get("slope_constraints", {}) or {}
+
+        self.extreme_ratio_min = float(ratio_cfg.get("min") or 0.97)
+        self.extreme_ratio_max = float(ratio_cfg.get("max") or 1.03)
+        self.middle_depth_min_pct = float(depth_cfg.get("min") or 5.0)
+        self.middle_depth_max_pct = float(depth_cfg.get("max") or 25.0)
+        self.extreme_spacing_min_bars = int(spacing_cfg.get("min_bars") or 7)
+        self.extreme_spacing_max_bars = int(spacing_cfg.get("max_bars") or 90)
+        self.extreme_spacing_optimal_bars = int(spacing_cfg.get("optimal_bars") or 28)
+        self.extreme_slope_max_deg = abs(float(slope_cfg.get(slope_cfg_key) or 0.5))
+        # Flat, step-like microstructure can make rounded double patterns look plausible in
+        # digitized pivots while being unusable for research or strategy. Keep this gate narrow:
+        # it should only remove pathological sequences, not normal low-volatility consolidations.
+        self.micro_max_same_close_ratio = 0.70
+        self.micro_max_zero_range_ratio = 0.75
+        self.micro_min_unique_close_ratio = 0.20
+
+        variant_cfg = spec.get("variant_handling", {}) or {}
+        self.variant_adam_max = 3
+        self.variant_eve_min = 7
+        for item in variant_cfg.get("variants", []) or []:
+            if not isinstance(item, dict):
+                continue
+            rules = item.get("detection_rules", {}) or {}
+            name = str(item.get("name") or "").upper()
+            width = rules.get("peak_width_bars")
+            if width is None:
+                width = rules.get("trough_width_bars")
+            try:
+                width_int = int(width) if width is not None else None
+            except Exception:
+                width_int = None
+            if width_int is None or width_int <= 0:
+                continue
+            if name == "AA":
+                self.variant_adam_max = min(self.variant_adam_max, width_int)
+            elif name == "EE":
+                self.variant_eve_min = max(self.variant_eve_min, width_int)
+
+    def _family_metrics(self, df: pd.DataFrame, pivot_indices: Sequence[Any]) -> Optional[Dict[str, Any]]:
+        if len(pivot_indices) < 3:
+            return None
+
+        try:
+            first_idx = int(pivot_indices[0])
+            middle_idx = int(pivot_indices[1])
+            second_idx = int(pivot_indices[2])
+        except Exception:
+            return None
+
+        if not (0 <= first_idx < middle_idx < second_idx < len(df)):
+            return None
+
+        first_col = "high" if self.is_top else "low"
+        middle_col = "low" if self.is_top else "high"
+        second_col = first_col
+
+        first_price = _safe_float(df.iloc[first_idx].get(first_col))
+        middle_price = _safe_float(df.iloc[middle_idx].get(middle_col))
+        second_price = _safe_float(df.iloc[second_idx].get(second_col))
+        if first_price is None or middle_price is None or second_price is None:
+            return None
+        if first_price <= 0 or second_price <= 0 or middle_price <= 0:
+            return None
+
+        avg_extreme = (first_price + second_price) / 2.0
+        if avg_extreme <= 0:
+            return None
+
+        if self.is_top:
+            middle_depth_pct = (avg_extreme - middle_price) / avg_extreme * 100.0
+            middle_between_extremes = middle_price < min(first_price, second_price)
+        else:
+            middle_depth_pct = (middle_price - avg_extreme) / avg_extreme * 100.0
+            middle_between_extremes = middle_price > max(first_price, second_price)
+
+        spacing_bars = int(second_idx - first_idx + 1)
+        slope_deg = abs(_slope_degrees(first_idx, first_price, second_idx, second_price))
+        seg = df.iloc[first_idx : second_idx + 1].copy()
+        same_close_ratio = None
+        unique_close_ratio = None
+        zero_range_ratio = None
+        if not seg.empty:
+            close = pd.to_numeric(seg.get("close"), errors="coerce")
+            high = pd.to_numeric(seg.get("high"), errors="coerce")
+            low = pd.to_numeric(seg.get("low"), errors="coerce")
+            if close.notna().any():
+                same_close_ratio = float((close.diff().abs().fillna(0.0) <= 1e-12).mean())
+                unique_close_ratio = float(close.nunique(dropna=True) / max(1, len(close)))
+            if high.notna().any() and low.notna().any():
+                zero_range_ratio = float(((high - low).abs() <= 1e-12).mean())
+
+        return {
+            "first_idx": int(first_idx),
+            "middle_idx": int(middle_idx),
+            "second_idx": int(second_idx),
+            "first_price": float(first_price),
+            "middle_price": float(middle_price),
+            "second_price": float(second_price),
+            "extreme_price_ratio": round(float(second_price / first_price), 4),
+            "extreme_price_diff_pct": round(float(_pct_diff(first_price, second_price)), 3),
+            "middle_depth_pct": round(float(middle_depth_pct), 3),
+            "extreme_spacing_bars": int(spacing_bars),
+            "extreme_slope_deg": round(float(slope_deg), 3),
+            "middle_between_extremes": bool(middle_between_extremes),
+            "same_close_ratio": round(float(same_close_ratio), 3) if same_close_ratio is not None else None,
+            "unique_close_ratio": round(float(unique_close_ratio), 3) if unique_close_ratio is not None else None,
+            "zero_range_ratio": round(float(zero_range_ratio), 3) if zero_range_ratio is not None else None,
+        }
+
+    def _family_metrics_ok(self, metrics: Dict[str, Any]) -> bool:
+        if not metrics.get("middle_between_extremes"):
+            return False
+
+        try:
+            ratio = float(metrics["extreme_price_ratio"])
+            depth_pct = float(metrics["middle_depth_pct"])
+            spacing_bars = int(metrics["extreme_spacing_bars"])
+            slope_deg = float(metrics["extreme_slope_deg"])
+        except Exception:
+            return False
+
+        if ratio < self.extreme_ratio_min or ratio > self.extreme_ratio_max:
+            return False
+        if depth_pct < self.middle_depth_min_pct or depth_pct > self.middle_depth_max_pct:
+            return False
+        if spacing_bars < self.extreme_spacing_min_bars or spacing_bars > self.extreme_spacing_max_bars:
+            return False
+        if slope_deg > self.extreme_slope_max_deg:
+            return False
+        same_close_ratio = _safe_float(metrics.get("same_close_ratio"))
+        unique_close_ratio = _safe_float(metrics.get("unique_close_ratio"))
+        zero_range_ratio = _safe_float(metrics.get("zero_range_ratio"))
+        if zero_range_ratio is not None and zero_range_ratio >= self.micro_max_zero_range_ratio:
+            return False
+        if (
+            same_close_ratio is not None
+            and unique_close_ratio is not None
+            and same_close_ratio >= self.micro_max_same_close_ratio
+            and unique_close_ratio <= self.micro_min_unique_close_ratio
+        ):
+            return False
+        return True
+
+    def _resolve_variant(self, df: pd.DataFrame, metrics: Dict[str, Any]) -> Dict[str, Any]:
+        kwargs = {
+            "first_idx": int(metrics["first_idx"]),
+            "second_idx": int(metrics["second_idx"]),
+            "adam_max": int(self.variant_adam_max),
+            "eve_min": int(self.variant_eve_min),
+        }
+        if self.is_top:
+            return resolve_double_top_variant(df, **kwargs)
+        return resolve_double_bottom_variant(df, **kwargs)
+
+    def _score_family_confidence(
+        self,
+        base_confidence: Any,
+        metrics: Dict[str, Any],
+        variant_result: Dict[str, Any],
+    ) -> int:
+        try:
+            confidence = int(base_confidence)
+        except Exception:
+            confidence = 70
+
+        diff_pct = float(metrics.get("extreme_price_diff_pct") or 0.0)
+        spacing_bars = int(metrics.get("extreme_spacing_bars") or 0)
+        depth_pct = float(metrics.get("middle_depth_pct") or 0.0)
+
+        if diff_pct <= float(self.geom.get("near_equal_tolerance_pct") or 1.5):
+            confidence += 5
+        elif diff_pct <= float(self.geom.get("symmetry_tolerance_pct") or 3.0):
+            confidence += 2
+
+        if spacing_bars > 0:
+            optimal_gap = abs(spacing_bars - int(self.extreme_spacing_optimal_bars))
+            if optimal_gap <= 7:
+                confidence += 2
+
+        if self.middle_depth_min_pct <= depth_pct <= self.middle_depth_max_pct:
+            confidence += 2
+
+        variant_confidence = int(variant_result.get("variant_confidence") or 0)
+        if variant_confidence >= 80:
+            confidence += 3
+        elif variant_confidence >= 58:
+            confidence += 1
+
+        return max(0, min(100, int(confidence)))
+
+    def scan(
+        self,
+        *,
+        symbol: str,
+        df: pd.DataFrame,
+        pivots_filtered: List[Pivot],
+        pivots_raw: List[Pivot],
+    ) -> List[Dict[str, Any]]:
+        base_rows = super().scan(symbol=symbol, df=df, pivots_filtered=pivots_filtered, pivots_raw=pivots_raw)
+        out: List[Dict[str, Any]] = []
+
+        for row in base_rows:
+            metrics = self._family_metrics(df, row.get("pivot_indices") or [])
+            if not metrics or not self._family_metrics_ok(metrics):
+                continue
+
+            variant_result = self._resolve_variant(df, metrics)
+            first_extreme = variant_result.get("first_extreme") or {}
+            second_extreme = variant_result.get("second_extreme") or {}
+
+            enriched = dict(row)
+            enriched["base_pattern_name"] = self.key
+            enriched["variant_code"] = variant_result.get("variant_code")
+            enriched["variant_confidence"] = int(variant_result.get("variant_confidence") or 0)
+            enriched["variant_evidence_json"] = json.dumps(
+                variant_result.get("evidence") or {},
+                sort_keys=True,
+                ensure_ascii=False,
+            )
+            enriched["first_extreme_width_bars"] = first_extreme.get("width_bars")
+            enriched["second_extreme_width_bars"] = second_extreme.get("width_bars")
+            enriched["family_metrics_json"] = json.dumps(metrics, sort_keys=True, ensure_ascii=False)
+            enriched["confidence_score"] = self._score_family_confidence(
+                row.get("confidence_score"),
+                metrics,
+                variant_result,
+            )
+            out.append(enriched)
+
+        return out
+
+
+class DoubleBottomFamilyScanner(_DoublePatternFamilyScanner):
+    def __init__(self, key: str, spec: Dict[str, Any]):
+        super().__init__(key, spec, is_top=False)
+
+
+class DoubleTopFamilyScanner(_DoublePatternFamilyScanner):
+    def __init__(self, key: str, spec: Dict[str, Any]):
+        super().__init__(key, spec, is_top=True)
+
+
+class _HeadShouldersFamilyScanner(PivotSequenceScanner):
+    """
+    Dedicated family scanner for head-and-shoulders top/bottom.
+
+    The generic 5-pivot sequence catches the broad shape, but it does not enforce the
+    most important family semantics from the Bulkowski-derived spec: shoulder symmetry,
+    head prominence, neckline slope, and a defensible separation between standard and
+    complex variants. This wrapper tightens family validity first, then classifies
+    standard vs complex from surrounding pivots.
+    """
+
+    def __init__(self, key: str, spec: Dict[str, Any], *, is_top: bool):
+        super().__init__(key, spec)
+        self.is_top = bool(is_top)
+        geom = self.geom if isinstance(self.geom, dict) else {}
+
+        self.standard_width_max = int(geom.get("width_max_bars") or 270)
+        self.family_width_max = int(self.standard_width_max)
+        variant_cfg = spec.get("variant_handling", {}) or {}
+        for item in variant_cfg.get("variants", []) or []:
+            if not isinstance(item, dict):
+                continue
+            if str(item.get("name") or "").lower() != "complex":
+                continue
+            override = (item.get("parameter_overrides") or {}).get("width_max_bars")
+            try:
+                self.family_width_max = max(self.family_width_max, int(override))
+            except Exception:
+                pass
+        self.geom["width_max_bars"] = int(self.family_width_max)
+
+        shoulder_ratio_cfg = geom.get("shoulder_head_ratio", {}) or {}
+        slope_cfg = geom.get("slope_constraints", {}) or {}
+        prominence_key = "head_above_shoulders_pct" if self.is_top else "head_below_shoulders_pct"
+        prominence_cfg = geom.get(prominence_key, {}) or {}
+
+        self.shoulder_tol_pct = float(geom.get("symmetry_tolerance_pct") or 5.0)
+        self.neckline_tol_pct = max(float(geom.get("near_equal_tolerance_pct") or 2.0), 3.0)
+        self.neckline_max_slope_deg = abs(float(slope_cfg.get("neckline_max_slope_degrees") or 1.6))
+        self.head_prominence_min_pct = float(prominence_cfg.get("min") or 2.0)
+        self.height_min_pct = float(geom.get("height_ratio_min") or 10.0)
+        self.height_max_pct = float(geom.get("height_ratio_max") or 40.0)
+        self.shoulder_ratio_min = float(shoulder_ratio_cfg.get("min") or 0.85)
+        self.shoulder_ratio_max = float(shoulder_ratio_cfg.get("max") or 1.05)
+        self.side_span_ratio_max = 2.5
+        self.extra_shoulder_spacing_bars = 5
+        self.bottom_min_shoulder_clearance_pct = 8.0
+        self.bottom_micro_max_zero_range_ratio = 0.84
+        self.bottom_micro_same_close_ratio_max = 0.75
+        self.bottom_micro_unique_close_ratio_min = 0.18
+
+    def _family_metrics(self, df: pd.DataFrame, pivot_indices: Sequence[Any]) -> Optional[Dict[str, Any]]:
+        if len(pivot_indices) < 5:
+            return None
+        try:
+            ls_idx, nl1_idx, head_idx, nl2_idx, rs_idx = [int(x) for x in pivot_indices[:5]]
+        except Exception:
+            return None
+        if not (0 <= ls_idx < nl1_idx < head_idx < nl2_idx < rs_idx < len(df)):
+            return None
+
+        extreme_col = "high" if self.is_top else "low"
+        neck_col = "low" if self.is_top else "high"
+
+        ls_price = _safe_float(df.iloc[ls_idx].get(extreme_col))
+        head_price = _safe_float(df.iloc[head_idx].get(extreme_col))
+        rs_price = _safe_float(df.iloc[rs_idx].get(extreme_col))
+        nl1_price = _safe_float(df.iloc[nl1_idx].get(neck_col))
+        nl2_price = _safe_float(df.iloc[nl2_idx].get(neck_col))
+        if None in (ls_price, head_price, rs_price, nl1_price, nl2_price):
+            return None
+        if min(float(ls_price), float(head_price), float(rs_price), float(nl1_price), float(nl2_price)) <= 0:
+            return None
+
+        shoulder_level = (float(ls_price) + float(rs_price)) / 2.0
+        neckline_level = (float(nl1_price) + float(nl2_price)) / 2.0
+        if shoulder_level <= 0 or neckline_level <= 0:
+            return None
+
+        if self.is_top:
+            head_prominence_pct = (float(head_price) - shoulder_level) / shoulder_level * 100.0
+            shoulder_clearance_pct = (shoulder_level - neckline_level) / shoulder_level * 100.0
+        else:
+            head_prominence_pct = (shoulder_level - float(head_price)) / shoulder_level * 100.0
+            shoulder_clearance_pct = (neckline_level - shoulder_level) / neckline_level * 100.0 if neckline_level > 0 else 0.0
+
+        height_pct = abs(float(head_price) - neckline_level) / ((float(head_price) + neckline_level) / 2.0) * 100.0
+        left_span = int(head_idx - ls_idx + 1)
+        right_span = int(rs_idx - head_idx + 1)
+        span_ratio = float(max(left_span, right_span) / max(1, min(left_span, right_span)))
+        shoulder_ratio = float(rs_price / ls_price) if float(ls_price) > 0 else None
+        formation = df.iloc[ls_idx : rs_idx + 1]
+        close_series = formation["close"].astype(float)
+        same_close_ratio = float((close_series.diff().abs() < 1e-12).mean()) if not close_series.empty else 0.0
+        unique_close_ratio = float(close_series.nunique() / max(1, len(close_series))) if not close_series.empty else 0.0
+        zero_range_ratio = (
+            float((((formation["high"].astype(float) - formation["low"].astype(float)).abs()) < 1e-12).mean())
+            if not formation.empty
+            else 0.0
+        )
+
+        return {
+            "ls_idx": int(ls_idx),
+            "nl1_idx": int(nl1_idx),
+            "head_idx": int(head_idx),
+            "nl2_idx": int(nl2_idx),
+            "rs_idx": int(rs_idx),
+            "ls_price": float(ls_price),
+            "head_price": float(head_price),
+            "rs_price": float(rs_price),
+            "nl1_price": float(nl1_price),
+            "nl2_price": float(nl2_price),
+            "shoulder_level": round(float(shoulder_level), 6),
+            "neckline_level": round(float(neckline_level), 6),
+            "shoulder_diff_pct": round(float(_pct_diff(float(ls_price), float(rs_price))), 3),
+            "shoulder_ratio": round(float(shoulder_ratio), 4) if shoulder_ratio is not None else None,
+            "head_prominence_pct": round(float(head_prominence_pct), 3),
+            "shoulder_clearance_pct": round(float(shoulder_clearance_pct), 3),
+            "height_pct": round(float(height_pct), 3),
+            "neckline_diff_pct": round(float(_pct_diff(float(nl1_price), float(nl2_price))), 3),
+            "neckline_slope_deg": round(float(abs(_slope_degrees(nl1_idx, float(nl1_price), nl2_idx, float(nl2_price)))), 3),
+            "left_span_bars": int(left_span),
+            "right_span_bars": int(right_span),
+            "side_span_ratio": round(float(span_ratio), 3),
+            "same_close_ratio": round(float(same_close_ratio), 3),
+            "unique_close_ratio": round(float(unique_close_ratio), 3),
+            "zero_range_ratio": round(float(zero_range_ratio), 3),
+        }
+
+    def _family_metrics_ok(self, metrics: Dict[str, Any]) -> bool:
+        try:
+            shoulder_diff_pct = float(metrics["shoulder_diff_pct"])
+            shoulder_ratio = float(metrics["shoulder_ratio"])
+            head_prominence_pct = float(metrics["head_prominence_pct"])
+            shoulder_clearance_pct = float(metrics["shoulder_clearance_pct"])
+            height_pct = float(metrics["height_pct"])
+            neckline_slope_deg = float(metrics["neckline_slope_deg"])
+            span_ratio = float(metrics["side_span_ratio"])
+        except Exception:
+            return False
+
+        if shoulder_diff_pct > self.shoulder_tol_pct:
+            return False
+        if shoulder_ratio < self.shoulder_ratio_min or shoulder_ratio > self.shoulder_ratio_max:
+            # The digitized ratio bounds are broader than symmetry_tolerance, but still reject
+            # extreme asymmetric shoulders.
+            return False
+        if head_prominence_pct < self.head_prominence_min_pct:
+            return False
+        if shoulder_clearance_pct <= 0:
+            return False
+        if height_pct < self.height_min_pct or height_pct > self.height_max_pct:
+            return False
+        if neckline_slope_deg > self.neckline_max_slope_deg:
+            return False
+        if span_ratio > self.side_span_ratio_max:
+            return False
+        if not self.is_top:
+            same_close_ratio = float(metrics.get("same_close_ratio") or 0.0)
+            unique_close_ratio = float(metrics.get("unique_close_ratio") or 0.0)
+            zero_range_ratio = float(metrics.get("zero_range_ratio") or 0.0)
+            if shoulder_clearance_pct < self.bottom_min_shoulder_clearance_pct:
+                return False
+            if zero_range_ratio >= self.bottom_micro_max_zero_range_ratio:
+                return False
+            if (
+                same_close_ratio >= self.bottom_micro_same_close_ratio_max
+                and unique_close_ratio <= self.bottom_micro_unique_close_ratio_min
+            ):
+                return False
+        return True
+
+    def _dedupe_extra_pivots(self, pivots: List[Pivot], *, head_idx: int) -> Dict[str, List[Pivot]]:
+        left: List[Pivot] = []
+        right: List[Pivot] = []
+        last_left = None
+        last_right = None
+        for p in sorted(pivots, key=lambda x: int(x.idx)):
+            idx = int(p.idx)
+            if idx < head_idx:
+                if last_left is None or idx - last_left >= self.extra_shoulder_spacing_bars:
+                    left.append(p)
+                    last_left = idx
+            elif idx > head_idx:
+                if last_right is None or idx - last_right >= self.extra_shoulder_spacing_bars:
+                    right.append(p)
+                    last_right = idx
+        return {"left": left, "right": right}
+
+    def _has_local_neckline_retrace(
+        self,
+        candidate: Pivot,
+        *,
+        source: Sequence[Pivot],
+        neckline_level: float,
+        ls_idx: int,
+        rs_idx: int,
+    ) -> bool:
+        neck_type = PivotType.LOW if self.is_top else PivotType.HIGH
+        idx = int(candidate.idx)
+        prev_neck: Optional[Pivot] = None
+        next_neck: Optional[Pivot] = None
+
+        for p in sorted(source, key=lambda x: int(x.idx)):
+            p_idx = int(p.idx)
+            if p_idx <= ls_idx or p_idx >= rs_idx or p_idx == idx or p.type != neck_type:
+                continue
+            if p_idx < idx:
+                prev_neck = p
+                continue
+            next_neck = p
+            break
+
+        tol_pct = max(self.neckline_tol_pct, 4.0)
+        for neck in (prev_neck, next_neck):
+            if neck is None:
+                continue
+            if _pct_diff(float(neck.price), float(neckline_level)) <= tol_pct:
+                return True
+        return False
+
+    def _classify_variant(
+        self,
+        *,
+        row: Dict[str, Any],
+        metrics: Dict[str, Any],
+        pivots_filtered: List[Pivot],
+        pivots_raw: List[Pivot],
+    ) -> Dict[str, Any]:
+        shoulder_level = float(metrics["shoulder_level"])
+        neckline_level = float(metrics["neckline_level"])
+        head_price = float(metrics["head_price"])
+        ls_idx = int(metrics["ls_idx"])
+        head_idx = int(metrics["head_idx"])
+        rs_idx = int(metrics["rs_idx"])
+
+        target_type = PivotType.HIGH if self.is_top else PivotType.LOW
+        tol = max(self.shoulder_tol_pct, self.neckline_tol_pct)
+        known = {ls_idx, head_idx, rs_idx}
+        source = pivots_raw or pivots_filtered
+
+        candidate_extras: List[Pivot] = []
+        for p in source:
+            idx = int(p.idx)
+            if p.type != target_type or idx <= ls_idx or idx >= rs_idx or idx in known:
+                continue
+            if min(abs(idx - ls_idx), abs(idx - head_idx), abs(idx - rs_idx)) < self.extra_shoulder_spacing_bars:
+                continue
+            price = float(p.price)
+            if _pct_diff(price, shoulder_level) > tol:
+                continue
+            if self.is_top:
+                if price >= head_price * (1.0 - max(0.01, self.head_prominence_min_pct / 200.0)):
+                    continue
+                if price <= neckline_level:
+                    continue
+            else:
+                if price <= head_price * (1.0 + max(0.01, self.head_prominence_min_pct / 200.0)):
+                    continue
+                if price >= neckline_level:
+                    continue
+            candidate_extras.append(p)
+
+        candidate_deduped = self._dedupe_extra_pivots(candidate_extras, head_idx=head_idx)
+        deduped = {
+            "left": [
+                p
+                for p in candidate_deduped["left"]
+                if self._has_local_neckline_retrace(
+                    p,
+                    source=source,
+                    neckline_level=neckline_level,
+                    ls_idx=ls_idx,
+                    rs_idx=rs_idx,
+                )
+            ],
+            "right": [
+                p
+                for p in candidate_deduped["right"]
+                if self._has_local_neckline_retrace(
+                    p,
+                    source=source,
+                    neckline_level=neckline_level,
+                    ls_idx=ls_idx,
+                    rs_idx=rs_idx,
+                )
+            ],
+        }
+        left_count = len(deduped["left"])
+        right_count = len(deduped["right"])
+        extra_count = left_count + right_count
+
+        evidence: Dict[str, Any] = {
+            "candidate_shoulders_left": len(candidate_deduped["left"]),
+            "candidate_shoulders_right": len(candidate_deduped["right"]),
+            "candidate_shoulders_total": len(candidate_deduped["left"]) + len(candidate_deduped["right"]),
+            "extra_shoulders_left": left_count,
+            "extra_shoulders_right": right_count,
+            "extra_shoulders_total": extra_count,
+            "width_exceeds_standard_max": bool(int(row.get("pattern_width_bars") or 0) > int(self.standard_width_max)),
+        }
+
+        if extra_count >= 2 or (left_count >= 1 and right_count >= 1):
+            return {"variant_code": "complex", "variant_confidence": 88, "evidence": evidence}
+        if extra_count == 1:
+            return {"variant_code": "complex", "variant_confidence": 76, "evidence": evidence}
+        if bool(evidence["width_exceeds_standard_max"]):
+            return {"variant_code": "complex", "variant_confidence": 58, "evidence": evidence}
+        return {"variant_code": "standard", "variant_confidence": 82, "evidence": evidence}
+
+    def _score_family_confidence(
+        self,
+        base_confidence: Any,
+        metrics: Dict[str, Any],
+        variant_result: Dict[str, Any],
+    ) -> int:
+        try:
+            confidence = int(base_confidence)
+        except Exception:
+            confidence = 70
+
+        if float(metrics.get("shoulder_diff_pct") or 999.0) <= (self.shoulder_tol_pct / 2.0):
+            confidence += 4
+        if float(metrics.get("head_prominence_pct") or 0.0) >= (self.head_prominence_min_pct + 1.5):
+            confidence += 3
+        if float(metrics.get("neckline_slope_deg") or 999.0) <= (self.neckline_max_slope_deg / 2.0):
+            confidence += 3
+        if float(metrics.get("side_span_ratio") or 999.0) <= 1.6:
+            confidence += 2
+
+        variant_confidence = int(variant_result.get("variant_confidence") or 0)
+        if variant_confidence >= 80:
+            confidence += 2
+
+        return max(0, min(100, int(confidence)))
+
+    def scan(
+        self,
+        *,
+        symbol: str,
+        df: pd.DataFrame,
+        pivots_filtered: List[Pivot],
+        pivots_raw: List[Pivot],
+    ) -> List[Dict[str, Any]]:
+        base_rows = super().scan(symbol=symbol, df=df, pivots_filtered=pivots_filtered, pivots_raw=pivots_raw)
+        out: List[Dict[str, Any]] = []
+        for row in base_rows:
+            if row.get("breakout_idx") is None or _safe_float(row.get("breakout_price")) is None:
+                continue
+            metrics = self._family_metrics(df, row.get("pivot_indices") or [])
+            if not metrics or not self._family_metrics_ok(metrics):
+                continue
+
+            variant_result = self._classify_variant(
+                row=row,
+                metrics=metrics,
+                pivots_filtered=pivots_filtered,
+                pivots_raw=pivots_raw,
+            )
+            enriched = dict(row)
+            enriched["base_pattern_name"] = self.key
+            enriched["variant_code"] = variant_result.get("variant_code")
+            enriched["variant_confidence"] = int(variant_result.get("variant_confidence") or 0)
+            enriched["variant_evidence_json"] = json.dumps(
+                variant_result.get("evidence") or {},
+                sort_keys=True,
+                ensure_ascii=False,
+            )
+            enriched["family_metrics_json"] = json.dumps(metrics, sort_keys=True, ensure_ascii=False)
+            enriched["confidence_score"] = self._score_family_confidence(
+                row.get("confidence_score"),
+                metrics,
+                variant_result,
+            )
+            out.append(enriched)
+        return out
+
+
+class HeadShouldersTopFamilyScanner(_HeadShouldersFamilyScanner):
+    def __init__(self, key: str, spec: Dict[str, Any]):
+        super().__init__(key, spec, is_top=True)
+
+
+class HeadShouldersBottomFamilyScanner(_HeadShouldersFamilyScanner):
+    def __init__(self, key: str, spec: Dict[str, Any]):
+        super().__init__(key, spec, is_top=False)
+
+    def _classify_variant(
+        self,
+        *,
+        row: Dict[str, Any],
+        metrics: Dict[str, Any],
+        pivots_filtered: List[Pivot],
+        pivots_raw: List[Pivot],
+    ) -> Dict[str, Any]:
+        result = super()._classify_variant(
+            row=row,
+            metrics=metrics,
+            pivots_filtered=pivots_filtered,
+            pivots_raw=pivots_raw,
+        )
+        if str(result.get("variant_code") or "") != "complex":
+            return result
+
+        evidence = dict(result.get("evidence") or {})
+        extra_total = int(evidence.get("extra_shoulders_total") or 0)
+        width_exceeds = bool(evidence.get("width_exceeds_standard_max"))
+        if extra_total == 1 and not width_exceeds:
+            evidence["single_extra_demoted_to_standard"] = True
+            return {
+                "variant_code": "standard",
+                "variant_confidence": 68,
+                "evidence": evidence,
+            }
+        return result
+
+
+class TriangleFamilyScanner(BaseDigitizedScanner):
+    """
+    Dedicated family scanner for triangles.
+
+    The old shared-spec splitter only looked at relative highs/lows on a single 5-pivot
+    sequence. That was too permissive: channels, flat compressions, and post-apex ranges
+    were frequently labeled as triangles. This family scanner matches both boundary-start
+    sequences, then enforces slope + convergence semantics before assigning the Bulkowski
+    chapter variants.
+    """
+
+    def __init__(self, key: str, spec: Dict[str, Any]):
+        super().__init__(key, spec)
+        self.geom = spec.get("geometry_constraints", {}) or {}
+        self.variant_cfg = spec.get("variant_handling", {}) or {}
+
+        self.flat_deg_max = 3.0
+        self.rising_deg_min = 3.0
+        self.falling_deg_max = -4.0
+        self.progress_min_pct = 30.0
+        self.progress_max_pct = 95.0
+        self.compression_min_ratio = 0.05
+        self.compression_max_ratio = 0.85
+        self.boundary_fit_error_max_pct = 30.0
+
+        high_first = copy.deepcopy(spec)
+        high_first.setdefault("detection_signature", {})
+        high_first["detection_signature"]["pivot_sequence"] = ["H", "L", "H", "L", "H"]
+        high_first["detection_signature"]["mandatory_pivots"] = []
+
+        low_first = copy.deepcopy(spec)
+        low_first.setdefault("detection_signature", {})
+        low_first["detection_signature"]["pivot_sequence"] = ["L", "H", "L", "H", "L"]
+        low_first["detection_signature"]["mandatory_pivots"] = []
+
+        self._high_first = PivotSequenceScanner("__triangles_high_first", high_first)
+        self._low_first = PivotSequenceScanner("__triangles_low_first", low_first)
+
+    def _collect_points(
+        self,
+        df: pd.DataFrame,
+        pivots: List[int],
+        tokens: List[str],
+    ) -> Tuple[List[Tuple[int, float]], List[Tuple[int, float]]]:
+        highs: List[Tuple[int, float]] = []
+        lows: List[Tuple[int, float]] = []
+        for idx, token in zip(pivots, tokens):
+            if idx < 0 or idx >= len(df):
+                return [], []
+            if token == "H":
+                highs.append((idx, float(df.iloc[idx]["high"])))
+            elif token == "L":
+                lows.append((idx, float(df.iloc[idx]["low"])))
+        return highs, lows
+
+    def _build_line(self, points: List[Tuple[int, float]]) -> Optional[Trendline]:
+        if len(points) < 2:
+            return None
+        idx0, price0 = points[0]
+        idx1, price1 = points[-1]
+        bars = max(1, idx1 - idx0)
+        return Trendline(
+            idx0=idx0,
+            price0=float(price0),
+            slope_per_bar=(float(price1) - float(price0)) / bars,
+        )
+
+    def _fit_error_pct(
+        self,
+        *,
+        line: Trendline,
+        points: List[Tuple[int, float]],
+        start_gap: float,
+    ) -> Optional[float]:
+        if len(points) <= 2 or start_gap <= 0:
+            return None
+        errs = [
+            abs(float(price) - line.value_at(int(idx))) / start_gap * 100.0
+            for idx, price in points[1:-1]
+        ]
+        return max(errs) if errs else None
+
+    def _family_metrics(
+        self,
+        df: pd.DataFrame,
+        pivots: List[Any],
+        *,
+        sequence_tag: str,
+    ) -> Optional[Dict[str, Any]]:
+        if not isinstance(pivots, (list, tuple)) or len(pivots) < 5:
+            return None
+        try:
+            idxs = [int(x) for x in pivots[:5]]
+        except Exception:
+            return None
+        if any(i < 0 or i >= len(df) for i in idxs):
+            return None
+
+        tokens = list(sequence_tag)
+        highs, lows = self._collect_points(df, idxs, tokens)
+        if len(highs) < 2 or len(lows) < 2:
+            return None
+
+        upper = self._build_line(highs)
+        lower = self._build_line(lows)
+        if upper is None or lower is None:
+            return None
+
+        start_idx = int(idxs[0])
+        end_idx = int(idxs[-1])
+        mid_idx = int(idxs[len(idxs) // 2])
+        start_gap = float(upper.value_at(start_idx) - lower.value_at(start_idx))
+        mid_gap = float(upper.value_at(mid_idx) - lower.value_at(mid_idx))
+        end_gap = float(upper.value_at(end_idx) - lower.value_at(end_idx))
+        compression_ratio = (end_gap / start_gap) if start_gap > 0 else None
+
+        upper_fit_error_pct = self._fit_error_pct(line=upper, points=highs, start_gap=start_gap)
+        lower_fit_error_pct = self._fit_error_pct(line=lower, points=lows, start_gap=start_gap)
+        boundary_fit_error_pct = max(
+            [x for x in (upper_fit_error_pct, lower_fit_error_pct) if x is not None],
+            default=None,
+        )
+
+        apex_idx = None
+        apex_progress_pct = None
+        bars_to_apex = None
+        slope_delta = float(upper.slope_per_bar - lower.slope_per_bar)
+        if abs(slope_delta) > 1e-9:
+            apex = upper.idx0 + (lower.value_at(upper.idx0) - upper.price0) / slope_delta
+            if np.isfinite(apex):
+                apex_idx = float(apex)
+                if apex > start_idx:
+                    apex_progress_pct = (end_idx - start_idx) / max(1e-9, apex - start_idx) * 100.0
+                if apex > end_idx:
+                    bars_to_apex = float(apex - end_idx)
+
+        return {
+            "sequence_tag": sequence_tag,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "high_touch_count": len(highs),
+            "low_touch_count": len(lows),
+            "upper_slope_deg": float(_slope_degrees(highs[0][0], highs[0][1], highs[-1][0], highs[-1][1])),
+            "lower_slope_deg": float(_slope_degrees(lows[0][0], lows[0][1], lows[-1][0], lows[-1][1])),
+            "upper_slope_per_bar": float(upper.slope_per_bar),
+            "lower_slope_per_bar": float(lower.slope_per_bar),
+            "start_gap": start_gap,
+            "mid_gap": mid_gap,
+            "end_gap": end_gap,
+            "compression_ratio": compression_ratio,
+            "gap_reduction_pct": ((1.0 - compression_ratio) * 100.0) if compression_ratio is not None else None,
+            "upper_fit_error_pct": upper_fit_error_pct,
+            "lower_fit_error_pct": lower_fit_error_pct,
+            "boundary_fit_error_pct": boundary_fit_error_pct,
+            "apex_idx": apex_idx,
+            "apex_progress_pct": apex_progress_pct,
+            "bars_to_apex": bars_to_apex,
+            "breakout_direction": None,
+        }
+
+    def _family_metrics_ok(self, metrics: Dict[str, Any]) -> bool:
+        start_gap = float(metrics.get("start_gap") or 0.0)
+        mid_gap = float(metrics.get("mid_gap") or 0.0)
+        end_gap = float(metrics.get("end_gap") or 0.0)
+        compression_ratio = _safe_float(metrics.get("compression_ratio"))
+        progress = _safe_float(metrics.get("apex_progress_pct"))
+        fit_error = _safe_float(metrics.get("boundary_fit_error_pct"))
+        upper_slope = _safe_float(metrics.get("upper_slope_per_bar"))
+        lower_slope = _safe_float(metrics.get("lower_slope_per_bar"))
+
+        if start_gap <= 0 or mid_gap <= 0 or end_gap <= 0:
+            return False
+        if compression_ratio is None or compression_ratio < self.compression_min_ratio or compression_ratio > self.compression_max_ratio:
+            return False
+        if progress is None or progress < self.progress_min_pct or progress > self.progress_max_pct:
+            return False
+        if fit_error is not None and fit_error > self.boundary_fit_error_max_pct:
+            return False
+        if upper_slope is None or lower_slope is None or upper_slope >= lower_slope:
+            return False
+        return True
+
+    def _resolve_variant(self, metrics: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        upper_deg = float(metrics.get("upper_slope_deg") or 0.0)
+        lower_deg = float(metrics.get("lower_slope_deg") or 0.0)
+        progress = float(metrics.get("apex_progress_pct") or 0.0)
+        compression_ratio = float(metrics.get("compression_ratio") or 0.0)
+        evidence = {
+            "upper_slope_deg": round(upper_deg, 2),
+            "lower_slope_deg": round(lower_deg, 2),
+            "compression_ratio": round(compression_ratio, 3),
+            "apex_progress_pct": round(progress, 1),
+            "boundary_fit_error_pct": round(float(metrics.get("boundary_fit_error_pct") or 0.0), 2),
+            "sequence_tag": metrics.get("sequence_tag"),
+        }
+
+        if abs(upper_deg) <= self.flat_deg_max and lower_deg >= self.rising_deg_min:
+            conf = 76
+            if abs(upper_deg) <= 1.5 and lower_deg >= 5.0:
+                conf += 8
+            if 45.0 <= progress <= 80.0:
+                conf += 4
+            if compression_ratio <= 0.50:
+                conf += 2
+            return {
+                "variant_code": "ascending",
+                "variant_confidence": min(100, conf),
+                "pattern_type": "continuation_bullish",
+                "evidence": evidence,
+            }
+
+        if upper_deg <= self.falling_deg_max and abs(lower_deg) <= self.flat_deg_max:
+            conf = 76
+            if upper_deg <= -7.0 and abs(lower_deg) <= 1.5:
+                conf += 8
+            if 45.0 <= progress <= 80.0:
+                conf += 4
+            if compression_ratio <= 0.50:
+                conf += 2
+            return {
+                "variant_code": "descending",
+                "variant_confidence": min(100, conf),
+                "pattern_type": "continuation_bearish",
+                "evidence": evidence,
+            }
+
+        if upper_deg <= self.falling_deg_max and lower_deg >= self.rising_deg_min:
+            conf = 74
+            if upper_deg <= -6.0 and lower_deg >= 5.0:
+                conf += 8
+            if 50.0 <= progress <= 85.0:
+                conf += 4
+            if compression_ratio <= 0.45:
+                conf += 2
+            return {
+                "variant_code": "symmetrical",
+                "variant_confidence": min(100, conf),
+                "pattern_type": "continuation_neutral",
+                "evidence": evidence,
+            }
+
+        return None
+
+    def _score_family_confidence(
+        self,
+        base_confidence: Any,
+        metrics: Dict[str, Any],
+        variant_result: Dict[str, Any],
+    ) -> int:
+        try:
+            confidence = int(base_confidence)
+        except Exception:
+            confidence = 70
+
+        fit_error = float(metrics.get("boundary_fit_error_pct") or 999.0)
+        progress = float(metrics.get("apex_progress_pct") or 0.0)
+        compression_ratio = float(metrics.get("compression_ratio") or 9.0)
+
+        if fit_error <= 10.0:
+            confidence += 4
+        elif fit_error <= 20.0:
+            confidence += 2
+
+        if 50.0 <= progress <= 75.0:
+            confidence += 3
+        elif self.progress_min_pct <= progress <= 90.0:
+            confidence += 1
+
+        if compression_ratio <= 0.35:
+            confidence += 3
+        elif compression_ratio <= 0.55:
+            confidence += 1
+
+        variant_confidence = int(variant_result.get("variant_confidence") or 0)
+        if variant_confidence >= 84:
+            confidence += 3
+        elif variant_confidence >= 76:
+            confidence += 1
+
+        return max(0, min(100, confidence))
+
+    def scan(
+        self,
+        *,
+        symbol: str,
+        df: pd.DataFrame,
+        pivots_filtered: List[Pivot],
+        pivots_raw: List[Pivot],
+    ) -> List[Dict[str, Any]]:
+        tagged_rows: List[Tuple[Dict[str, Any], str]] = []
+        for scanner, sequence_tag in (
+            (self._high_first, "HLHLH"),
+            (self._low_first, "LHLHL"),
+        ):
+            for row in scanner.scan(symbol=symbol, df=df, pivots_filtered=pivots_filtered, pivots_raw=pivots_raw):
+                tagged_rows.append((dict(row), sequence_tag))
+
+        deduped: Dict[Tuple[int, ...], Dict[str, Any]] = {}
+        out: List[Dict[str, Any]] = []
+        for row, sequence_tag in tagged_rows:
+            pivots = row.get("pivot_indices") or []
+            key = tuple(int(x) for x in pivots[:5]) if isinstance(pivots, (list, tuple)) else ()
+            if not key:
+                continue
+
+            metrics = self._family_metrics(df, list(key), sequence_tag=sequence_tag)
+            if not metrics:
+                continue
+            metrics["breakout_direction"] = row.get("breakout_direction")
+            if not self._family_metrics_ok(metrics):
+                continue
+
+            variant_result = self._resolve_variant(metrics)
+            if not variant_result:
+                continue
+
+            enriched = dict(row)
+            enriched["pattern_name"] = self.key
+            enriched["pattern_id"] = f"{symbol}_{self.key}_{key[0]}_{key[-1]}"
+            enriched["pattern_type"] = variant_result.get("pattern_type") or self.pattern_type
+            enriched["base_pattern_name"] = self.key
+            enriched["variant_code"] = variant_result.get("variant_code")
+            enriched["variant_confidence"] = int(variant_result.get("variant_confidence") or 0)
+            enriched["variant_evidence_json"] = json.dumps(
+                variant_result.get("evidence") or {},
+                sort_keys=True,
+                ensure_ascii=False,
+            )
+            enriched["family_metrics_json"] = json.dumps(metrics, sort_keys=True, ensure_ascii=False)
+            enriched["confidence_score"] = self._score_family_confidence(
+                row.get("confidence_score"),
+                metrics,
+                variant_result,
+            )
+
+            prev = deduped.get(key)
+            if prev is None or int(enriched.get("confidence_score") or 0) > int(prev.get("confidence_score") or 0):
+                deduped[key] = enriched
+
+        out.extend(deduped.values())
+        return out
+
+
+class BroadeningWedgeFamilyScanner(PivotSequenceScanner):
+    """
+    Dedicated family scanner for broadening wedges.
+
+    The old chapter splitter reused a generic 6-pivot detector and only checked
+    the sign of the first/last boundary slopes. That admitted broad channels and
+    loose megaphones with poor boundary discipline. This wrapper keeps the same
+    base sequence, then requires coherent same-direction diverging boundaries
+    before assigning ascending vs descending chapters.
+    """
+
+    def __init__(self, key: str, spec: Dict[str, Any]):
+        super().__init__(key, spec)
+        self.divergence_min_ratio = 1.10
+        self.fit_error_max_pct = 26.0
+        self.min_abs_slope_deg = 0.4
+        self.min_slope_gap_deg = 1.0
+        self.max_width_bars = min(int(self.geom.get("width_max_bars") or 180), 165)
+
+    def _family_metrics(self, df: pd.DataFrame, pivots: Sequence[Any]) -> Optional[Dict[str, Any]]:
+        if len(pivots) < 6:
+            return None
+        try:
+            idxs = [int(x) for x in pivots[:6]]
+        except Exception:
+            return None
+        if any(i < 0 or i >= len(df) for i in idxs):
+            return None
+        hs = [idxs[i] for i in (0, 2, 4)]
+        ls = [idxs[i] for i in (1, 3, 5)]
+        if not (hs[0] < ls[0] < hs[1] < ls[1] < hs[2] < ls[2]):
+            return None
+
+        highs = [(idx, float(df.iloc[idx]["high"])) for idx in hs]
+        lows = [(idx, float(df.iloc[idx]["low"])) for idx in ls]
+        upper = Trendline(
+            idx0=highs[0][0],
+            price0=highs[0][1],
+            slope_per_bar=(highs[-1][1] - highs[0][1]) / max(1, highs[-1][0] - highs[0][0]),
+        )
+        lower = Trendline(
+            idx0=lows[0][0],
+            price0=lows[0][1],
+            slope_per_bar=(lows[-1][1] - lows[0][1]) / max(1, lows[-1][0] - lows[0][0]),
+        )
+
+        start_idx = idxs[0]
+        end_idx = idxs[-1]
+        start_gap = upper.value_at(start_idx) - lower.value_at(start_idx)
+        mid_idx = idxs[2]
+        mid_gap = upper.value_at(mid_idx) - lower.value_at(mid_idx)
+        end_gap = upper.value_at(end_idx) - lower.value_at(end_idx)
+        if start_gap <= 0 or mid_gap <= 0 or end_gap <= 0:
+            return None
+
+        def _fit_error(line: Trendline, points: List[Tuple[int, float]]) -> Optional[float]:
+            errs = [
+                abs(price - line.value_at(idx)) / start_gap * 100.0
+                for idx, price in points[1:-1]
+            ]
+            return max(errs) if errs else None
+
+        upper_fit = _fit_error(upper, highs)
+        lower_fit = _fit_error(lower, lows)
+        boundary_fit = max([x for x in (upper_fit, lower_fit) if x is not None], default=None)
+        width_bars = end_idx - start_idx + 1
+        divergence_ratio = end_gap / start_gap
+        slope_gap_deg = abs(
+            _slope_degrees(highs[0][0], highs[0][1], highs[-1][0], highs[-1][1])
+            - _slope_degrees(lows[0][0], lows[0][1], lows[-1][0], lows[-1][1])
+        )
+
+        return {
+            "start_idx": int(start_idx),
+            "end_idx": int(end_idx),
+            "width_bars": int(width_bars),
+            "upper_slope_deg": float(_slope_degrees(highs[0][0], highs[0][1], highs[-1][0], highs[-1][1])),
+            "lower_slope_deg": float(_slope_degrees(lows[0][0], lows[0][1], lows[-1][0], lows[-1][1])),
+            "upper_slope_per_bar": float(upper.slope_per_bar),
+            "lower_slope_per_bar": float(lower.slope_per_bar),
+            "start_gap": float(start_gap),
+            "mid_gap": float(mid_gap),
+            "end_gap": float(end_gap),
+            "divergence_ratio": float(divergence_ratio),
+            "gap_growth_pct": float((divergence_ratio - 1.0) * 100.0),
+            "upper_fit_error_pct": upper_fit,
+            "lower_fit_error_pct": lower_fit,
+            "boundary_fit_error_pct": boundary_fit,
+            "slope_gap_deg": float(slope_gap_deg),
+        }
+
+    def _family_metrics_ok(self, metrics: Dict[str, Any]) -> bool:
+        upper_deg = float(metrics.get("upper_slope_deg") or 0.0)
+        lower_deg = float(metrics.get("lower_slope_deg") or 0.0)
+        divergence_ratio = float(metrics.get("divergence_ratio") or 0.0)
+        fit_error = _safe_float(metrics.get("boundary_fit_error_pct"))
+        width_bars = int(metrics.get("width_bars") or 0)
+        slope_gap_deg = float(metrics.get("slope_gap_deg") or 0.0)
+
+        if width_bars <= 0 or width_bars > self.max_width_bars:
+            return False
+        if divergence_ratio < self.divergence_min_ratio:
+            return False
+        if fit_error is not None and fit_error > self.fit_error_max_pct:
+            return False
+        if abs(upper_deg) < self.min_abs_slope_deg or abs(lower_deg) < self.min_abs_slope_deg:
+            return False
+        if slope_gap_deg < self.min_slope_gap_deg:
+            return False
+        return True
+
+    def _resolve_variant(self, metrics: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        upper_deg = float(metrics.get("upper_slope_deg") or 0.0)
+        lower_deg = float(metrics.get("lower_slope_deg") or 0.0)
+        divergence_ratio = float(metrics.get("divergence_ratio") or 0.0)
+        evidence = {
+            "upper_slope_deg": round(upper_deg, 2),
+            "lower_slope_deg": round(lower_deg, 2),
+            "divergence_ratio": round(divergence_ratio, 3),
+            "boundary_fit_error_pct": round(float(metrics.get("boundary_fit_error_pct") or 0.0), 2),
+            "slope_gap_deg": round(float(metrics.get("slope_gap_deg") or 0.0), 2),
+        }
+
+        if upper_deg > 0.0 and lower_deg > 0.0 and upper_deg > lower_deg + 0.4:
+            conf = 76
+            if divergence_ratio >= 1.20:
+                conf += 4
+            if upper_deg >= 3.5 and lower_deg >= 1.0:
+                conf += 4
+            return {
+                "variant_code": "ascending",
+                "variant_confidence": min(100, conf),
+                "pattern_type": "continuation_bullish",
+                "evidence": evidence,
+            }
+
+        if upper_deg < 0.0 and lower_deg < 0.0 and lower_deg < upper_deg - 0.4:
+            conf = 76
+            if divergence_ratio >= 1.20:
+                conf += 4
+            if upper_deg <= -1.0 and lower_deg <= -3.5:
+                conf += 4
+            return {
+                "variant_code": "descending",
+                "variant_confidence": min(100, conf),
+                "pattern_type": "continuation_bearish",
+                "evidence": evidence,
+            }
+        return None
+
+    def _score_family_confidence(self, base_confidence: Any, metrics: Dict[str, Any], variant_result: Dict[str, Any]) -> int:
+        try:
+            confidence = int(base_confidence)
+        except Exception:
+            confidence = 70
+        divergence_ratio = float(metrics.get("divergence_ratio") or 0.0)
+        fit_error = float(metrics.get("boundary_fit_error_pct") or 999.0)
+        if divergence_ratio >= 1.20:
+            confidence += 4
+        elif divergence_ratio >= 1.14:
+            confidence += 2
+        if fit_error <= 12.0:
+            confidence += 4
+        elif fit_error <= 20.0:
+            confidence += 2
+        if int(variant_result.get("variant_confidence") or 0) >= 84:
+            confidence += 2
+        return max(0, min(100, confidence))
+
+    def scan(
+        self,
+        *,
+        symbol: str,
+        df: pd.DataFrame,
+        pivots_filtered: List[Pivot],
+        pivots_raw: List[Pivot],
+    ) -> List[Dict[str, Any]]:
+        base_rows = super().scan(symbol=symbol, df=df, pivots_filtered=pivots_filtered, pivots_raw=pivots_raw)
+        out: List[Dict[str, Any]] = []
+        for row in base_rows:
+            if row.get("breakout_idx") is None or _safe_float(row.get("breakout_price")) is None:
+                continue
+            metrics = self._family_metrics(df, row.get("pivot_indices") or [])
+            if not metrics or not self._family_metrics_ok(metrics):
+                continue
+            variant = self._resolve_variant(metrics)
+            if not variant:
+                continue
+            enriched = dict(row)
+            enriched["pattern_name"] = self.key
+            enriched["base_pattern_name"] = self.key
+            enriched["variant_code"] = variant.get("variant_code")
+            enriched["variant_confidence"] = int(variant.get("variant_confidence") or 0)
+            enriched["variant_evidence_json"] = json.dumps(variant.get("evidence") or {}, sort_keys=True, ensure_ascii=False)
+            enriched["family_metrics_json"] = json.dumps(metrics, sort_keys=True, ensure_ascii=False)
+            enriched["pattern_type"] = variant.get("pattern_type") or self.pattern_type
+            enriched["confidence_score"] = self._score_family_confidence(
+                row.get("confidence_score"),
+                metrics,
+                variant,
+            )
+            out.append(enriched)
+        return out
+
+
+class HornFamilyScanner(BaseDigitizedScanner):
+    """
+    Dedicated family scanner for horn bottoms/tops.
+
+    The legacy mapping only split the shared detector by breakout direction. Horns
+    are much stricter than that: they are short, sharp, symmetric spike reversals.
+    This scanner evaluates both mirrored 3-pivot sequences and keeps only the fast,
+    V-shaped structures that match the family semantics.
+    """
+
+    def __init__(self, key: str, spec: Dict[str, Any]):
+        super().__init__(key, spec)
+        self.geom = spec.get("geometry_constraints", {}) or {}
+        self.prior = spec.get("prior_trend_requirements", {}) or {}
+
+        hlh = copy.deepcopy(spec)
+        hlh.setdefault("detection_signature", {})
+        hlh["detection_signature"]["pivot_sequence"] = ["H", "L", "H"]
+        hlh["detection_signature"]["mandatory_pivots"] = []
+        hlh["pattern_type"] = "reversal_bearish"
+
+        lhl = copy.deepcopy(spec)
+        lhl.setdefault("detection_signature", {})
+        lhl["detection_signature"]["pivot_sequence"] = ["L", "H", "L"]
+        lhl["detection_signature"]["mandatory_pivots"] = []
+        lhl["pattern_type"] = "reversal_bullish"
+
+        self._top = PivotSequenceScanner("__horns_hlh", hlh)
+        self._bottom = PivotSequenceScanner("__horns_lhl", lhl)
+
+        self.width_max_bars = min(int(self.geom.get("width_max_bars") or 20), 18)
+        self.leg_span_max_bars = 6
+        self.extreme_similarity_min = float((self.geom.get("horn_peak_similarity_pct") or {}).get("min") or 0.92)
+        self.extreme_similarity_max = float((self.geom.get("horn_peak_similarity_pct") or {}).get("max") or 1.08)
+        self.depth_min_pct = max(4.0, float(self.geom.get("height_ratio_min") or 3.0))
+        self.depth_max_pct = min(18.0, float(self.geom.get("height_ratio_max") or 15.0) + 3.0)
+        self.approach_angle_min_deg = 18.0
+        self.directional_ratio_min = 0.55
+        self.min_prior_bars = int(self.prior.get("min_period_bars") or 10)
+        self.min_prior_change_pct = float(self.prior.get("min_change_pct") or 5.0)
+
+    def _direction_ratio(self, df: pd.DataFrame, *, start_idx: int, end_idx: int, positive: bool) -> Optional[float]:
+        if end_idx <= start_idx:
+            return None
+        closes = pd.to_numeric(df.iloc[start_idx : end_idx + 1]["close"], errors="coerce").dropna().to_numpy()
+        if len(closes) < 2:
+            return None
+        diffs = np.diff(closes)
+        if len(diffs) == 0:
+            return None
+        return float(np.mean(diffs > 0)) if positive else float(np.mean(diffs < 0))
+
+    def _prior_change_pct(self, df: pd.DataFrame, start_idx: int) -> Optional[float]:
+        if start_idx < self.min_prior_bars:
+            return None
+        p0 = _safe_float(df.iloc[start_idx - self.min_prior_bars].get("close"))
+        p1 = _safe_float(df.iloc[start_idx].get("close"))
+        if p0 is None or p1 is None or p0 <= 0:
+            return None
+        return (p1 - p0) / p0 * 100.0
+
+    def _family_metrics(self, df: pd.DataFrame, pivots: Sequence[Any], *, sequence_tag: str) -> Optional[Dict[str, Any]]:
+        if len(pivots) < 3:
+            return None
+        try:
+            i0, i1, i2 = [int(x) for x in pivots[:3]]
+        except Exception:
+            return None
+        if not (0 <= i0 < i1 < i2 < len(df)):
+            return None
+
+        if sequence_tag == "HLH":
+            p0 = float(df.iloc[i0]["high"])
+            pm = float(df.iloc[i1]["low"])
+            p2 = float(df.iloc[i2]["high"])
+            left_positive = False
+            right_positive = True
+        else:
+            p0 = float(df.iloc[i0]["low"])
+            pm = float(df.iloc[i1]["high"])
+            p2 = float(df.iloc[i2]["low"])
+            left_positive = True
+            right_positive = False
+
+        if min(abs(p0), abs(pm), abs(p2)) <= 0:
+            return None
+
+        avg_extreme = (p0 + p2) / 2.0
+        similarity_ratio = p2 / p0 if p0 != 0 else None
+        if sequence_tag == "HLH":
+            middle_depth_pct = (avg_extreme - pm) / avg_extreme * 100.0
+        else:
+            middle_depth_pct = (pm - avg_extreme) / avg_extreme * 100.0
+
+        width_bars = i2 - i0 + 1
+        left_span = i1 - i0
+        right_span = i2 - i1
+        prior_change_pct = self._prior_change_pct(df, i0)
+
+        return {
+            "sequence_tag": sequence_tag,
+            "width_bars": int(width_bars),
+            "left_span_bars": int(left_span),
+            "right_span_bars": int(right_span),
+            "similarity_ratio": float(similarity_ratio) if similarity_ratio is not None else None,
+            "extreme_diff_pct": float(_pct_diff(p0, p2)),
+            "middle_depth_pct": float(middle_depth_pct),
+            "left_leg_deg": float(_slope_degrees(i0, p0, i1, pm)),
+            "right_leg_deg": float(_slope_degrees(i1, pm, i2, p2)),
+            "left_direction_ratio": self._direction_ratio(df, start_idx=i0, end_idx=i1, positive=left_positive),
+            "right_direction_ratio": self._direction_ratio(df, start_idx=i1, end_idx=i2, positive=right_positive),
+            "prior_change_pct": prior_change_pct,
+        }
+
+    def _family_metrics_ok(self, metrics: Dict[str, Any]) -> bool:
+        width_bars = int(metrics.get("width_bars") or 0)
+        left_span = int(metrics.get("left_span_bars") or 0)
+        right_span = int(metrics.get("right_span_bars") or 0)
+        sim = _safe_float(metrics.get("similarity_ratio"))
+        depth_pct = float(metrics.get("middle_depth_pct") or 0.0)
+        left_deg = abs(float(metrics.get("left_leg_deg") or 0.0))
+        right_deg = abs(float(metrics.get("right_leg_deg") or 0.0))
+        left_ratio = _safe_float(metrics.get("left_direction_ratio"))
+        right_ratio = _safe_float(metrics.get("right_direction_ratio"))
+        seq = str(metrics.get("sequence_tag") or "")
+        prior_change_pct = _safe_float(metrics.get("prior_change_pct"))
+
+        if width_bars <= 0 or width_bars > self.width_max_bars:
+            return False
+        if left_span <= 0 or right_span <= 0 or left_span > self.leg_span_max_bars or right_span > self.leg_span_max_bars:
+            return False
+        if sim is None or sim < self.extreme_similarity_min or sim > self.extreme_similarity_max:
+            return False
+        if depth_pct < self.depth_min_pct or depth_pct > self.depth_max_pct:
+            return False
+        if left_deg < self.approach_angle_min_deg or right_deg < self.approach_angle_min_deg:
+            return False
+        if left_ratio is not None and left_ratio < self.directional_ratio_min:
+            return False
+        if right_ratio is not None and right_ratio < self.directional_ratio_min:
+            return False
+        if prior_change_pct is None:
+            return False
+        if seq == "HLH" and prior_change_pct < self.min_prior_change_pct:
+            return False
+        if seq == "LHL" and prior_change_pct > -self.min_prior_change_pct:
+            return False
+        return True
+
+    def _resolve_variant(self, metrics: Dict[str, Any], *, breakout_direction: Optional[str]) -> Optional[Dict[str, Any]]:
+        seq = str(metrics.get("sequence_tag") or "")
+        bo = str(breakout_direction or "")
+        evidence = {
+            "sequence_tag": seq,
+            "middle_depth_pct": round(float(metrics.get("middle_depth_pct") or 0.0), 2),
+            "extreme_diff_pct": round(float(metrics.get("extreme_diff_pct") or 0.0), 2),
+            "left_leg_deg": round(float(metrics.get("left_leg_deg") or 0.0), 2),
+            "right_leg_deg": round(float(metrics.get("right_leg_deg") or 0.0), 2),
+            "prior_change_pct": round(float(metrics.get("prior_change_pct") or 0.0), 2),
+        }
+
+        if seq == "HLH" and bo == "down":
+            return {"variant_code": "horn_top", "variant_confidence": 82, "pattern_type": "reversal_bearish", "evidence": evidence}
+        if seq == "LHL" and bo == "up":
+            return {"variant_code": "horn_bottom", "variant_confidence": 82, "pattern_type": "reversal_bullish", "evidence": evidence}
+        return None
+
+    def _score_family_confidence(self, base_confidence: Any, metrics: Dict[str, Any], variant_result: Dict[str, Any]) -> int:
+        try:
+            confidence = int(base_confidence)
+        except Exception:
+            confidence = 70
+        if float(metrics.get("extreme_diff_pct") or 999.0) <= 3.0:
+            confidence += 4
+        if abs(float(metrics.get("left_leg_deg") or 0.0)) >= 30.0:
+            confidence += 2
+        if abs(float(metrics.get("right_leg_deg") or 0.0)) >= 30.0:
+            confidence += 2
+        return max(0, min(100, confidence))
+
+    def scan(
+        self,
+        *,
+        symbol: str,
+        df: pd.DataFrame,
+        pivots_filtered: List[Pivot],
+        pivots_raw: List[Pivot],
+    ) -> List[Dict[str, Any]]:
+        tagged_rows: List[Tuple[Dict[str, Any], str]] = []
+        for scanner, sequence_tag in ((self._top, "HLH"), (self._bottom, "LHL")):
+            for row in scanner.scan(symbol=symbol, df=df, pivots_filtered=pivots_filtered, pivots_raw=pivots_raw):
+                tagged_rows.append((dict(row), sequence_tag))
+
+        out: List[Dict[str, Any]] = []
+        for row, sequence_tag in tagged_rows:
+            if row.get("breakout_idx") is None or _safe_float(row.get("breakout_price")) is None:
+                continue
+            metrics = self._family_metrics(df, row.get("pivot_indices") or [], sequence_tag=sequence_tag)
+            if not metrics or not self._family_metrics_ok(metrics):
+                continue
+            variant = self._resolve_variant(metrics, breakout_direction=row.get("breakout_direction"))
+            if not variant:
+                continue
+            enriched = dict(row)
+            enriched["pattern_name"] = self.key
+            enriched["base_pattern_name"] = self.key
+            enriched["variant_code"] = variant.get("variant_code")
+            enriched["variant_confidence"] = int(variant.get("variant_confidence") or 0)
+            enriched["variant_evidence_json"] = json.dumps(variant.get("evidence") or {}, sort_keys=True, ensure_ascii=False)
+            enriched["family_metrics_json"] = json.dumps(metrics, sort_keys=True, ensure_ascii=False)
+            enriched["pattern_type"] = variant.get("pattern_type") or self.pattern_type
+            enriched["confidence_score"] = self._score_family_confidence(
+                row.get("confidence_score"),
+                metrics,
+                variant,
+            )
+            out.append(enriched)
+        return out
+
+
+class ScallopFamilyScanner(BaseDigitizedScanner):
+    """
+    Dedicated family scanner for scallops.
+
+    The legacy chapter splitter treated every scallop as the same 3-pivot `L-H-L`
+    structure and only flipped the chapter label by comparing start/end lows plus
+    breakout direction. That misses the core ontology from the source material:
+    some chapters are `L-H-L`, others are their mirrored `H-L-H` form, and all of
+    them need a curved/asymmetric profile rather than an arbitrary three-pivot swing.
+    """
+
+    def __init__(self, key: str, spec: Dict[str, Any]):
+        super().__init__(key, spec)
+        self.geom = spec.get("geometry_constraints", {}) or {}
+
+        lhl = copy.deepcopy(spec)
+        lhl.setdefault("detection_signature", {})
+        lhl["detection_signature"]["pivot_sequence"] = ["L", "H", "L"]
+        lhl["detection_signature"]["mandatory_pivots"] = []
+
+        hlh = copy.deepcopy(spec)
+        hlh.setdefault("detection_signature", {})
+        hlh["detection_signature"]["pivot_sequence"] = ["H", "L", "H"]
+        hlh["detection_signature"]["mandatory_pivots"] = []
+
+        self._lhl = PivotSequenceScanner("__scallops_lhl", lhl)
+        self._hlh = PivotSequenceScanner("__scallops_hlh", hlh)
+
+        self.min_left_share_pct = 45.0
+        self.max_left_share_pct = 90.0
+        self.min_excursion_pct = 14.0
+        self.min_leg_bars = 4
+        self.min_left_leg_deg = 2.0
+        self.min_right_leg_deg = 2.0
+        self.min_directional_ratio = 0.40
+        self.min_overall_shift_pct = 1.5
+        self.descending_min_shift_pct = 4.0
+        self.descending_min_left_leg_abs_deg = 18.0
+        self.descending_min_right_leg_deg = 22.0
+        self.descending_directional_ratio_min = 0.46
+        self.ascending_inverted_min_shift_pct = 4.0
+        self.ascending_inverted_min_left_leg_abs_deg = 18.0
+        self.ascending_inverted_min_right_leg_deg = 34.0
+        self.ascending_inverted_max_left_share_pct = 72.0
+        self.ascending_inverted_min_excursion_pct = 75.0
+        self.ascending_inverted_directional_ratio_min = 0.48
+
+    def _segment_direction_ratio(
+        self,
+        df: pd.DataFrame,
+        *,
+        start_idx: int,
+        end_idx: int,
+        positive: bool,
+    ) -> Optional[float]:
+        if end_idx <= start_idx:
+            return None
+        closes = pd.to_numeric(df.iloc[start_idx : end_idx + 1]["close"], errors="coerce").dropna().to_numpy()
+        if len(closes) < 2:
+            return None
+        diffs = np.diff(closes)
+        if len(diffs) == 0:
+            return None
+        if positive:
+            return float(np.mean(diffs > 0))
+        return float(np.mean(diffs < 0))
+
+    def _family_metrics(
+        self,
+        df: pd.DataFrame,
+        pivots: List[Any],
+        *,
+        sequence_tag: str,
+    ) -> Optional[Dict[str, Any]]:
+        if not isinstance(pivots, (list, tuple)) or len(pivots) < 3:
+            return None
+        try:
+            i0, i1, i2 = [int(x) for x in pivots[:3]]
+        except Exception:
+            return None
+        if any(i < 0 or i >= len(df) for i in (i0, i1, i2)):
+            return None
+
+        if sequence_tag == "LHL":
+            p0 = float(df.iloc[i0]["low"])
+            pm = float(df.iloc[i1]["high"])
+            p2 = float(df.iloc[i2]["low"])
+            left_positive = True
+            right_positive = False
+        else:
+            p0 = float(df.iloc[i0]["high"])
+            pm = float(df.iloc[i1]["low"])
+            p2 = float(df.iloc[i2]["high"])
+            left_positive = False
+            right_positive = True
+
+        total_span = i2 - i0
+        if total_span <= 0:
+            return None
+        left_span = i1 - i0
+        right_span = i2 - i1
+        if left_span <= 0 or right_span <= 0:
+            return None
+
+        line_mid = p0 + (p2 - p0) * ((i1 - i0) / total_span)
+        span_height = max(abs(pm - p0), abs(pm - p2), 1e-9)
+        excursion_pct = abs(pm - line_mid) / span_height * 100.0
+        overall_shift_pct = ((p2 - p0) / max(abs(p0), 1e-9)) * 100.0
+
+        left_ratio = self._segment_direction_ratio(df, start_idx=i0, end_idx=i1, positive=left_positive)
+        right_ratio = self._segment_direction_ratio(df, start_idx=i1, end_idx=i2, positive=right_positive)
+
+        return {
+            "sequence_tag": sequence_tag,
+            "start_idx": i0,
+            "mid_idx": i1,
+            "end_idx": i2,
+            "start_anchor_price": p0,
+            "mid_anchor_price": pm,
+            "end_anchor_price": p2,
+            "left_span_bars": left_span,
+            "right_span_bars": right_span,
+            "left_share_pct": left_span / total_span * 100.0,
+            "overall_shift_pct": overall_shift_pct,
+            "left_leg_deg": float(_slope_degrees(i0, p0, i1, pm)),
+            "right_leg_deg": float(_slope_degrees(i1, pm, i2, p2)),
+            "arc_excursion_pct": excursion_pct,
+            "left_directional_ratio": left_ratio,
+            "right_directional_ratio": right_ratio,
+        }
+
+    def _family_metrics_ok(self, metrics: Dict[str, Any]) -> bool:
+        left_span = int(metrics.get("left_span_bars") or 0)
+        right_span = int(metrics.get("right_span_bars") or 0)
+        left_share = float(metrics.get("left_share_pct") or 0.0)
+        excursion = float(metrics.get("arc_excursion_pct") or 0.0)
+        left_deg = float(metrics.get("left_leg_deg") or 0.0)
+        right_deg = float(metrics.get("right_leg_deg") or 0.0)
+        left_ratio = _safe_float(metrics.get("left_directional_ratio"))
+        right_ratio = _safe_float(metrics.get("right_directional_ratio"))
+        seq = str(metrics.get("sequence_tag") or "")
+        start_price = float(metrics.get("start_anchor_price") or 0.0)
+        mid_price = float(metrics.get("mid_anchor_price") or 0.0)
+        end_price = float(metrics.get("end_anchor_price") or 0.0)
+
+        if left_span < self.min_leg_bars or right_span < self.min_leg_bars:
+            return False
+        if left_share < self.min_left_share_pct or left_share > self.max_left_share_pct:
+            return False
+        if excursion < self.min_excursion_pct:
+            return False
+        if left_ratio is not None and left_ratio < self.min_directional_ratio:
+            return False
+        if right_ratio is not None and right_ratio < self.min_directional_ratio:
+            return False
+
+        if seq == "LHL":
+            if left_deg < self.min_left_leg_deg or right_deg > -self.min_right_leg_deg:
+                return False
+            if mid_price <= max(start_price, end_price):
+                return False
+        elif seq == "HLH":
+            if left_deg > -self.min_left_leg_deg or right_deg < self.min_right_leg_deg:
+                return False
+            if mid_price >= min(start_price, end_price):
+                return False
+        else:
+            return False
+
+        return True
+
+    def _resolve_variant(self, metrics: Dict[str, Any], *, breakout_direction: Optional[str]) -> Optional[Dict[str, Any]]:
+        seq = str(metrics.get("sequence_tag") or "")
+        bo = str(breakout_direction or "")
+        overall_shift = float(metrics.get("overall_shift_pct") or 0.0)
+        left_share = float(metrics.get("left_share_pct") or 0.0)
+        excursion = float(metrics.get("arc_excursion_pct") or 0.0)
+        left_deg = float(metrics.get("left_leg_deg") or 0.0)
+        right_deg = float(metrics.get("right_leg_deg") or 0.0)
+        left_ratio = _safe_float(metrics.get("left_directional_ratio"))
+        right_ratio = _safe_float(metrics.get("right_directional_ratio"))
+        evidence = {
+            "sequence_tag": seq,
+            "overall_shift_pct": round(overall_shift, 2),
+            "left_share_pct": round(left_share, 1),
+            "left_leg_deg": round(left_deg, 2),
+            "right_leg_deg": round(right_deg, 2),
+            "arc_excursion_pct": round(excursion, 2),
+            "left_directional_ratio": round(float(left_ratio), 3) if left_ratio is not None else None,
+            "right_directional_ratio": round(float(right_ratio), 3) if right_ratio is not None else None,
+        }
+
+        def _conf(base: int) -> int:
+            bonus = 0
+            if 55.0 <= left_share <= 82.0:
+                bonus += 4
+            if excursion >= 24.0:
+                bonus += 4
+            if abs(overall_shift) >= 4.0:
+                bonus += 3
+            return min(100, base + bonus)
+
+        if seq == "LHL" and bo == "up":
+            if overall_shift >= self.min_overall_shift_pct:
+                return {
+                    "variant_code": "scallops_ascending",
+                    "variant_confidence": _conf(78),
+                    "pattern_type": "reversal_bullish",
+                    "evidence": evidence,
+                }
+            if overall_shift <= -self.min_overall_shift_pct:
+                return {
+                    "variant_code": "scallops_descending_inverted",
+                    "variant_confidence": _conf(74),
+                    "pattern_type": "reversal_bullish",
+                    "evidence": evidence,
+                }
+
+        if seq == "HLH" and bo == "down":
+            if overall_shift <= -self.min_overall_shift_pct:
+                if overall_shift > -self.descending_min_shift_pct:
+                    return None
+                if abs(left_deg) < self.descending_min_left_leg_abs_deg or right_deg < self.descending_min_right_leg_deg:
+                    return None
+                if left_ratio is not None and left_ratio < self.descending_directional_ratio_min:
+                    return None
+                if right_ratio is not None and right_ratio < self.descending_directional_ratio_min:
+                    return None
+                return {
+                    "variant_code": "scallops_descending",
+                    "variant_confidence": _conf(78),
+                    "pattern_type": "reversal_bearish",
+                    "evidence": evidence,
+                }
+            if overall_shift >= self.min_overall_shift_pct:
+                if overall_shift < self.ascending_inverted_min_shift_pct:
+                    return None
+                if abs(left_deg) < self.ascending_inverted_min_left_leg_abs_deg:
+                    return None
+                if right_deg < self.ascending_inverted_min_right_leg_deg:
+                    return None
+                if left_share > self.ascending_inverted_max_left_share_pct:
+                    return None
+                if excursion < self.ascending_inverted_min_excursion_pct:
+                    return None
+                if left_ratio is not None and left_ratio < self.ascending_inverted_directional_ratio_min:
+                    return None
+                if right_ratio is not None and right_ratio < self.ascending_inverted_directional_ratio_min:
+                    return None
+                return {
+                    "variant_code": "scallops_ascending_inverted",
+                    "variant_confidence": _conf(74),
+                    "pattern_type": "reversal_bearish",
+                    "evidence": evidence,
+                }
+
+        return None
+
+    def _score_family_confidence(
+        self,
+        base_confidence: Any,
+        metrics: Dict[str, Any],
+        variant_result: Dict[str, Any],
+    ) -> int:
+        try:
+            confidence = int(base_confidence)
+        except Exception:
+            confidence = 70
+
+        left_share = float(metrics.get("left_share_pct") or 0.0)
+        excursion = float(metrics.get("arc_excursion_pct") or 0.0)
+        if 55.0 <= left_share <= 80.0:
+            confidence += 3
+        elif left_share >= 50.0:
+            confidence += 1
+        if excursion >= 24.0:
+            confidence += 4
+        elif excursion >= 18.0:
+            confidence += 2
+
+        variant_confidence = int(variant_result.get("variant_confidence") or 0)
+        if variant_confidence >= 84:
+            confidence += 3
+        elif variant_confidence >= 76:
+            confidence += 1
+
+        return max(0, min(100, confidence))
+
+    def scan(
+        self,
+        *,
+        symbol: str,
+        df: pd.DataFrame,
+        pivots_filtered: List[Pivot],
+        pivots_raw: List[Pivot],
+    ) -> List[Dict[str, Any]]:
+        tagged_rows: List[Tuple[Dict[str, Any], str]] = []
+        for scanner, sequence_tag in ((self._lhl, "LHL"), (self._hlh, "HLH")):
+            for row in scanner.scan(symbol=symbol, df=df, pivots_filtered=pivots_filtered, pivots_raw=pivots_raw):
+                tagged_rows.append((dict(row), sequence_tag))
+
+        deduped: Dict[Tuple[int, ...], Dict[str, Any]] = {}
+        for row, sequence_tag in tagged_rows:
+            pivots = row.get("pivot_indices") or []
+            key = tuple(int(x) for x in pivots[:3]) if isinstance(pivots, (list, tuple)) else ()
+            if not key:
+                continue
+
+            metrics = self._family_metrics(df, list(key), sequence_tag=sequence_tag)
+            if not metrics or not self._family_metrics_ok(metrics):
+                continue
+
+            variant_result = self._resolve_variant(metrics, breakout_direction=row.get("breakout_direction"))
+            if not variant_result:
+                continue
+
+            enriched = dict(row)
+            enriched["pattern_name"] = self.key
+            enriched["pattern_id"] = f"{symbol}_{self.key}_{key[0]}_{key[-1]}"
+            enriched["pattern_type"] = variant_result.get("pattern_type") or self.pattern_type
+            enriched["base_pattern_name"] = self.key
+            enriched["variant_code"] = variant_result.get("variant_code")
+            enriched["variant_confidence"] = int(variant_result.get("variant_confidence") or 0)
+            enriched["variant_evidence_json"] = json.dumps(
+                variant_result.get("evidence") or {},
+                sort_keys=True,
+                ensure_ascii=False,
+            )
+            enriched["family_metrics_json"] = json.dumps(metrics, sort_keys=True, ensure_ascii=False)
+            enriched["confidence_score"] = self._score_family_confidence(
+                row.get("confidence_score"),
+                metrics,
+                variant_result,
+            )
+
+            prev = deduped.get(key)
+            if prev is None or int(enriched.get("confidence_score") or 0) > int(prev.get("confidence_score") or 0):
+                deduped[key] = enriched
+
+        return list(deduped.values())
+
+
 class RoundingBottomsTopsScanner(BaseDigitizedScanner):
     """
     The digitized spec contains both rounding bottoms and rounding tops in one file.
@@ -544,6 +2351,7 @@ class RoundingBottomsTopsScanner(BaseDigitizedScanner):
 
     def __init__(self, key: str, spec: Dict[str, Any]):
         super().__init__(key, spec)
+        self.geom = spec.get("geometry_constraints", {}) or {}
 
         ds = spec.get("detection_signature", {}) or {}
         base_seq = (ds.get("pivot_sequence") or []) if isinstance(ds.get("pivot_sequence"), list) else []
@@ -576,7 +2384,202 @@ class RoundingBottomsTopsScanner(BaseDigitizedScanner):
         top_spec["detection_signature"]["mandatory_pivots"] = [
             mp for mp in base_mps if not isinstance(mp, dict) or (mp.get("variant") in (None, "", "top"))
         ]
-        self._top = PivotSequenceScanner(key, top_spec)
+        self._top = PivotSequenceScanner("__rounding_top", top_spec)
+
+        self.width_max_bars = min(int(self.geom.get("width_max_bars") or 180), 170)
+        curvature = self.geom.get("curvature_measurement", {}) or {}
+        # The digitized fit error is idealized; allow a pragmatic ceiling for real OHLCV.
+        self.fit_error_max_pct = max(14.0, float(curvature.get("max_fit_error_pct") or 2.0) * 12.0)
+        self.directional_ratio_min = 0.52
+        self.symmetry_ratio_max = 2.1
+        self.center_pos_min_pct = 28.0
+        self.center_pos_max_pct = 72.0
+        self.center_clearance_min_pct = 3.0
+        self.top_width_max_bars = 95
+        self.top_fit_error_max_pct = min(self.fit_error_max_pct, 19.0)
+        self.top_directional_ratio_min = 0.55
+        self.top_center_clearance_min_pct = 4.5
+
+    def _direction_ratio(self, df: pd.DataFrame, *, start_idx: int, end_idx: int, positive: bool) -> Optional[float]:
+        if end_idx <= start_idx:
+            return None
+        closes = pd.to_numeric(df.iloc[start_idx : end_idx + 1]["close"], errors="coerce").dropna().to_numpy()
+        if len(closes) < 2:
+            return None
+        diffs = np.diff(closes)
+        if len(diffs) == 0:
+            return None
+        return float(np.mean(diffs > 0)) if positive else float(np.mean(diffs < 0))
+
+    def _quadratic_fit_error_pct(self, df: pd.DataFrame, start_idx: int, end_idx: int) -> Optional[float]:
+        if end_idx <= start_idx:
+            return None
+        closes = pd.to_numeric(df.iloc[start_idx : end_idx + 1]["close"], errors="coerce").dropna().to_numpy(dtype=float, copy=False)
+        if len(closes) < 7:
+            return None
+        price_range = float(np.nanmax(closes) - np.nanmin(closes))
+        if not np.isfinite(price_range) or price_range <= 0:
+            return None
+        x = np.linspace(-1.0, 1.0, len(closes))
+        try:
+            coeff = np.polyfit(x, closes, 2)
+        except Exception:
+            return None
+        fit = np.polyval(coeff, x)
+        rmse = float(np.sqrt(np.nanmean((closes - fit) ** 2)))
+        return rmse / price_range * 100.0
+
+    def _family_metrics(self, df: pd.DataFrame, pivots: Sequence[Any], *, variant_tag: str) -> Optional[Dict[str, Any]]:
+        if len(pivots) < 6:
+            return None
+        try:
+            i0, i1, i2, i3, i4, i5 = [int(x) for x in pivots[:6]]
+        except Exception:
+            return None
+        if not (0 <= i0 < i1 < i2 < i3 < i4 < i5 < len(df)):
+            return None
+
+        start_idx = i0
+        end_idx = i5
+        width_bars = end_idx - start_idx + 1
+        center_idx = i2
+        center_pos_pct = (center_idx - start_idx) / max(1, end_idx - start_idx) * 100.0
+        left_span = i2 - i0
+        right_span = i5 - i2
+        span_balance_ratio = max(left_span, right_span) / max(1, min(left_span, right_span))
+        fit_error_pct = self._quadratic_fit_error_pct(df, start_idx, end_idx)
+
+        if variant_tag == "bottom":
+            left_edge = float(df.iloc[i0]["low"])
+            center_extreme = float(df.iloc[i2]["low"])
+            right_edge = float(df.iloc[i4]["low"])
+            mid1 = float(df.iloc[i1]["high"])
+            mid2 = float(df.iloc[i3]["high"])
+            last_mid = float(df.iloc[i5]["high"])
+            center_clearance_pct = ((0.5 * (left_edge + right_edge)) - center_extreme) / max(1e-9, 0.5 * (left_edge + right_edge)) * 100.0
+            monotonic_left = self._direction_ratio(df, start_idx=i0, end_idx=i2, positive=False)
+            monotonic_right = self._direction_ratio(df, start_idx=i2, end_idx=i5, positive=True)
+            trend_progress_pct = (last_mid - mid1) / max(1e-9, mid1) * 100.0
+            expected_sign = 1.0
+        else:
+            left_edge = float(df.iloc[i0]["high"])
+            center_extreme = float(df.iloc[i2]["high"])
+            right_edge = float(df.iloc[i4]["high"])
+            mid1 = float(df.iloc[i1]["low"])
+            mid2 = float(df.iloc[i3]["low"])
+            last_mid = float(df.iloc[i5]["low"])
+            center_clearance_pct = (center_extreme - (0.5 * (left_edge + right_edge))) / max(1e-9, 0.5 * (left_edge + right_edge)) * 100.0
+            monotonic_left = self._direction_ratio(df, start_idx=i0, end_idx=i2, positive=True)
+            monotonic_right = self._direction_ratio(df, start_idx=i2, end_idx=i5, positive=False)
+            trend_progress_pct = (mid1 - last_mid) / max(1e-9, mid1) * 100.0
+            expected_sign = -1.0
+
+        x = np.array([0.0, 0.5, 1.0])
+        y = np.array([left_edge, center_extreme, right_edge])
+        try:
+            coeff = np.polyfit(x, y, 2)
+            curvature_coeff = float(coeff[0])
+        except Exception:
+            curvature_coeff = 0.0
+
+        return {
+            "variant_tag": variant_tag,
+            "width_bars": int(width_bars),
+            "center_pos_pct": float(center_pos_pct),
+            "span_balance_ratio": float(span_balance_ratio),
+            "center_clearance_pct": float(center_clearance_pct),
+            "fit_error_pct": fit_error_pct,
+            "monotonic_left_ratio": monotonic_left,
+            "monotonic_right_ratio": monotonic_right,
+            "trend_progress_pct": float(trend_progress_pct),
+            "mid_progress_pct": float(_pct_diff(mid1, mid2)),
+            "curvature_coeff": float(curvature_coeff),
+            "expected_curvature_sign": float(expected_sign),
+        }
+
+    def _family_metrics_ok(self, metrics: Dict[str, Any]) -> bool:
+        width_bars = int(metrics.get("width_bars") or 0)
+        center_pos_pct = float(metrics.get("center_pos_pct") or 0.0)
+        span_balance_ratio = float(metrics.get("span_balance_ratio") or 999.0)
+        center_clearance_pct = float(metrics.get("center_clearance_pct") or 0.0)
+        fit_error_pct = _safe_float(metrics.get("fit_error_pct"))
+        monotonic_left = _safe_float(metrics.get("monotonic_left_ratio"))
+        monotonic_right = _safe_float(metrics.get("monotonic_right_ratio"))
+        curvature_coeff = float(metrics.get("curvature_coeff") or 0.0)
+        expected_sign = float(metrics.get("expected_curvature_sign") or 0.0)
+
+        if width_bars <= 0 or width_bars > self.width_max_bars:
+            return False
+        if center_pos_pct < self.center_pos_min_pct or center_pos_pct > self.center_pos_max_pct:
+            return False
+        if span_balance_ratio > self.symmetry_ratio_max:
+            return False
+        if center_clearance_pct < self.center_clearance_min_pct:
+            return False
+        if fit_error_pct is not None and fit_error_pct > self.fit_error_max_pct:
+            return False
+        if monotonic_left is not None and monotonic_left < self.directional_ratio_min:
+            return False
+        if monotonic_right is not None and monotonic_right < self.directional_ratio_min:
+            return False
+        if expected_sign > 0 and curvature_coeff <= 0:
+            return False
+        if expected_sign < 0 and curvature_coeff >= 0:
+            return False
+        if str(metrics.get("variant_tag") or "") == "top":
+            if width_bars > self.top_width_max_bars:
+                return False
+            if fit_error_pct is not None and fit_error_pct > self.top_fit_error_max_pct:
+                return False
+            if center_clearance_pct < self.top_center_clearance_min_pct:
+                return False
+            if monotonic_left is not None and monotonic_left < self.top_directional_ratio_min:
+                return False
+            if monotonic_right is not None and monotonic_right < self.top_directional_ratio_min:
+                return False
+        return True
+
+    def _resolve_variant(self, metrics: Dict[str, Any], *, breakout_direction: Optional[str]) -> Optional[Dict[str, Any]]:
+        tag = str(metrics.get("variant_tag") or "")
+        bo = str(breakout_direction or "")
+        evidence = {
+            "center_pos_pct": round(float(metrics.get("center_pos_pct") or 0.0), 2),
+            "center_clearance_pct": round(float(metrics.get("center_clearance_pct") or 0.0), 2),
+            "fit_error_pct": round(float(metrics.get("fit_error_pct") or 0.0), 2),
+            "span_balance_ratio": round(float(metrics.get("span_balance_ratio") or 0.0), 2),
+            "trend_progress_pct": round(float(metrics.get("trend_progress_pct") or 0.0), 2),
+        }
+        if tag == "bottom" and bo == "up":
+            return {
+                "variant_code": "rounding_bottom",
+                "variant_confidence": 82,
+                "pattern_type": "reversal_bullish",
+                "evidence": evidence,
+            }
+        if tag == "top" and bo == "down":
+            return {
+                "variant_code": "rounding_top",
+                "variant_confidence": 82,
+                "pattern_type": "reversal_bearish",
+                "evidence": evidence,
+            }
+        return None
+
+    def _score_family_confidence(self, base_confidence: Any, metrics: Dict[str, Any], variant_result: Dict[str, Any]) -> int:
+        try:
+            confidence = int(base_confidence)
+        except Exception:
+            confidence = 70
+        fit_error = float(metrics.get("fit_error_pct") or 999.0)
+        if fit_error <= 10.0:
+            confidence += 5
+        elif fit_error <= 18.0:
+            confidence += 3
+        if float(metrics.get("span_balance_ratio") or 999.0) <= 1.4:
+            confidence += 2
+        if float(metrics.get("center_clearance_pct") or 0.0) >= 7.0:
+            confidence += 3
+        return max(0, min(100, confidence))
 
     def scan(
         self,
@@ -588,14 +2591,25 @@ class RoundingBottomsTopsScanner(BaseDigitizedScanner):
     ) -> List[Dict[str, Any]]:
         out: List[Dict[str, Any]] = []
 
-        for row in self._bottom.scan(symbol=symbol, df=df, pivots_filtered=pivots_filtered, pivots_raw=pivots_raw):
-            row["pattern_id"] = f"{row['pattern_id']}_bottom"
-            row["pattern_type"] = "reversal_bullish"
-            out.append(row)
-
-        for row in self._top.scan(symbol=symbol, df=df, pivots_filtered=pivots_filtered, pivots_raw=pivots_raw):
-            row["pattern_id"] = f"{row['pattern_id']}_top"
-            row["pattern_type"] = "reversal_bearish"
+        for base_row, tag in [*( (r, "bottom") for r in self._bottom.scan(symbol=symbol, df=df, pivots_filtered=pivots_filtered, pivots_raw=pivots_raw) ), *( (r, "top") for r in self._top.scan(symbol=symbol, df=df, pivots_filtered=pivots_filtered, pivots_raw=pivots_raw) )]:
+            row = dict(base_row)
+            if row.get("breakout_idx") is None or _safe_float(row.get("breakout_price")) is None:
+                continue
+            metrics = self._family_metrics(df, row.get("pivot_indices") or [], variant_tag=tag)
+            if not metrics or not self._family_metrics_ok(metrics):
+                continue
+            variant = self._resolve_variant(metrics, breakout_direction=row.get("breakout_direction"))
+            if not variant:
+                continue
+            row["pattern_id"] = f"{row['pattern_id']}_{tag}"
+            row["pattern_name"] = self.key
+            row["base_pattern_name"] = self.key
+            row["variant_code"] = variant.get("variant_code")
+            row["variant_confidence"] = int(variant.get("variant_confidence") or 0)
+            row["variant_evidence_json"] = json.dumps(variant.get("evidence") or {}, sort_keys=True, ensure_ascii=False)
+            row["family_metrics_json"] = json.dumps(metrics, sort_keys=True, ensure_ascii=False)
+            row["pattern_type"] = variant.get("pattern_type") or row.get("pattern_type") or self.pattern_type
+            row["confidence_score"] = self._score_family_confidence(row.get("confidence_score"), metrics, variant)
             out.append(row)
 
         return out
@@ -621,8 +2635,13 @@ class CupWithHandleScanner(BaseDigitizedScanner):
 
         self.width_min = int(self.geom.get("width_min_bars") or 84)
         self.width_max = int(self.geom.get("width_max_bars") or 504)
+        self.width_hard_max = min(self.width_max, int(self.geom.get("width_hard_cap_bars") or 220))
         self.depth_min = float(self.geom.get("height_ratio_min") or 15.0)
         self.depth_max = float(self.geom.get("height_ratio_max") or 33.0)
+        self.bottom_pos_min_pct = float(self.geom.get("bottom_position_min_pct") or 28.0)
+        self.bottom_pos_max_pct = float(self.geom.get("bottom_position_max_pct") or 72.0)
+        self.roundness_band_pct = float(self.geom.get("roundness_band_pct") or 35.0)
+        self.roundness_min_bars = int(self.geom.get("roundness_min_bars") or 5)
 
         handle = self.geom.get("handle_constraints", {}) or {}
         self.handle_min_bars = 5
@@ -630,6 +2649,9 @@ class CupWithHandleScanner(BaseDigitizedScanner):
         self.handle_pos_min_pct = float(handle.get("handle_position_min_pct") or 67.0)
         self.handle_min_decline_pct = float(handle.get("handle_min_decline_pct") or 2.0)
         self.handle_max_decline_pct = float(handle.get("handle_max_decline_pct") or 12.0)
+        self.handle_width_max_pct = float(handle.get("handle_width_max_pct_of_cup") or 35.0)
+        self.handle_slope_max_pct = float(handle.get("handle_slope_max_pct") or 3.0)
+        self.handle_retrace_max_pct = float(handle.get("handle_retrace_max_pct_of_cup") or 45.0)
 
         # Rims "near equal" is very strict in some digitizations; treat the digitized tolerance
         # as "ideal" and apply a looser hard cap for coverage. Confidence scoring rewards tight rims.
@@ -643,7 +2665,8 @@ class CupWithHandleScanner(BaseDigitizedScanner):
         self.vol_mult_min = float(self.bo.get("volume_multiplier_min") or 1.3)
 
         # Bound breakout search to keep scans fast.
-        self.breakout_search_bars = int(self.geom.get("breakout_search_bars") or 60)
+        self.breakout_search_bars = min(int(self.geom.get("breakout_search_bars") or 12), 15)
+        self.breakout_lag_max_bars = int(self.geom.get("breakout_lag_max_bars") or 8)
 
     def _prior_trend_ok(self, df: pd.DataFrame, start_idx: int) -> bool:
         direction = str(self.prior.get("direction") or "up").lower()
@@ -725,7 +2748,7 @@ class CupWithHandleScanner(BaseDigitizedScanner):
                 width_bars = int(right.idx) - int(left.idx) + 1
                 if width_bars < self.width_min:
                     continue
-                if width_bars > self.width_max:
+                if width_bars > self.width_hard_max:
                     break
 
                 # Rim similarity (hard cap for coverage; scoring uses ideal tolerance).
@@ -747,6 +2770,24 @@ class CupWithHandleScanner(BaseDigitizedScanner):
                 depth_pct = (rim_avg - bottom_low) / rim_avg * 100.0
                 if depth_pct < self.depth_min or depth_pct > self.depth_max:
                     continue
+                depth_abs = max(0.0, rim_avg - bottom_low)
+                if depth_abs <= 0:
+                    continue
+
+                bottom_idx = int(left.idx) + int(np.argmin(seg["low"].to_numpy()))
+                left_span_bars = bottom_idx - int(left.idx)
+                right_span_bars = int(right.idx) - bottom_idx
+                if left_span_bars <= 0 or right_span_bars <= 0:
+                    continue
+                bottom_pos_pct = left_span_bars / max(1, width_bars - 1) * 100.0
+                if bottom_pos_pct < self.bottom_pos_min_pct or bottom_pos_pct > self.bottom_pos_max_pct:
+                    continue
+
+                roundness_band = bottom_low + depth_abs * (self.roundness_band_pct / 100.0)
+                near_bottom_bars = int((seg["low"] <= roundness_band).sum())
+                min_roundness_bars = max(3, min(self.roundness_min_bars, width_bars // 8))
+                if near_bottom_bars < min_roundness_bars:
+                    continue
 
                 # Handle search window
                 handle_start = int(right.idx) + 1
@@ -758,16 +2799,21 @@ class CupWithHandleScanner(BaseDigitizedScanner):
                     # Enforce width constraints on the *full* formation (cup + handle).
                     # We persist `pattern_width_bars` as left-rim -> handle_end inclusive.
                     total_width_bars = int(handle_end) - int(left.idx) + 1
-                    if total_width_bars > self.width_max:
+                    if total_width_bars > self.width_hard_max:
                         break
                     hseg = df.iloc[handle_start : handle_end + 1]
                     if len(hseg) == 0:
+                        continue
+                    handle_width_bars = len(hseg)
+                    if handle_width_bars > max(self.handle_min_bars, int(round(width_bars * self.handle_width_max_pct / 100.0))):
                         continue
                     handle_low = _safe_float(hseg["low"].min())
                     if handle_low is None:
                         continue
                     handle_decline = (rim_avg - handle_low) / rim_avg * 100.0
                     if handle_decline < self.handle_min_decline_pct or handle_decline > self.handle_max_decline_pct:
+                        continue
+                    if depth_pct > 0 and (handle_decline / depth_pct * 100.0) > self.handle_retrace_max_pct:
                         continue
 
                     # Handle must be in upper third of cup depth (position % from bottom -> rim).
@@ -776,6 +2822,14 @@ class CupWithHandleScanner(BaseDigitizedScanner):
                         continue
                     handle_pos_pct = (handle_low - bottom_low) / denom * 100.0
                     if handle_pos_pct < self.handle_pos_min_pct:
+                        continue
+
+                    handle_start_close = _safe_float(hseg.iloc[0].get("close"))
+                    handle_end_close = _safe_float(hseg.iloc[-1].get("close"))
+                    if handle_start_close is None or handle_end_close is None:
+                        continue
+                    handle_slope_pct = (handle_end_close - handle_start_close) / rim_avg * 100.0
+                    if handle_slope_pct > self.handle_slope_max_pct:
                         continue
 
                     handle_res = _safe_float(hseg["high"].max())
@@ -787,16 +2841,44 @@ class CupWithHandleScanner(BaseDigitizedScanner):
                     breakout_idx, breakout_price, vol_ok = self._breakout_ok(df, handle_end + 1, handle_res)
                     if breakout_idx is None or breakout_price is None:
                         continue
+                    breakout_lag_bars = int(breakout_idx) - int(handle_end)
+                    if breakout_lag_bars < 1 or breakout_lag_bars > self.breakout_lag_max_bars:
+                        continue
 
                     # Target/stop (pragmatic): depth in absolute price units.
-                    depth_abs = max(0.0, rim_avg - bottom_low)
                     target = breakout_price + depth_abs
                     stop = float(handle_low)
+
+                    variant_code = "standard"
+                    if depth_pct < 20.0:
+                        variant_code = "shallow_cup"
+                    elif depth_pct > 30.0:
+                        variant_code = "deep_cup"
+
+                    family_metrics = {
+                        "cup_width_bars": int(width_bars),
+                        "handle_width_bars": int(handle_width_bars),
+                        "bottom_pos_pct": round(float(bottom_pos_pct), 2),
+                        "near_bottom_bars": int(near_bottom_bars),
+                        "rim_diff_pct": round(float(rim_diff), 2),
+                        "handle_decline_pct": round(float(handle_decline), 2),
+                        "handle_pos_pct": round(float(handle_pos_pct), 2),
+                        "handle_slope_pct": round(float(handle_slope_pct), 2),
+                        "breakout_lag_bars": int(breakout_lag_bars),
+                    }
+                    variant_evidence = {
+                        "depth_pct": round(float(depth_pct), 2),
+                        "variant_code": variant_code,
+                    }
 
                     confidence = 60
                     if rim_diff <= self.rim_tol_ideal:
                         confidence += 10
                     elif rim_diff <= 5.0:
+                        confidence += 5
+                    if abs(bottom_pos_pct - 50.0) <= 10.0:
+                        confidence += 5
+                    if near_bottom_bars >= max(self.roundness_min_bars, 5):
                         confidence += 5
                     if vol_ok:
                         confidence += 10
@@ -804,7 +2886,6 @@ class CupWithHandleScanner(BaseDigitizedScanner):
                     confidence = int(min(100, confidence))
 
                     # Use positional indices (pivot engine works on iloc positions).
-                    bottom_idx = int(left.idx) + int(np.argmin(seg["low"].to_numpy()))
                     handle_low_idx = int(handle_start) + int(np.argmin(hseg["low"].to_numpy()))
 
                     pattern_id = f"{symbol}_{self.key}_{int(left.idx)}_{int(handle_end)}"
@@ -828,6 +2909,11 @@ class CupWithHandleScanner(BaseDigitizedScanner):
                             "pattern_width_bars": (int(handle_end) - int(left.idx)) + 1,
                             "touch_count": 6,
                             "pivot_indices": [int(left.idx), bottom_idx, int(right.idx), handle_low_idx, int(handle_end)],
+                            "base_pattern_name": "cup_with_handle",
+                            "variant_code": variant_code,
+                            "variant_confidence": confidence,
+                            "variant_evidence_json": json.dumps(variant_evidence, ensure_ascii=False, sort_keys=True),
+                            "family_metrics_json": json.dumps(family_metrics, ensure_ascii=False, sort_keys=True),
                             "config_hash": self.config_hash,
                             "created_at": datetime.now().isoformat(),
                         }
@@ -965,12 +3051,47 @@ class InvertedCupWithHandleScanner(CupWithHandleScanner):
             if handle_high is None or handle_high <= 0:
                 continue
 
+            family_metrics = {}
+            if r.get("family_metrics_json"):
+                try:
+                    family_metrics = json.loads(str(r.get("family_metrics_json") or ""))
+                except Exception:
+                    family_metrics = {}
+
+            handle_rebound_pct = (float(handle_high) - float(rim_avg)) / float(rim_avg) * 100.0 if float(rim_avg) > 0 else 0.0
+            handle_ceiling_pct = (float(handle_high) - float(rim_avg)) / float(depth_abs) * 100.0 if float(depth_abs) > 0 else 0.0
+            mirrored_handle_slope_pct = _safe_float(family_metrics.get("handle_slope_pct"))
+            breakout_lag_bars = int(family_metrics.get("breakout_lag_bars") or 0)
+            rim_diff_pct = _safe_float(family_metrics.get("rim_diff_pct"))
+
+            # The mirrored bullish scan still lets in a few bearish cups whose handles do not
+            # drift upward or whose downside breakout comes too late. Re-check those semantics
+            # in original price space before keeping the formation.
+            if mirrored_handle_slope_pct is None or mirrored_handle_slope_pct > 0.75:
+                continue
+            if breakout_lag_bars <= 0 or breakout_lag_bars > 5:
+                continue
+            if rim_diff_pct is not None and rim_diff_pct > max(self.rim_tol_ideal + 3.0, 6.0):
+                continue
+            if handle_rebound_pct < 2.5 or handle_rebound_pct > 8.5:
+                continue
+            if handle_ceiling_pct > 32.0:
+                continue
+
             row = dict(r)
             row["pattern_type"] = "continuation_bearish"
             row["breakout_direction"] = "down"
             row["breakout_price"] = float(breakout_price)
             row["target_price"] = float(breakout_price) - float(depth_abs)
             row["stop_loss_price"] = float(handle_high)
+            family_metrics.update(
+                {
+                    "orig_handle_rebound_pct": round(float(handle_rebound_pct), 2),
+                    "orig_handle_ceiling_pct": round(float(handle_ceiling_pct), 2),
+                    "orig_handle_high": round(float(handle_high), 6),
+                }
+            )
+            row["family_metrics_json"] = json.dumps(family_metrics, ensure_ascii=False, sort_keys=True)
             out.append(row)
 
         return out
@@ -1767,22 +3888,151 @@ class TripleBottomsTopsScanner(BaseDigitizedScanner):
     def __init__(self, key: str, spec: Dict[str, Any]):
         super().__init__(key, spec)
         ds = spec.get("detection_signature", {}) or {}
+        bo = spec.get("breakout_confirmation", {}) or {}
+        self.geom = spec.get("geometry_constraints", {}) or {}
 
         self._bottom: Optional[PivotSequenceScanner] = None
         self._top: Optional[PivotSequenceScanner] = None
 
         tb = ds.get("triple_bottom")
         if isinstance(tb, dict):
-            bottom_spec = dict(spec)
+            bottom_spec = copy.deepcopy(spec)
             bottom_spec["detection_signature"] = tb
-            # Keep top-level pattern_type for now (reversal_both); breakout_direction disambiguates.
-            self._bottom = PivotSequenceScanner(key, bottom_spec)
+            bottom_spec["pattern_type"] = "reversal_bullish"
+            if isinstance(bo.get("triple_bottom"), dict):
+                bottom_spec["breakout_confirmation"] = bo.get("triple_bottom")
+            self._bottom = PivotSequenceScanner("__triple_bottom", bottom_spec)
 
         tt = ds.get("triple_top")
         if isinstance(tt, dict):
-            top_spec = dict(spec)
+            top_spec = copy.deepcopy(spec)
             top_spec["detection_signature"] = tt
-            self._top = PivotSequenceScanner(key, top_spec)
+            top_spec["pattern_type"] = "reversal_bearish"
+            if isinstance(bo.get("triple_top"), dict):
+                top_spec["breakout_confirmation"] = bo.get("triple_top")
+            self._top = PivotSequenceScanner("__triple_top", top_spec)
+
+        triple_ratio = self.geom.get("triple_price_ratio", {}) or {}
+        depth = self.geom.get("peak_trough_depth_pct", {}) or {}
+        slope = self.geom.get("slope_constraints", {}) or {}
+        self.width_max_bars = min(int(self.geom.get("width_max_bars") or 270), 240)
+        self.extreme_ratio_min = float(triple_ratio.get("min") or 0.96)
+        self.extreme_ratio_max = float(triple_ratio.get("max") or 1.04)
+        self.depth_min_pct = float(depth.get("min") or 5.0)
+        self.depth_max_pct = float(depth.get("max") or 25.0)
+        self.boundary_slope_max_deg = max(2.0, float(slope.get("boundary_max_slope_degrees") or 1.0) + 1.5)
+        self.span_balance_max_ratio = 2.75
+        self.pullback_similarity_max_ratio = 1.18
+
+    def _family_metrics(self, df: pd.DataFrame, pivots: Sequence[Any], *, variant_tag: str) -> Optional[Dict[str, Any]]:
+        if len(pivots) < 5:
+            return None
+        try:
+            i0, i1, i2, i3, i4 = [int(x) for x in pivots[:5]]
+        except Exception:
+            return None
+        if not (0 <= i0 < i1 < i2 < i3 < i4 < len(df)):
+            return None
+
+        width_bars = i4 - i0 + 1
+        left_span = i2 - i0
+        right_span = i4 - i2
+        span_balance_ratio = max(left_span, right_span) / max(1, min(left_span, right_span))
+
+        if variant_tag == "bottom":
+            extremes = [float(df.iloc[i0]["low"]), float(df.iloc[i2]["low"]), float(df.iloc[i4]["low"])]
+            pullbacks = [float(df.iloc[i1]["high"]), float(df.iloc[i3]["high"])]
+        else:
+            extremes = [float(df.iloc[i0]["high"]), float(df.iloc[i2]["high"]), float(df.iloc[i4]["high"])]
+            pullbacks = [float(df.iloc[i1]["low"]), float(df.iloc[i3]["low"])]
+
+        if min(abs(x) for x in extremes + pullbacks) <= 0:
+            return None
+
+        extreme_ratio = max(extremes) / min(extremes)
+        pullback_ratio = max(pullbacks) / min(pullbacks)
+        avg_extreme = float(np.mean(extremes))
+        avg_pullback = float(np.mean(pullbacks))
+        if variant_tag == "bottom":
+            depth_pct = (avg_pullback - avg_extreme) / avg_pullback * 100.0
+            boundary_slope_deg = abs(_slope_degrees(i0, extremes[0], i4, extremes[2]))
+        else:
+            depth_pct = (avg_extreme - avg_pullback) / avg_extreme * 100.0
+            boundary_slope_deg = abs(_slope_degrees(i0, extremes[0], i4, extremes[2]))
+
+        return {
+            "variant_tag": variant_tag,
+            "width_bars": int(width_bars),
+            "left_span_bars": int(left_span),
+            "right_span_bars": int(right_span),
+            "span_balance_ratio": float(span_balance_ratio),
+            "extreme_ratio": float(extreme_ratio),
+            "extreme_diff_pct": float(_pct_diff(extremes[0], extremes[2])),
+            "pullback_ratio": float(pullback_ratio),
+            "pullback_diff_pct": float(_pct_diff(pullbacks[0], pullbacks[1])),
+            "depth_pct": float(depth_pct),
+            "boundary_slope_deg": float(boundary_slope_deg),
+        }
+
+    def _family_metrics_ok(self, metrics: Dict[str, Any]) -> bool:
+        width_bars = int(metrics.get("width_bars") or 0)
+        span_balance_ratio = float(metrics.get("span_balance_ratio") or 999.0)
+        extreme_ratio = float(metrics.get("extreme_ratio") or 0.0)
+        pullback_ratio = float(metrics.get("pullback_ratio") or 999.0)
+        depth_pct = float(metrics.get("depth_pct") or 0.0)
+        boundary_slope_deg = float(metrics.get("boundary_slope_deg") or 999.0)
+
+        if width_bars <= 0 or width_bars > self.width_max_bars:
+            return False
+        if span_balance_ratio > self.span_balance_max_ratio:
+            return False
+        if extreme_ratio < self.extreme_ratio_min or extreme_ratio > self.extreme_ratio_max:
+            return False
+        if pullback_ratio > self.pullback_similarity_max_ratio:
+            return False
+        if depth_pct < self.depth_min_pct or depth_pct > self.depth_max_pct:
+            return False
+        if boundary_slope_deg > self.boundary_slope_max_deg:
+            return False
+        return True
+
+    def _resolve_variant(self, metrics: Dict[str, Any], *, breakout_direction: Optional[str]) -> Optional[Dict[str, Any]]:
+        tag = str(metrics.get("variant_tag") or "")
+        bo = str(breakout_direction or "")
+        evidence = {
+            "extreme_diff_pct": round(float(metrics.get("extreme_diff_pct") or 0.0), 2),
+            "pullback_diff_pct": round(float(metrics.get("pullback_diff_pct") or 0.0), 2),
+            "depth_pct": round(float(metrics.get("depth_pct") or 0.0), 2),
+            "boundary_slope_deg": round(float(metrics.get("boundary_slope_deg") or 0.0), 2),
+        }
+        if tag == "bottom" and bo == "up":
+            return {
+                "variant_code": "triple_bottom",
+                "variant_confidence": 82,
+                "pattern_type": "reversal_bullish",
+                "evidence": evidence,
+            }
+        if tag == "top" and bo == "down":
+            return {
+                "variant_code": "triple_top",
+                "variant_confidence": 82,
+                "pattern_type": "reversal_bearish",
+                "evidence": evidence,
+            }
+        return None
+
+    def _score_family_confidence(self, base_confidence: Any, metrics: Dict[str, Any], variant_result: Dict[str, Any]) -> int:
+        try:
+            confidence = int(base_confidence)
+        except Exception:
+            confidence = 70
+        if float(metrics.get("extreme_diff_pct") or 999.0) <= 2.0:
+            confidence += 4
+        if float(metrics.get("pullback_diff_pct") or 999.0) <= 4.0:
+            confidence += 3
+        if float(metrics.get("boundary_slope_deg") or 999.0) <= 1.25:
+            confidence += 3
+        return max(0, min(100, confidence))
 
     def scan(
         self,
@@ -1793,9 +4043,11 @@ class TripleBottomsTopsScanner(BaseDigitizedScanner):
         pivots_raw: List[Pivot],
     ) -> List[Dict[str, Any]]:
         out: List[Dict[str, Any]] = []
+        tagged_rows: List[Tuple[Dict[str, Any], str]] = []
         if self._bottom is not None:
-            out.extend(
-                self._bottom.scan(
+            tagged_rows.extend(
+                (dict(r), "bottom")
+                for r in self._bottom.scan(
                     symbol=symbol,
                     df=df,
                     pivots_filtered=pivots_filtered,
@@ -1803,14 +4055,34 @@ class TripleBottomsTopsScanner(BaseDigitizedScanner):
                 )
             )
         if self._top is not None:
-            out.extend(
-                self._top.scan(
+            tagged_rows.extend(
+                (dict(r), "top")
+                for r in self._top.scan(
                     symbol=symbol,
                     df=df,
                     pivots_filtered=pivots_filtered,
                     pivots_raw=pivots_raw,
                 )
             )
+
+        for row, tag in tagged_rows:
+            if row.get("breakout_idx") is None or _safe_float(row.get("breakout_price")) is None:
+                continue
+            metrics = self._family_metrics(df, row.get("pivot_indices") or [], variant_tag=tag)
+            if not metrics or not self._family_metrics_ok(metrics):
+                continue
+            variant = self._resolve_variant(metrics, breakout_direction=row.get("breakout_direction"))
+            if not variant:
+                continue
+            row["pattern_name"] = self.key
+            row["base_pattern_name"] = self.key
+            row["variant_code"] = variant.get("variant_code")
+            row["variant_confidence"] = int(variant.get("variant_confidence") or 0)
+            row["variant_evidence_json"] = json.dumps(variant.get("evidence") or {}, sort_keys=True, ensure_ascii=False)
+            row["family_metrics_json"] = json.dumps(metrics, sort_keys=True, ensure_ascii=False)
+            row["pattern_type"] = variant.get("pattern_type") or row.get("pattern_type") or self.pattern_type
+            row["confidence_score"] = self._score_family_confidence(row.get("confidence_score"), metrics, variant)
+            out.append(row)
         return out
 
 
@@ -1857,6 +4129,9 @@ class PipeBottomScanner(BaseDigitizedScanner):
         self.close_beyond = bool(self.bo.get("close_beyond_required") if self.bo.get("close_beyond_required") is not None else True)
         self.vol_required = bool(self.bo.get("volume_required") or False)
         self.vol_mult_min = float(self.bo.get("volume_multiplier_min") or 1.3)
+        self.breakout_lag_max_bars = min(int(self.geom.get("breakout_lag_max_bars") or 12), 15)
+        self.leg_balance_max_ratio = 2.25
+        self.angle_gap_max_deg = 28.0
 
         # Pragmatic local windows for "vertical" leg checks
         self._leg_window_pre = 3
@@ -1979,6 +4254,32 @@ class PipeBottomScanner(BaseDigitizedScanner):
         pivots_filtered: List[Pivot],
         pivots_raw: List[Pivot],
     ) -> List[Dict[str, Any]]:
+        def _leg_snapshot(low_idx: int, low_price: float) -> Optional[Dict[str, float]]:
+            pre0 = max(0, low_idx - self._leg_window_pre)
+            pre = df.iloc[pre0:low_idx]
+            post1 = min(len(df), low_idx + 1 + self._leg_window_post)
+            post = df.iloc[low_idx + 1 : post1]
+            if len(pre) == 0 or len(post) == 0:
+                return None
+            pre_high = _safe_float(pre["high"].max())
+            post_high = _safe_float(post["high"].max())
+            if pre_high is None or post_high is None or pre_high <= 0 or low_price <= 0:
+                return None
+            try:
+                pre_high_vals = pre["high"].to_numpy(dtype=float, copy=False)
+                pre_high_rel = int(np.nanargmax(pre_high_vals))
+                pre_high_idx = int(pre0 + pre_high_rel)
+            except Exception:
+                return None
+            drop_pct = (pre_high - low_price) / pre_high * 100.0
+            rebound_pct = (post_high - low_price) / low_price * 100.0
+            angle_deg = abs(_slope_degrees(pre_high_idx, pre_high, low_idx, low_price))
+            return {
+                "drop_pct": float(drop_pct),
+                "rebound_pct": float(rebound_pct),
+                "angle_deg": float(angle_deg),
+            }
+
         pivots = pivots_raw or pivots_filtered
         lows = [p for p in pivots if p.type == PivotType.LOW]
         if len(lows) < 2:
@@ -2011,6 +4312,10 @@ class PipeBottomScanner(BaseDigitizedScanner):
                 if not self._leg_ok(df, int(l1.idx), float(l1.price)):
                     continue
                 if not self._leg_ok(df, int(l2.idx), float(l2.price)):
+                    continue
+                left_leg = _leg_snapshot(int(l1.idx), float(l1.price))
+                right_leg = _leg_snapshot(int(l2.idx), float(l2.price))
+                if left_leg is None or right_leg is None:
                     continue
 
                 # Interim high between the two lows acts as breakout level.
@@ -2047,6 +4352,21 @@ class PipeBottomScanner(BaseDigitizedScanner):
                 )
                 if breakout_idx is None or breakout_price is None:
                     continue
+                breakout_lag_bars = int(breakout_idx) - int(l2.idx)
+                if breakout_lag_bars > self.breakout_lag_max_bars:
+                    continue
+                drop_min = min(float(left_leg["drop_pct"]), float(right_leg["drop_pct"]))
+                drop_max = max(float(left_leg["drop_pct"]), float(right_leg["drop_pct"]))
+                rebound_min = min(float(left_leg["rebound_pct"]), float(right_leg["rebound_pct"]))
+                rebound_max = max(float(left_leg["rebound_pct"]), float(right_leg["rebound_pct"]))
+                if drop_min <= 0 or rebound_min <= 0:
+                    continue
+                drop_balance = drop_max / drop_min
+                rebound_balance = rebound_max / rebound_min
+                if drop_balance > self.leg_balance_max_ratio or rebound_balance > self.leg_balance_max_ratio:
+                    continue
+                if abs(float(left_leg["angle_deg"]) - float(right_leg["angle_deg"])) > self.angle_gap_max_deg:
+                    continue
 
                 target = breakout_price + height_abs
                 stop = avg_low
@@ -2054,7 +4374,26 @@ class PipeBottomScanner(BaseDigitizedScanner):
                 confidence = 75
                 if vol_ok:
                     confidence += 10
+                if drop_balance <= 1.35:
+                    confidence += 4
+                if rebound_balance <= 1.35:
+                    confidence += 3
                 confidence = int(min(100, confidence))
+                family_metrics = {
+                    "width_bars": int(width_bars),
+                    "separation_bars": int(sep),
+                    "similarity_ratio": float(ratio),
+                    "height_drop_pct": float(height_drop_pct),
+                    "left_drop_pct": float(left_leg["drop_pct"]),
+                    "right_drop_pct": float(right_leg["drop_pct"]),
+                    "left_rebound_pct": float(left_leg["rebound_pct"]),
+                    "right_rebound_pct": float(right_leg["rebound_pct"]),
+                    "left_angle_deg": float(left_leg["angle_deg"]),
+                    "right_angle_deg": float(right_leg["angle_deg"]),
+                    "breakout_lag_bars": int(breakout_lag_bars),
+                    "drop_balance_ratio": float(drop_balance),
+                    "rebound_balance_ratio": float(rebound_balance),
+                }
 
                 pattern_id = f"{symbol}_{self.key}_{int(l1.idx)}_{int(l2.idx)}"
 
@@ -2074,6 +4413,19 @@ class PipeBottomScanner(BaseDigitizedScanner):
                         "stop_loss_price": float(stop),
                         "confidence_score": confidence,
                         "volume_confirmed": bool(vol_ok),
+                        "base_pattern_name": self.key,
+                        "variant_code": "pipe_bottom",
+                        "variant_confidence": confidence,
+                        "variant_evidence_json": json.dumps(
+                            {
+                                "similarity_ratio": round(float(ratio), 4),
+                                "height_drop_pct": round(float(height_drop_pct), 2),
+                                "breakout_lag_bars": int(breakout_lag_bars),
+                            },
+                            sort_keys=True,
+                            ensure_ascii=False,
+                        ),
+                        "family_metrics_json": json.dumps(family_metrics, sort_keys=True, ensure_ascii=False),
                         "pattern_height_pct": round(height_drop_pct, 2),
                         "pattern_width_bars": int(width_bars),
                         "touch_count": 2,
@@ -2127,6 +4479,9 @@ class PipeTopScanner(BaseDigitizedScanner):
         self.confirm_bars = int(self.bo.get("confirmation_bars") or 1)
         self.vol_required = bool(self.bo.get("volume_required") or False)
         self.vol_mult_min = float(self.bo.get("volume_multiplier_min") or 1.3)
+        self.breakout_lag_max_bars = min(int(self.geom.get("breakout_lag_max_bars") or 12), 15)
+        self.leg_balance_max_ratio = 2.25
+        self.angle_gap_max_deg = 28.0
 
         self._leg_window_pre = 3
         self._leg_window_post = 3
@@ -2247,6 +4602,32 @@ class PipeTopScanner(BaseDigitizedScanner):
         pivots_filtered: List[Pivot],
         pivots_raw: List[Pivot],
     ) -> List[Dict[str, Any]]:
+        def _leg_snapshot(high_idx: int, high_price: float) -> Optional[Dict[str, float]]:
+            pre0 = max(0, high_idx - self._leg_window_pre)
+            pre = df.iloc[pre0:high_idx]
+            post1 = min(len(df), high_idx + 1 + self._leg_window_post)
+            post = df.iloc[high_idx + 1 : post1]
+            if len(pre) == 0 or len(post) == 0:
+                return None
+            pre_low = _safe_float(pre["low"].min())
+            post_low = _safe_float(post["low"].min())
+            if pre_low is None or post_low is None or pre_low <= 0 or post_low <= 0 or high_price <= 0:
+                return None
+            try:
+                pre_low_vals = pre["low"].to_numpy(dtype=float, copy=False)
+                pre_low_rel = int(np.nanargmin(pre_low_vals))
+                pre_low_idx = int(pre0 + pre_low_rel)
+            except Exception:
+                return None
+            rise_pct = (high_price - pre_low) / pre_low * 100.0
+            drop_pct = (high_price - post_low) / high_price * 100.0
+            angle_deg = abs(_slope_degrees(pre_low_idx, pre_low, high_idx, high_price))
+            return {
+                "rise_pct": float(rise_pct),
+                "drop_pct": float(drop_pct),
+                "angle_deg": float(angle_deg),
+            }
+
         pivots = pivots_raw or pivots_filtered
         highs = [p for p in pivots if p.type == PivotType.HIGH]
         if len(highs) < 2:
@@ -2278,6 +4659,10 @@ class PipeTopScanner(BaseDigitizedScanner):
                 if not self._leg_ok(df, int(h1.idx), float(h1.price)):
                     continue
                 if not self._leg_ok(df, int(h2.idx), float(h2.price)):
+                    continue
+                left_leg = _leg_snapshot(int(h1.idx), float(h1.price))
+                right_leg = _leg_snapshot(int(h2.idx), float(h2.price))
+                if left_leg is None or right_leg is None:
                     continue
 
                 interim = df.iloc[int(h1.idx) : int(h2.idx) + 1]
@@ -2315,6 +4700,21 @@ class PipeTopScanner(BaseDigitizedScanner):
                 )
                 if breakout_idx is None or breakout_price is None:
                     continue
+                breakout_lag_bars = int(breakout_idx) - int(h2.idx)
+                if breakout_lag_bars > self.breakout_lag_max_bars:
+                    continue
+                rise_min = min(float(left_leg["rise_pct"]), float(right_leg["rise_pct"]))
+                rise_max = max(float(left_leg["rise_pct"]), float(right_leg["rise_pct"]))
+                drop_min = min(float(left_leg["drop_pct"]), float(right_leg["drop_pct"]))
+                drop_max = max(float(left_leg["drop_pct"]), float(right_leg["drop_pct"]))
+                if rise_min <= 0 or drop_min <= 0:
+                    continue
+                rise_balance = rise_max / rise_min
+                drop_balance = drop_max / drop_min
+                if rise_balance > self.leg_balance_max_ratio or drop_balance > self.leg_balance_max_ratio:
+                    continue
+                if abs(float(left_leg["angle_deg"]) - float(right_leg["angle_deg"])) > self.angle_gap_max_deg:
+                    continue
 
                 target = float(breakout_price) - float(height_abs)
                 stop = float(avg_high)
@@ -2322,7 +4722,26 @@ class PipeTopScanner(BaseDigitizedScanner):
                 confidence = 75
                 if vol_ok:
                     confidence += 10
+                if rise_balance <= 1.35:
+                    confidence += 4
+                if drop_balance <= 1.35:
+                    confidence += 3
                 confidence = int(min(100, confidence))
+                family_metrics = {
+                    "width_bars": int(width_bars),
+                    "separation_bars": int(sep),
+                    "similarity_ratio": float(ratio),
+                    "height_rise_pct": float(height_pct),
+                    "left_rise_pct": float(left_leg["rise_pct"]),
+                    "right_rise_pct": float(right_leg["rise_pct"]),
+                    "left_drop_pct": float(left_leg["drop_pct"]),
+                    "right_drop_pct": float(right_leg["drop_pct"]),
+                    "left_angle_deg": float(left_leg["angle_deg"]),
+                    "right_angle_deg": float(right_leg["angle_deg"]),
+                    "breakout_lag_bars": int(breakout_lag_bars),
+                    "rise_balance_ratio": float(rise_balance),
+                    "drop_balance_ratio": float(drop_balance),
+                }
 
                 pattern_id = f"{symbol}_{self.key}_{int(h1.idx)}_{int(h2.idx)}"
                 out.append(
@@ -2341,6 +4760,19 @@ class PipeTopScanner(BaseDigitizedScanner):
                         "stop_loss_price": float(stop),
                         "confidence_score": confidence,
                         "volume_confirmed": bool(vol_ok),
+                        "base_pattern_name": self.key,
+                        "variant_code": "pipe_top",
+                        "variant_confidence": confidence,
+                        "variant_evidence_json": json.dumps(
+                            {
+                                "similarity_ratio": round(float(ratio), 4),
+                                "height_rise_pct": round(float(height_pct), 2),
+                                "breakout_lag_bars": int(breakout_lag_bars),
+                            },
+                            sort_keys=True,
+                            ensure_ascii=False,
+                        ),
+                        "family_metrics_json": json.dumps(family_metrics, sort_keys=True, ensure_ascii=False),
                         "pattern_height_pct": round(float(height_pct), 2),
                         "pattern_width_bars": int(width_bars),
                         "touch_count": 2,
@@ -2350,6 +4782,320 @@ class PipeTopScanner(BaseDigitizedScanner):
                     }
                 )
 
+        return out
+
+
+class FlagFamilyScanner(BaseDigitizedScanner):
+    """
+    Dedicated family scanner for flags.
+
+    The generic pivot scanner ignores the `flagpole` token from the digitized spec,
+    so the old implementation mostly detected short channels with breakouts. This
+    family scanner reinstates the core semantics:
+    - a strong prior pole
+    - a short parallel consolidation channel
+    - breakout in the same direction as the pole
+    """
+
+    def __init__(self, key: str, spec: Dict[str, Any]):
+        super().__init__(key, spec)
+        self.geom = spec.get("geometry_constraints", {}) or {}
+        self.prior = spec.get("prior_trend_requirements", {}) or {}
+        self.bo = spec.get("breakout_confirmation", {}) or {}
+
+        self.width_min_bars = int(self.geom.get("width_min_bars") or 5)
+        self.width_max_bars = min(int(self.geom.get("width_max_bars") or 25), 26)
+        slope_cfg = self.geom.get("slope_constraints", {}) or {}
+        bull_slope = slope_cfg.get("bull_flag", {}) or {}
+        bear_slope = slope_cfg.get("bear_flag", {}) or {}
+        self.parallel_tol_deg = max(
+            float(bull_slope.get("parallel_tolerance_degrees") or 3.0),
+            float(bear_slope.get("parallel_tolerance_degrees") or 3.0),
+        )
+        self.bull_avg_slope_min = -10.0
+        self.bull_avg_slope_max = 3.0
+        self.bear_avg_slope_min = -3.0
+        self.bear_avg_slope_max = 10.0
+        self.height_min_pct = float(self.geom.get("height_ratio_min") or 3.0)
+        self.height_max_pct = float(self.geom.get("height_ratio_max") or 15.0)
+        self.pole_lookback_bars = 40
+        self.pole_min_change_pct = max(8.0, float(self.prior.get("min_change_pct") or 10.0))
+        self.pole_min_slope_deg = max(8.0, float(self.prior.get("trend_slope_min_degrees") or 30.0) * 0.45)
+        self.flag_to_pole_max_pct = 55.0
+        self.breakout_search_bars = 12
+        self.breakout_thr = float(self.bo.get("breakout_threshold_pct") or 0.75) / 100.0
+        self.confirm_bars = int(self.bo.get("confirmation_bars") or 1)
+        self.vol_required = bool(self.bo.get("volume_required") or False)
+        self.vol_mult_min = float(self.bo.get("volume_multiplier_min") or 1.2)
+
+    def _prior_pole(self, df: pd.DataFrame, *, start_idx: int, direction: str, anchor_price: float) -> Optional[Dict[str, float]]:
+        lb = max(0, start_idx - self.pole_lookback_bars)
+        window = df.iloc[lb : start_idx + 1]
+        if len(window) < 4 or anchor_price <= 0:
+            return None
+
+        if direction == "up":
+            pole_price = _safe_float(window["low"].min())
+            if pole_price is None or pole_price <= 0:
+                return None
+            try:
+                vals = window["low"].to_numpy(dtype=float, copy=False)
+                pole_rel = int(np.nanargmin(vals))
+            except Exception:
+                return None
+            pole_idx = int(lb + pole_rel)
+            move_pct = (anchor_price - pole_price) / pole_price * 100.0
+            slope_deg = _slope_degrees(pole_idx, pole_price, start_idx, anchor_price)
+        else:
+            pole_price = _safe_float(window["high"].max())
+            if pole_price is None or pole_price <= 0:
+                return None
+            try:
+                vals = window["high"].to_numpy(dtype=float, copy=False)
+                pole_rel = int(np.nanargmax(vals))
+            except Exception:
+                return None
+            pole_idx = int(lb + pole_rel)
+            move_pct = (pole_price - anchor_price) / pole_price * 100.0
+            slope_deg = abs(_slope_degrees(pole_idx, pole_price, start_idx, anchor_price))
+
+        pole_bars = start_idx - pole_idx + 1
+        if pole_bars <= 1 or pole_bars > self.pole_lookback_bars:
+            return None
+        if move_pct < self.pole_min_change_pct or slope_deg < self.pole_min_slope_deg:
+            return None
+        return {
+            "pole_idx": float(pole_idx),
+            "pole_price": float(pole_price),
+            "pole_move_pct": float(move_pct),
+            "pole_slope_deg": float(slope_deg),
+            "pole_bars": float(pole_bars),
+        }
+
+    def _breakout_ok(self, df: pd.DataFrame, *, start_idx: int, line: Trendline, direction: str) -> Tuple[Optional[int], Optional[float], bool]:
+        for i in range(start_idx, min(len(df), start_idx + self.breakout_search_bars)):
+            close = _safe_float(df.iloc[i].get("close"))
+            boundary = line.value_at(i)
+            if close is None or boundary <= 0:
+                continue
+            thr = boundary * (1.0 + self.breakout_thr) if direction == "up" else boundary * (1.0 - self.breakout_thr)
+            if direction == "up":
+                ok = close > thr
+            else:
+                ok = close < thr
+            if not ok:
+                continue
+
+            if self.confirm_bars > 1:
+                j_end = min(len(df), i + self.confirm_bars)
+                all_ok = True
+                for j in range(i, j_end):
+                    c = _safe_float(df.iloc[j].get("close"))
+                    b = line.value_at(j)
+                    if c is None or b <= 0:
+                        all_ok = False
+                        break
+                    tt = b * (1.0 + self.breakout_thr) if direction == "up" else b * (1.0 - self.breakout_thr)
+                    if direction == "up" and not (c > tt):
+                        all_ok = False
+                        break
+                    if direction == "down" and not (c < tt):
+                        all_ok = False
+                        break
+                if not all_ok:
+                    continue
+
+            vr = df.iloc[i].get("volume_ratio", np.nan)
+            vol_ok = bool(pd.notna(vr) and np.isfinite(vr) and float(vr) >= self.vol_mult_min)
+            if self.vol_required and not vol_ok:
+                continue
+            return i, close, vol_ok
+        return None, None, False
+
+    def _candidate(self, df: pd.DataFrame, pivots: Sequence[Pivot]) -> Optional[Dict[str, Any]]:
+        if len(pivots) != 4:
+            return None
+        idxs = [int(p.idx) for p in pivots]
+        if not (idxs[0] < idxs[1] < idxs[2] < idxs[3]):
+            return None
+        width_bars = idxs[-1] - idxs[0] + 1
+        if width_bars < self.width_min_bars or width_bars > self.width_max_bars:
+            return None
+
+        kinds = [p.type for p in pivots]
+        if kinds == [PivotType.HIGH, PivotType.LOW, PivotType.HIGH, PivotType.LOW]:
+            direction = "up"
+            upper_points = [(idxs[0], float(df.iloc[idxs[0]]["high"])), (idxs[2], float(df.iloc[idxs[2]]["high"]))]
+            lower_points = [(idxs[1], float(df.iloc[idxs[1]]["low"])), (idxs[3], float(df.iloc[idxs[3]]["low"]))]
+            anchor_price = upper_points[0][1]
+            pattern_type = "continuation_bullish"
+            variant_code = "bull_flag"
+        elif kinds == [PivotType.LOW, PivotType.HIGH, PivotType.LOW, PivotType.HIGH]:
+            direction = "down"
+            upper_points = [(idxs[1], float(df.iloc[idxs[1]]["high"])), (idxs[3], float(df.iloc[idxs[3]]["high"]))]
+            lower_points = [(idxs[0], float(df.iloc[idxs[0]]["low"])), (idxs[2], float(df.iloc[idxs[2]]["low"]))]
+            anchor_price = lower_points[0][1]
+            pattern_type = "continuation_bearish"
+            variant_code = "bear_flag"
+        else:
+            return None
+
+        upper = Trendline(
+            idx0=upper_points[0][0],
+            price0=upper_points[0][1],
+            slope_per_bar=(upper_points[1][1] - upper_points[0][1]) / max(1, upper_points[1][0] - upper_points[0][0]),
+        )
+        lower = Trendline(
+            idx0=lower_points[0][0],
+            price0=lower_points[0][1],
+            slope_per_bar=(lower_points[1][1] - lower_points[0][1]) / max(1, lower_points[1][0] - lower_points[0][0]),
+        )
+        upper_deg = _slope_degrees(upper_points[0][0], upper_points[0][1], upper_points[1][0], upper_points[1][1])
+        lower_deg = _slope_degrees(lower_points[0][0], lower_points[0][1], lower_points[1][0], lower_points[1][1])
+        slope_gap_deg = abs(upper_deg - lower_deg)
+        if slope_gap_deg > self.parallel_tol_deg + 1.0:
+            return None
+
+        avg_slope_deg = (upper_deg + lower_deg) / 2.0
+        if direction == "up":
+            if avg_slope_deg < self.bull_avg_slope_min or avg_slope_deg > self.bull_avg_slope_max:
+                return None
+        else:
+            if avg_slope_deg < self.bear_avg_slope_min or avg_slope_deg > self.bear_avg_slope_max:
+                return None
+
+        mid_idx = (idxs[1] + idxs[2]) // 2
+        gap_mid = upper.value_at(mid_idx) - lower.value_at(mid_idx)
+        if gap_mid <= 0:
+            return None
+        mid_ref = (upper.value_at(mid_idx) + lower.value_at(mid_idx)) / 2.0
+        if mid_ref <= 0:
+            return None
+        flag_height_pct = gap_mid / mid_ref * 100.0
+        if flag_height_pct < self.height_min_pct or flag_height_pct > self.height_max_pct:
+            return None
+
+        pole = self._prior_pole(df, start_idx=idxs[0], direction=direction, anchor_price=anchor_price)
+        if not pole:
+            return None
+        if pole["pole_move_pct"] <= 0:
+            return None
+        flag_to_pole_pct = flag_height_pct / pole["pole_move_pct"] * 100.0
+        if flag_to_pole_pct > self.flag_to_pole_max_pct:
+            return None
+
+        breakout_line = upper if direction == "up" else lower
+        breakout_idx, breakout_price, vol_ok = self._breakout_ok(df, start_idx=idxs[-1] + 1, line=breakout_line, direction=direction)
+        if breakout_idx is None or breakout_price is None:
+            return None
+
+        pole_height_abs = abs(anchor_price - float(pole["pole_price"]))
+        target_price = float(breakout_price) + pole_height_abs if direction == "up" else float(breakout_price) - pole_height_abs
+        stop_loss_price = float(lower.value_at(int(breakout_idx))) if direction == "up" else float(upper.value_at(int(breakout_idx)))
+
+        confidence = 78
+        if pole["pole_move_pct"] >= 14.0:
+            confidence += 4
+        if slope_gap_deg <= 1.8:
+            confidence += 4
+        if flag_to_pole_pct <= 35.0:
+            confidence += 4
+        if vol_ok:
+            confidence += 4
+        confidence = max(0, min(100, confidence))
+
+        family_metrics = {
+            "width_bars": int(width_bars),
+            "upper_slope_deg": float(upper_deg),
+            "lower_slope_deg": float(lower_deg),
+            "avg_slope_deg": float(avg_slope_deg),
+            "slope_gap_deg": float(slope_gap_deg),
+            "flag_height_pct": float(flag_height_pct),
+            "flag_to_pole_pct": float(flag_to_pole_pct),
+            "pole_move_pct": float(pole["pole_move_pct"]),
+            "pole_slope_deg": float(pole["pole_slope_deg"]),
+            "pole_bars": int(pole["pole_bars"]),
+            "breakout_lag_bars": int(int(breakout_idx) - idxs[-1]),
+        }
+
+        return {
+            "pattern_id": f"{variant_code}_{idxs[0]}_{idxs[-1]}",
+            "pattern_type": pattern_type,
+            "breakout_direction": direction,
+            "breakout_idx": int(breakout_idx),
+            "breakout_price": float(breakout_price),
+            "target_price": float(target_price),
+            "stop_loss_price": float(stop_loss_price),
+            "confidence_score": int(confidence),
+            "volume_confirmed": bool(vol_ok),
+            "pattern_height_pct": round(float(flag_height_pct), 2),
+            "pattern_width_bars": int(width_bars),
+            "touch_count": 4,
+            "pivot_indices": idxs,
+            "variant_code": variant_code,
+            "variant_confidence": int(confidence),
+            "variant_evidence_json": json.dumps(
+                {
+                    "pole_move_pct": round(float(pole["pole_move_pct"]), 2),
+                    "flag_to_pole_pct": round(float(flag_to_pole_pct), 2),
+                    "avg_slope_deg": round(float(avg_slope_deg), 2),
+                },
+                sort_keys=True,
+                ensure_ascii=False,
+            ),
+            "family_metrics_json": json.dumps(family_metrics, sort_keys=True, ensure_ascii=False),
+        }
+
+    def scan(
+        self,
+        *,
+        symbol: str,
+        df: pd.DataFrame,
+        pivots_filtered: List[Pivot],
+        pivots_raw: List[Pivot],
+    ) -> List[Dict[str, Any]]:
+        pivots = pivots_filtered or pivots_raw
+        if len(pivots) < 4:
+            return []
+
+        out: List[Dict[str, Any]] = []
+        for i in range(len(pivots) - 3):
+            window = pivots[i : i + 4]
+            candidate = self._candidate(df, window)
+            if not candidate:
+                continue
+            start_idx = int(candidate["pivot_indices"][0])
+            end_idx = int(candidate["pivot_indices"][-1])
+            breakout_idx = int(candidate["breakout_idx"])
+            out.append(
+                {
+                    "pattern_id": f"{symbol}_{self.key}_{candidate['pattern_id']}",
+                    "symbol": symbol,
+                    "pattern_name": self.key,
+                    "base_pattern_name": self.key,
+                    "pattern_type": candidate["pattern_type"],
+                    "formation_start": str(df.iloc[start_idx]["date"].date()) if "date" in df.columns else str(start_idx),
+                    "formation_end": str(df.iloc[end_idx]["date"].date()) if "date" in df.columns else str(end_idx),
+                    "breakout_date": str(df.iloc[breakout_idx]["date"].date()) if "date" in df.columns else None,
+                    "breakout_idx": breakout_idx,
+                    "breakout_direction": candidate["breakout_direction"],
+                    "breakout_price": candidate["breakout_price"],
+                    "target_price": candidate["target_price"],
+                    "stop_loss_price": candidate["stop_loss_price"],
+                    "confidence_score": candidate["confidence_score"],
+                    "volume_confirmed": candidate["volume_confirmed"],
+                    "variant_code": candidate["variant_code"],
+                    "variant_confidence": candidate["variant_confidence"],
+                    "variant_evidence_json": candidate["variant_evidence_json"],
+                    "family_metrics_json": candidate["family_metrics_json"],
+                    "pattern_height_pct": candidate["pattern_height_pct"],
+                    "pattern_width_bars": candidate["pattern_width_bars"],
+                    "touch_count": candidate["touch_count"],
+                    "pivot_indices": candidate["pivot_indices"],
+                    "config_hash": self.config_hash,
+                    "created_at": datetime.now().isoformat(),
+                }
+            )
         return out
 
 
@@ -2429,6 +5175,9 @@ def build_digitized_scanners(
         if key == "rounding_bottoms_tops":
             scanners[key] = RoundingBottomsTopsScanner(key, spec)
             continue
+        if key == "horn_bottoms_tops":
+            scanners[key] = HornFamilyScanner(key, spec)
+            continue
         if key == "cup_with_handle":
             scanners[key] = CupWithHandleScanner(key, spec)
             continue
@@ -2436,8 +5185,23 @@ def build_digitized_scanners(
         if key == "triple_bottoms_tops":
             scanners[key] = TripleBottomsTopsScanner(key, spec)
             continue
+        if key == "head_and_shoulders_top":
+            scanners[key] = HeadShouldersTopFamilyScanner(key, spec)
+            continue
+        if key == "head_and_shoulders_bottom":
+            scanners[key] = HeadShouldersBottomFamilyScanner(key, spec)
+            continue
+        if key == "double_bottoms":
+            scanners[key] = DoubleBottomFamilyScanner(key, spec)
+            continue
+        if key == "double_tops":
+            scanners[key] = DoubleTopFamilyScanner(key, spec)
+            continue
         if key == "pipe_bottoms":
             scanners[key] = PipeBottomScanner(key, spec)
+            continue
+        if key == "flags":
+            scanners[key] = FlagFamilyScanner(key, spec)
             continue
 
         if key == "inside_day":
@@ -2551,63 +5315,6 @@ def build_bulkowski_53_scanners(library: DigitizedPatternLibrary) -> Dict[str, A
             return float("inf")
         return abs(a - b) / abs(b) * 100.0
 
-    def _peak_width_bars(df: pd.DataFrame, peak_idx: int, peak_price: float, *, tol_pct: float = 2.0, window: int = 15) -> Optional[int]:
-        if peak_idx < 0 or peak_idx >= len(df) or peak_price <= 0:
-            return None
-        thr = float(peak_price) * (1.0 - float(tol_pct) / 100.0)
-        left = peak_idx
-        for k in range(1, window + 1):
-            j = peak_idx - k
-            if j < 0:
-                break
-            if float(df.iloc[j]["high"]) >= thr:
-                left = j
-            else:
-                break
-        right = peak_idx
-        for k in range(1, window + 1):
-            j = peak_idx + k
-            if j >= len(df):
-                break
-            if float(df.iloc[j]["high"]) >= thr:
-                right = j
-            else:
-                break
-        return int(right - left + 1)
-
-    def _trough_width_bars(df: pd.DataFrame, trough_idx: int, trough_price: float, *, tol_pct: float = 2.0, window: int = 15) -> Optional[int]:
-        if trough_idx < 0 or trough_idx >= len(df) or trough_price <= 0:
-            return None
-        thr = float(trough_price) * (1.0 + float(tol_pct) / 100.0)
-        left = trough_idx
-        for k in range(1, window + 1):
-            j = trough_idx - k
-            if j < 0:
-                break
-            if float(df.iloc[j]["low"]) <= thr:
-                left = j
-            else:
-                break
-        right = trough_idx
-        for k in range(1, window + 1):
-            j = trough_idx + k
-            if j >= len(df):
-                break
-            if float(df.iloc[j]["low"]) <= thr:
-                right = j
-            else:
-                break
-        return int(right - left + 1)
-
-    def _ae(width: Optional[int], *, adam_max: int = 3, eve_min: int = 7) -> Optional[str]:
-        if width is None:
-            return None
-        if int(width) <= int(adam_max):
-            return "A"
-        if int(width) >= int(eve_min):
-            return "E"
-        return None
-
     # Chapter 1 + 4
     if _get("broadening_bottoms"):
         out["broadening_bottoms"] = _get("broadening_bottoms")
@@ -2696,58 +5403,17 @@ def build_bulkowski_53_scanners(library: DigitizedPatternLibrary) -> Dict[str, A
             "prior_trend_requirements": {"direction": "any", "min_period_bars": 21, "min_change_pct": 10.0},
             "breakout_confirmation": {"breakout_direction": "both", "breakout_threshold_pct": 1.0, "confirmation_bars": 1, "close_beyond_required": True},
         }
-    bw_base = _CachedScanner(PivotSequenceScanner("__broadening_wedges_base", bw_spec))
-
-    def _bw_slopes(r: Dict[str, Any], df: pd.DataFrame) -> Optional[Tuple[float, float, float, float]]:
-        piv = r.get("pivot_indices") or []
-        if not isinstance(piv, (list, tuple)) or len(piv) < 6:
-            return None
-        try:
-            idxs = [int(x) for x in piv[:6]]
-        except Exception:
-            return None
-        hs = [idxs[i] for i in (0, 2, 4)]
-        ls = [idxs[i] for i in (1, 3, 5)]
-        if any(i < 0 or i >= len(df) for i in hs + ls):
-            return None
-        h0, h1 = hs[0], hs[-1]
-        l0, l1 = ls[0], ls[-1]
-        upper0 = float(df.iloc[h0]["high"])
-        upper1 = float(df.iloc[h1]["high"])
-        lower0 = float(df.iloc[l0]["low"])
-        lower1 = float(df.iloc[l1]["low"])
-        up_deg = _slope_degrees(h0, upper0, h1, upper1)
-        lo_deg = _slope_degrees(l0, lower0, l1, lower1)
-        d0 = upper0 - lower0
-        d1 = upper1 - lower1
-        return up_deg, lo_deg, d0, d1
-
-    def _keep_bw_ascending(r: Dict[str, Any], df: pd.DataFrame, *_: Any) -> bool:
-        s = _bw_slopes(r, df)
-        if s is None:
-            return False
-        up_deg, lo_deg, d0, d1 = s
-        if up_deg <= 0.2 or lo_deg <= 0.2:
-            return False
-        if d1 <= d0 * 1.05:
-            return False
-        # Upper boundary rises faster than lower -> broadening.
-        return up_deg > lo_deg + 0.1
-
-    def _keep_bw_descending(r: Dict[str, Any], df: pd.DataFrame, *_: Any) -> bool:
-        s = _bw_slopes(r, df)
-        if s is None:
-            return False
-        up_deg, lo_deg, d0, d1 = s
-        if up_deg >= -0.2 or lo_deg >= -0.2:
-            return False
-        if d1 <= d0 * 1.05:
-            return False
-        # Lower boundary falls faster (more negative) -> broadening.
-        return lo_deg < up_deg - 0.1
-
-    out["broadening_wedges_ascending"] = _DerivedScanner("broadening_wedges_ascending", bw_base, keep_if=_keep_bw_ascending)
-    out["broadening_wedges_descending"] = _DerivedScanner("broadening_wedges_descending", bw_base, keep_if=_keep_bw_descending)
+    bw_base = _CachedScanner(BroadeningWedgeFamilyScanner("broadening_wedges", bw_spec))
+    out["broadening_wedges_ascending"] = _DerivedScanner(
+        "broadening_wedges_ascending",
+        bw_base,
+        keep_if=lambda r, *_: str(r.get("variant_code") or "") == "ascending",
+    )
+    out["broadening_wedges_descending"] = _DerivedScanner(
+        "broadening_wedges_descending",
+        bw_base,
+        keep_if=lambda r, *_: str(r.get("variant_code") or "") == "descending",
+    )
 
     # Chapter 7 + 8: bump-and-run reversal bottom/top
     barr = library.load("bump_and_run_reversal") if "bump_and_run_reversal" in library.list_keys() else None
@@ -2793,6 +5459,9 @@ def build_bulkowski_53_scanners(library: DigitizedPatternLibrary) -> Dict[str, A
         base = _CachedScanner(_get("double_bottoms"))
 
         def _db_variant(r: Dict[str, Any], df: pd.DataFrame) -> Optional[str]:
+            code = r.get("variant_code")
+            if isinstance(code, str) and code:
+                return code
             piv = r.get("pivot_indices") or []
             if not isinstance(piv, (list, tuple)) or len(piv) < 3:
                 return None
@@ -2800,15 +5469,8 @@ def build_bulkowski_53_scanners(library: DigitizedPatternLibrary) -> Dict[str, A
                 b1, b2 = int(piv[0]), int(piv[2])
             except Exception:
                 return None
-            if not (0 <= b1 < len(df) and 0 <= b2 < len(df)):
-                return None
-            p1 = float(df.iloc[b1]["low"])
-            p2 = float(df.iloc[b2]["low"])
-            w1 = _trough_width_bars(df, b1, p1)
-            w2 = _trough_width_bars(df, b2, p2)
-            t1 = _ae(w1)
-            t2 = _ae(w2)
-            return f"{t1}{t2}" if (t1 and t2) else None
+            variant, _, _ = classify_double_bottom_variant(df, first_idx=b1, second_idx=b2)
+            return variant
 
         out["double_bottoms_adam_adam"] = _DerivedScanner("double_bottoms_adam_adam", base, keep_if=lambda r, df, *_: _db_variant(r, df) == "AA")
         out["double_bottoms_adam_eve"] = _DerivedScanner("double_bottoms_adam_eve", base, keep_if=lambda r, df, *_: _db_variant(r, df) == "AE")
@@ -2819,6 +5481,9 @@ def build_bulkowski_53_scanners(library: DigitizedPatternLibrary) -> Dict[str, A
         base = _CachedScanner(_get("double_tops"))
 
         def _dt_variant(r: Dict[str, Any], df: pd.DataFrame) -> Optional[str]:
+            code = r.get("variant_code")
+            if isinstance(code, str) and code:
+                return code
             piv = r.get("pivot_indices") or []
             if not isinstance(piv, (list, tuple)) or len(piv) < 3:
                 return None
@@ -2826,15 +5491,8 @@ def build_bulkowski_53_scanners(library: DigitizedPatternLibrary) -> Dict[str, A
                 p1i, p2i = int(piv[0]), int(piv[2])
             except Exception:
                 return None
-            if not (0 <= p1i < len(df) and 0 <= p2i < len(df)):
-                return None
-            p1 = float(df.iloc[p1i]["high"])
-            p2 = float(df.iloc[p2i]["high"])
-            w1 = _peak_width_bars(df, p1i, p1)
-            w2 = _peak_width_bars(df, p2i, p2)
-            t1 = _ae(w1)
-            t2 = _ae(w2)
-            return f"{t1}{t2}" if (t1 and t2) else None
+            variant, _, _ = classify_double_top_variant(df, first_idx=p1i, second_idx=p2i)
+            return variant
 
         out["double_tops_adam_adam"] = _DerivedScanner("double_tops_adam_adam", base, keep_if=lambda r, df, *_: _dt_variant(r, df) == "AA")
         out["double_tops_adam_eve"] = _DerivedScanner("double_tops_adam_eve", base, keep_if=lambda r, df, *_: _dt_variant(r, df) == "AE")
@@ -2902,9 +5560,12 @@ def build_bulkowski_53_scanners(library: DigitizedPatternLibrary) -> Dict[str, A
     if _get("head_and_shoulders_bottom"):
         base = _CachedScanner(_get("head_and_shoulders_bottom"))
         hs_spec = library.load("head_and_shoulders_bottom") if "head_and_shoulders_bottom" in library.list_keys() else {}
-        tol = float((hs_spec.get("geometry_constraints", {}) or {}).get("near_equal_tolerance_pct") or 3.0)
+        standard_width_max = int((hs_spec.get("geometry_constraints", {}) or {}).get("width_max_bars") or 270)
 
         def _hsb_complex(r: Dict[str, Any], df: pd.DataFrame, _pf: List[Pivot], pr: List[Pivot]) -> bool:
+            variant = str(r.get("variant_code") or "")
+            if variant:
+                return variant == "complex"
             piv = r.get("pivot_indices") or []
             if not isinstance(piv, (list, tuple)) or len(piv) < 5:
                 return False
@@ -2919,6 +5580,10 @@ def build_bulkowski_53_scanners(library: DigitizedPatternLibrary) -> Dict[str, A
             if shoulder_level <= 0:
                 return False
 
+            if int(r.get("pattern_width_bars") or 0) > standard_width_max:
+                return True
+
+            tol = float((hs_spec.get("geometry_constraints", {}) or {}).get("near_equal_tolerance_pct") or 3.0)
             lows = [p for p in (pr or _pf) if p.type == PivotType.LOW and l1 <= int(p.idx) <= l3]
             count = 0
             for p in lows:
@@ -2931,14 +5596,21 @@ def build_bulkowski_53_scanners(library: DigitizedPatternLibrary) -> Dict[str, A
             return count >= 1
 
         out["head_and_shoulders_bottoms_complex"] = _DerivedScanner("head_and_shoulders_bottoms_complex", base, keep_if=_hsb_complex)
-        out["head_and_shoulders_bottoms"] = _DerivedScanner("head_and_shoulders_bottoms", base, keep_if=lambda r, df, pf, pr: not _hsb_complex(r, df, pf, pr))
+        out["head_and_shoulders_bottoms"] = _DerivedScanner(
+            "head_and_shoulders_bottoms",
+            base,
+            keep_if=lambda r, df, pf, pr: (int(r.get("pattern_width_bars") or 0) <= standard_width_max) and (not _hsb_complex(r, df, pf, pr)),
+        )
 
     if _get("head_and_shoulders_top"):
         base = _CachedScanner(_get("head_and_shoulders_top"))
         hs_spec = library.load("head_and_shoulders_top") if "head_and_shoulders_top" in library.list_keys() else {}
-        tol = float((hs_spec.get("geometry_constraints", {}) or {}).get("near_equal_tolerance_pct") or 3.0)
+        standard_width_max = int((hs_spec.get("geometry_constraints", {}) or {}).get("width_max_bars") or 270)
 
         def _hst_complex(r: Dict[str, Any], df: pd.DataFrame, _pf: List[Pivot], pr: List[Pivot]) -> bool:
+            variant = str(r.get("variant_code") or "")
+            if variant:
+                return variant == "complex"
             piv = r.get("pivot_indices") or []
             if not isinstance(piv, (list, tuple)) or len(piv) < 5:
                 return False
@@ -2953,6 +5625,10 @@ def build_bulkowski_53_scanners(library: DigitizedPatternLibrary) -> Dict[str, A
             if shoulder_level <= 0:
                 return False
 
+            if int(r.get("pattern_width_bars") or 0) > standard_width_max:
+                return True
+
+            tol = float((hs_spec.get("geometry_constraints", {}) or {}).get("near_equal_tolerance_pct") or 3.0)
             highs = [p for p in (pr or _pf) if p.type == PivotType.HIGH and h1 <= int(p.idx) <= h3]
             count = 0
             for p in highs:
@@ -2965,13 +5641,17 @@ def build_bulkowski_53_scanners(library: DigitizedPatternLibrary) -> Dict[str, A
             return count >= 1
 
         out["head_and_shoulders_tops_complex"] = _DerivedScanner("head_and_shoulders_tops_complex", base, keep_if=_hst_complex)
-        out["head_and_shoulders_tops"] = _DerivedScanner("head_and_shoulders_tops", base, keep_if=lambda r, df, pf, pr: not _hst_complex(r, df, pf, pr))
+        out["head_and_shoulders_tops"] = _DerivedScanner(
+            "head_and_shoulders_tops",
+            base,
+            keep_if=lambda r, df, pf, pr: (int(r.get("pattern_width_bars") or 0) <= standard_width_max) and (not _hst_complex(r, df, pf, pr)),
+        )
 
     # Chapter 28-29: horns
     if _get("horn_bottoms_tops"):
         base = _CachedScanner(_get("horn_bottoms_tops"))
-        out["horn_bottoms"] = _DerivedScanner("horn_bottoms", base, keep_if=lambda r, *_: str(r.get("breakout_direction") or "") == "up")
-        out["horn_tops"] = _DerivedScanner("horn_tops", base, keep_if=lambda r, *_: str(r.get("breakout_direction") or "") == "down")
+        out["horn_bottoms"] = _DerivedScanner("horn_bottoms", base, keep_if=lambda r, *_: str(r.get("variant_code") or "") == "horn_bottom")
+        out["horn_tops"] = _DerivedScanner("horn_tops", base, keep_if=lambda r, *_: str(r.get("variant_code") or "") == "horn_top")
 
     # Chapter 30-31: islands (regular vs long)
     islands_spec = library.load("islands") if "islands" in library.list_keys() else None
@@ -3023,47 +5703,33 @@ def build_bulkowski_53_scanners(library: DigitizedPatternLibrary) -> Dict[str, A
     # Chapter 39-40: rounding bottoms/tops
     if _get("rounding_bottoms_tops"):
         base = _CachedScanner(_get("rounding_bottoms_tops"))
-        out["rounding_bottoms"] = _DerivedScanner("rounding_bottoms", base, keep_if=lambda r, *_: str(r.get("pattern_type") or "") == "reversal_bullish")
-        out["rounding_tops"] = _DerivedScanner("rounding_tops", base, keep_if=lambda r, *_: str(r.get("pattern_type") or "") == "reversal_bearish")
+        out["rounding_bottoms"] = _DerivedScanner("rounding_bottoms", base, keep_if=lambda r, *_: str(r.get("variant_code") or "") == "rounding_bottom")
+        out["rounding_tops"] = _DerivedScanner("rounding_tops", base, keep_if=lambda r, *_: str(r.get("variant_code") or "") == "rounding_top")
 
     # Chapter 41-44: scallops (ascending/descending + inverted)
     if _get("scallop_ascending_descending"):
-        base = _CachedScanner(_get("scallop_ascending_descending"))
-
-        def _sc_dir(r: Dict[str, Any], df: pd.DataFrame) -> Optional[str]:
-            piv = r.get("pivot_indices") or []
-            if not isinstance(piv, (list, tuple)) or len(piv) < 3:
-                return None
-            try:
-                s, e = int(piv[0]), int(piv[2])
-            except Exception:
-                return None
-            if not (0 <= s < len(df) and 0 <= e < len(df)):
-                return None
-            s_low = float(df.iloc[s]["low"])
-            e_low = float(df.iloc[e]["low"])
-            return "ascending" if e_low > s_low else "descending"
-
-        def _keep_sc(name: str):
-            def _f(r: Dict[str, Any], df: pd.DataFrame, *_: Any) -> bool:
-                d = _sc_dir(r, df)
-                bo = str(r.get("breakout_direction") or "")
-                if d == "ascending" and bo == "up":
-                    return name == "scallops_ascending"
-                if d == "ascending" and bo == "down":
-                    return name == "scallops_ascending_inverted"
-                if d == "descending" and bo == "down":
-                    return name == "scallops_descending"
-                if d == "descending" and bo == "up":
-                    return name == "scallops_descending_inverted"
-                return False
-
-            return _f
-
-        out["scallops_ascending"] = _DerivedScanner("scallops_ascending", base, keep_if=_keep_sc("scallops_ascending"))
-        out["scallops_ascending_inverted"] = _DerivedScanner("scallops_ascending_inverted", base, keep_if=_keep_sc("scallops_ascending_inverted"))
-        out["scallops_descending"] = _DerivedScanner("scallops_descending", base, keep_if=_keep_sc("scallops_descending"))
-        out["scallops_descending_inverted"] = _DerivedScanner("scallops_descending_inverted", base, keep_if=_keep_sc("scallops_descending_inverted"))
+        spec = library.load("scallop_ascending_descending") if "scallop_ascending_descending" in library.list_keys() else {}
+        base = _CachedScanner(ScallopFamilyScanner("scallops", spec if isinstance(spec, dict) else {}))
+        out["scallops_ascending"] = _DerivedScanner(
+            "scallops_ascending",
+            base,
+            keep_if=lambda r, *_: str(r.get("variant_code") or "") == "scallops_ascending",
+        )
+        out["scallops_ascending_inverted"] = _DerivedScanner(
+            "scallops_ascending_inverted",
+            base,
+            keep_if=lambda r, *_: str(r.get("variant_code") or "") == "scallops_ascending_inverted",
+        )
+        out["scallops_descending"] = _DerivedScanner(
+            "scallops_descending",
+            base,
+            keep_if=lambda r, *_: str(r.get("variant_code") or "") == "scallops_descending",
+        )
+        out["scallops_descending_inverted"] = _DerivedScanner(
+            "scallops_descending_inverted",
+            base,
+            keep_if=lambda r, *_: str(r.get("variant_code") or "") == "scallops_descending_inverted",
+        )
 
     # Chapter 45-46: three falling peaks / three rising valleys
     tfp_spec = library.load("three_falling_peaks") if "three_falling_peaks" in library.list_keys() else None
@@ -3109,65 +5775,29 @@ def build_bulkowski_53_scanners(library: DigitizedPatternLibrary) -> Dict[str, A
     # Chapter 47-49: triangles (ascending/descending/symmetrical)
     tri_spec = library.load("triangles") if "triangles" in library.list_keys() else None
     if isinstance(tri_spec, dict):
-        tri_any = copy.deepcopy(tri_spec)
-        tri_any.setdefault("detection_signature", {})
-        tri_any["detection_signature"]["mandatory_pivots"] = []
-        base = _CachedScanner(PivotSequenceScanner("__triangles_base", tri_any))
-
-        tol = float((tri_spec.get("geometry_constraints", {}) or {}).get("near_equal_tolerance_pct") or 2.0)
-
-        def _tri_class(r: Dict[str, Any], df: pd.DataFrame) -> Optional[str]:
-            piv = r.get("pivot_indices") or []
-            if not isinstance(piv, (list, tuple)) or len(piv) < 5:
-                return None
-            try:
-                idxs = [int(x) for x in piv[:5]]
-            except Exception:
-                return None
-            if any(i < 0 or i >= len(df) for i in idxs):
-                return None
-            h1 = float(df.iloc[idxs[0]]["high"])
-            l1 = float(df.iloc[idxs[1]]["low"])
-            h2 = float(df.iloc[idxs[2]]["high"])
-            l2 = float(df.iloc[idxs[3]]["low"])
-            h3 = float(df.iloc[idxs[4]]["high"])
-
-            highs_near = (_pct(h2, h1) <= tol) and (_pct(h3, h1) <= tol)
-            lows_near = _pct(l2, l1) <= tol
-            highs_fall = (h2 < h1) and (h3 < h2)
-            lows_rise = l2 > l1
-
-            if highs_near and lows_rise:
-                return "ascending"
-            if lows_near and highs_fall:
-                return "descending"
-            if highs_fall and lows_rise:
-                return "symmetrical"
-            return None
-
-        out["triangles_ascending"] = _DerivedScanner("triangles_ascending", base, keep_if=lambda r, df, *_: _tri_class(r, df) == "ascending")
-        out["triangles_descending"] = _DerivedScanner("triangles_descending", base, keep_if=lambda r, df, *_: _tri_class(r, df) == "descending")
-        out["triangles_symmetrical"] = _DerivedScanner("triangles_symmetrical", base, keep_if=lambda r, df, *_: _tri_class(r, df) == "symmetrical")
+        base = _CachedScanner(TriangleFamilyScanner("triangles", tri_spec))
+        out["triangles_ascending"] = _DerivedScanner(
+            "triangles_ascending",
+            base,
+            keep_if=lambda r, *_: str(r.get("variant_code") or "") == "ascending",
+        )
+        out["triangles_descending"] = _DerivedScanner(
+            "triangles_descending",
+            base,
+            keep_if=lambda r, *_: str(r.get("variant_code") or "") == "descending",
+        )
+        out["triangles_symmetrical"] = _DerivedScanner(
+            "triangles_symmetrical",
+            base,
+            keep_if=lambda r, *_: str(r.get("variant_code") or "") == "symmetrical",
+        )
 
     # Chapter 50-51: triple bottoms/tops
     tbt = library.load("triple_bottoms_tops") if "triple_bottoms_tops" in library.list_keys() else None
     if isinstance(tbt, dict):
-        ds = tbt.get("detection_signature", {}) or {}
-        bo = tbt.get("breakout_confirmation", {}) or {}
-        tb = ds.get("triple_bottom")
-        tt = ds.get("triple_top")
-        if isinstance(tb, dict) and isinstance(bo.get("triple_bottom"), dict):
-            spec = copy.deepcopy(tbt)
-            spec["pattern_type"] = "reversal_bullish"
-            spec["detection_signature"] = tb
-            spec["breakout_confirmation"] = bo["triple_bottom"]
-            out["triple_bottoms"] = PivotSequenceScanner("triple_bottoms", spec)
-        if isinstance(tt, dict) and isinstance(bo.get("triple_top"), dict):
-            spec = copy.deepcopy(tbt)
-            spec["pattern_type"] = "reversal_bearish"
-            spec["detection_signature"] = tt
-            spec["breakout_confirmation"] = bo["triple_top"]
-            out["triple_tops"] = PivotSequenceScanner("triple_tops", spec)
+        base = _CachedScanner(TripleBottomsTopsScanner("triple_bottoms_tops", tbt))
+        out["triple_bottoms"] = _DerivedScanner("triple_bottoms", base, keep_if=lambda r, *_: str(r.get("variant_code") or "") == "triple_bottom")
+        out["triple_tops"] = _DerivedScanner("triple_tops", base, keep_if=lambda r, *_: str(r.get("variant_code") or "") == "triple_top")
 
     # Chapter 52-53: wedges (falling/rising)
     wedge_spec = library.load("wedges_ascending_descending") if "wedges_ascending_descending" in library.list_keys() else None

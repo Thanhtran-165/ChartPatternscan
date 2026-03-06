@@ -49,9 +49,17 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
 try:
-    from .bulkowski_report import generate_bulkowski_payload  # type: ignore
+    from .bulkowski_report import (  # type: ignore
+        _apply_overlap_policy as _report_apply_overlap_policy,
+        _load_index_symbols as _report_load_index_symbols,
+        generate_bulkowski_payload,
+    )
 except Exception:  # pragma: no cover
-    from bulkowski_report import generate_bulkowski_payload  # type: ignore
+    from bulkowski_report import (  # type: ignore
+        _apply_overlap_policy as _report_apply_overlap_policy,
+        _load_index_symbols as _report_load_index_symbols,
+        generate_bulkowski_payload,
+    )
 
 
 def _utc_now_iso() -> str:
@@ -83,6 +91,13 @@ def _write_text(path: str, text: str) -> None:
 
 def _sha256_text(s: str) -> str:
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+
+def _safe_int(x: Any) -> int:
+    try:
+        return int(x or 0)
+    except Exception:
+        return 0
 
 
 def _breakable_key(s: Any) -> str:
@@ -197,6 +212,34 @@ def _load_digitized_spec(spec_key: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+def _target_width_bars_from_spec(spec: Optional[Dict[str, Any]]) -> Optional[int]:
+    """
+    Pick a "representative" pattern width (bars) for illustration.
+
+    Many specs allow very long formations (e.g., up to ~252 bars). Choosing the absolute
+    widest detections tends to create charts that look "flat" in PDF. A moderate width
+    usually makes the shape easier to see.
+    """
+    if not isinstance(spec, dict):
+        return None
+    geom = spec.get("geometry_constraints")
+    if not isinstance(geom, dict):
+        return None
+    wmin = geom.get("width_min_bars")
+    wmax = geom.get("width_max_bars")
+    try:
+        wmin_i = int(wmin) if wmin is not None else None
+        wmax_i = int(wmax) if wmax is not None else None
+    except Exception:
+        return None
+    if wmin_i is None or wmax_i is None:
+        return None
+    if wmin_i <= 0 or wmax_i <= 0 or wmax_i < wmin_i:
+        return None
+    # Prefer the lower-middle of the allowed range for readability.
+    return int(round(wmin_i + 0.35 * (wmax_i - wmin_i)))
+
+
 def _spec_summary_vi(spec_key: str) -> List[str]:
     spec = _load_digitized_spec(spec_key) or {}
     geom = spec.get("geometry_constraints") if isinstance(spec, dict) else {}
@@ -242,6 +285,79 @@ def _spec_summary_vi(spec_key: str) -> List[str]:
             lines.append(f"- Volume confirm: {'có' if bool(vol_req) else 'không'} (min_mult={vol_mult})")
 
     return lines
+
+
+def _load_book_run_frame(results_db_path: str, run_id: str) -> pd.DataFrame:
+    conn = sqlite3.connect(os.path.abspath(results_db_path))
+    try:
+        q = """
+        SELECT
+            d.pattern_id,
+            d.symbol,
+            d.pattern_name,
+            d.formation_start,
+            d.formation_end,
+            d.breakout_date,
+            d.breakout_direction,
+            d.breakout_price,
+            d.target_price,
+            d.stop_loss_price,
+            d.confidence_score,
+            d.pattern_width_bars,
+            d.touch_count,
+            d.pattern_height_pct,
+            d.pivot_indices_json
+        FROM pattern_detections d
+        WHERE d.run_id = ?
+        """
+        df = pd.read_sql_query(q, conn, params=[run_id])
+    finally:
+        conn.close()
+
+    for col in ["formation_start", "formation_end", "breakout_date"]:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], errors="coerce")
+    return df
+
+
+def _filter_case_frame(
+    df: pd.DataFrame,
+    *,
+    price_db_path: str,
+    overlap_policy: str,
+    min_breakout_price: Optional[float],
+) -> pd.DataFrame:
+    g = df.copy()
+    index_symbols = _report_load_index_symbols(price_db_path)
+    if index_symbols and "symbol" in g.columns:
+        g = g[~g["symbol"].astype(str).isin(index_symbols)].copy()
+
+    if min_breakout_price is not None and "breakout_price" in g.columns:
+        g["breakout_price"] = pd.to_numeric(g["breakout_price"], errors="coerce")
+        g = g[(g["breakout_price"].isna()) | (g["breakout_price"] >= float(min_breakout_price))].copy()
+
+    if overlap_policy != "none":
+        g = _report_apply_overlap_policy(g, str(overlap_policy))
+
+    return g.reset_index(drop=True)
+
+
+def _parse_pivot_indices(raw_piv: Any) -> List[int]:
+    if raw_piv is None or (isinstance(raw_piv, float) and np.isnan(raw_piv)):
+        return []
+    try:
+        parsed = json.loads(raw_piv) if isinstance(raw_piv, str) else list(raw_piv)
+    except Exception:
+        return []
+    if not isinstance(parsed, list):
+        return []
+    out: List[int] = []
+    for x in parsed:
+        try:
+            out.append(int(x))
+        except Exception:
+            continue
+    return out
 
 
 def _format_group_table_md(groups: List[Dict[str, Any]], *, title: str) -> str:
@@ -340,6 +456,8 @@ def _generate_narrative_vi(
     *,
     context: Dict[str, Any],
     table_md: str,
+    canon_md: str,
+    delta_md: str,
     api_key: str,
     base_url: str,
     model: str,
@@ -348,7 +466,7 @@ def _generate_narrative_vi(
     Generate qualitative Vietnamese narrative only (avoid introducing numbers).
     """
     pat_name = str(context.get("pattern_display_name") or context.get("canonical_key") or "").strip()
-    spec_key = str(context.get("spec_key") or "").strip()
+    has_pattern_key_stats = bool(context.get("has_pattern_key_stats"))
 
     system = (
         "Bạn là trợ lý nghiên cứu thị trường tài chính. "
@@ -362,8 +480,14 @@ def _generate_narrative_vi(
         "Thông tin kỹ thuật (spec tóm tắt):\n"
         + "\n".join(str(x) for x in context.get("spec_summary_vi", []))
         + "\n\n"
-        "Bảng thống kê (đã có sẵn, không cần nhắc số cụ thể):\n"
+        "Thống kê trực tiếp theo pattern_key:\n"
         + table_md
+        + "\n\n"
+        "Tổng hợp hỗ trợ theo canonical_key:\n"
+        + (canon_md or "(Không có dữ liệu canonical)\n")
+        + "\n\n"
+        "So sánh calibration và validation:\n"
+        + (delta_md or "(Không có dữ liệu so sánh)\n")
         + "\n\n"
         "Yêu cầu đầu ra:\n"
         "- Viết 4 mục (dùng Markdown headings cấp 3):\n"
@@ -373,6 +497,13 @@ def _generate_narrative_vi(
         "  4) Ý tưởng nghiên cứu tiếp theo trên dữ liệu Việt Nam\n"
         "- Không dùng bất kỳ chữ số nào (0-9). Nếu bắt buộc, viết bằng chữ.\n"
         "- Không thêm bảng số liệu mới.\n"
+        + (
+            "- Quan trọng: chapter này không có số liệu trực tiếp ở pattern_key trong VALID. "
+            "Không được viết như thể đã có bằng chứng thực nghiệm riêng cho đúng biến thể này; "
+            "nếu cần nói về hiệu quả thì phải nêu rõ đó là ngữ cảnh canonical hoặc giả thuyết cần kiểm chứng.\n"
+            if not has_pattern_key_stats
+            else ""
+        )
     )
 
     messages = [
@@ -516,56 +647,65 @@ class CaseRow:
     target_price: Optional[float]
     stop_loss_price: Optional[float]
     confidence_score: int
+    pattern_width_bars: Optional[int]
+    touch_count: Optional[int]
+    pattern_height_pct: Optional[float]
+    pivot_indices: List[int]
 
 
 def _select_cases(
     *,
-    results_db_path: str,
-    run_id: str,
+    df: pd.DataFrame,
     pattern_keys: List[str],
     max_cases_per_direction: int = 1,
+    target_width_bars: int = 90,
 ) -> List[CaseRow]:
-    conn = sqlite3.connect(os.path.abspath(results_db_path))
-    try:
-        q = f"""
-        SELECT
-            d.pattern_id,
-            d.symbol,
-            d.pattern_name,
-            d.formation_start,
-            d.formation_end,
-            d.breakout_date,
-            d.breakout_direction,
-            d.breakout_price,
-            d.target_price,
-            d.stop_loss_price,
-            d.confidence_score
-        FROM pattern_detections d
-        WHERE d.run_id = ?
-          AND d.pattern_name IN ({",".join(["?"] * len(pattern_keys))})
-          AND d.breakout_date IS NOT NULL
-          AND d.breakout_price IS NOT NULL
-        ORDER BY d.confidence_score DESC, d.pattern_width_bars DESC, d.pattern_id
-        """
-        rows = conn.execute(q, (run_id, *pattern_keys)).fetchall()
-    finally:
-        conn.close()
+    if df.empty:
+        return []
+
+    g = df[df["pattern_name"].astype(str).isin([str(x) for x in pattern_keys])].copy()
+    g = g[g["breakout_date"].notna()].copy()
+    g["breakout_price"] = pd.to_numeric(g["breakout_price"], errors="coerce")
+    g = g[g["breakout_price"].notna()].copy()
+    if g.empty:
+        return []
+
+    g["confidence_score"] = pd.to_numeric(g["confidence_score"], errors="coerce").fillna(0)
+    g["touch_count"] = pd.to_numeric(g["touch_count"], errors="coerce").fillna(0)
+    g["pattern_height_pct"] = pd.to_numeric(g["pattern_height_pct"], errors="coerce").fillna(0)
+    g["pattern_width_bars"] = pd.to_numeric(g["pattern_width_bars"], errors="coerce")
+    g["_width_distance"] = (g["pattern_width_bars"].fillna(0) - int(target_width_bars)).abs()
+    g = g.sort_values(
+        by=[
+            "confidence_score",
+            "touch_count",
+            "pattern_height_pct",
+            "_width_distance",
+            "pattern_width_bars",
+            "pattern_id",
+        ],
+        ascending=[False, False, False, True, True, True],
+    )
 
     up: List[CaseRow] = []
     down: List[CaseRow] = []
-    for r in rows:
+    for row in g.itertuples(index=False):
         cr = CaseRow(
-            pattern_id=str(r[0]),
-            symbol=str(r[1]),
-            pattern_key=str(r[2]),
-            formation_start=str(r[3]),
-            formation_end=str(r[4]),
-            breakout_date=str(r[5]) if r[5] is not None else None,
-            breakout_direction=str(r[6]) if r[6] is not None else None,
-            breakout_price=float(r[7]) if r[7] is not None else None,
-            target_price=float(r[8]) if r[8] is not None else None,
-            stop_loss_price=float(r[9]) if r[9] is not None else None,
-            confidence_score=int(r[10] or 0),
+            pattern_id=str(row.pattern_id),
+            symbol=str(row.symbol),
+            pattern_key=str(row.pattern_name),
+            formation_start=str(row.formation_start),
+            formation_end=str(row.formation_end),
+            breakout_date=str(row.breakout_date) if row.breakout_date is not None else None,
+            breakout_direction=str(row.breakout_direction) if row.breakout_direction is not None else None,
+            breakout_price=float(row.breakout_price) if row.breakout_price is not None else None,
+            target_price=float(row.target_price) if row.target_price is not None else None,
+            stop_loss_price=float(row.stop_loss_price) if row.stop_loss_price is not None else None,
+            confidence_score=int(row.confidence_score or 0),
+            pattern_width_bars=int(row.pattern_width_bars) if pd.notna(row.pattern_width_bars) else None,
+            touch_count=int(row.touch_count) if pd.notna(row.touch_count) else None,
+            pattern_height_pct=float(row.pattern_height_pct) if pd.notna(row.pattern_height_pct) else None,
+            pivot_indices=_parse_pivot_indices(row.pivot_indices_json),
         )
         if (cr.breakout_direction or "").lower() == "up":
             if len(up) < int(max_cases_per_direction):
@@ -604,14 +744,14 @@ def _slice_window(
     breakout_date: Optional[str],
     pre_bars: int = 30,
     post_bars: int = 30,
-) -> Tuple[pd.DataFrame, pd.Timestamp, pd.Timestamp, Optional[pd.Timestamp]]:
+) -> Tuple[pd.DataFrame, pd.Timestamp, pd.Timestamp, Optional[pd.Timestamp], int]:
     fs = pd.to_datetime(formation_start, errors="coerce")
     fe = pd.to_datetime(formation_end, errors="coerce")
     bd = pd.to_datetime(breakout_date, errors="coerce") if breakout_date else pd.NaT
     bd = bd if pd.notna(bd) else pd.NaT
 
     if df.empty or pd.isna(fs) or pd.isna(fe):
-        return df.iloc[:0].copy(), fs, fe, (bd if pd.notna(bd) else None)
+        return df.iloc[:0].copy(), fs, fe, (bd if pd.notna(bd) else None), 0
 
     # Find nearest indices for slicing.
     idx_start = int(df["date"].searchsorted(fs, side="left"))
@@ -622,7 +762,7 @@ def _slice_window(
     w0 = max(0, idx_start - int(pre_bars))
     w1 = min(len(df), idx_end + int(post_bars))
     out = df.iloc[w0:w1].copy().reset_index(drop=True)
-    return out, fs, fe, (bd.to_pydatetime() if pd.notna(bd) else None)
+    return out, fs, fe, (bd if pd.notna(bd) else None), int(w0)
 
 
 def _plot_candles(
@@ -634,6 +774,7 @@ def _plot_candles(
     breakout_direction: Optional[str],
     target_price: Optional[float],
     stop_loss_price: Optional[float],
+    pivot_local_indices: Optional[List[int]],
     title: str,
     out_png: str,
 ) -> None:
@@ -648,8 +789,9 @@ def _plot_candles(
     x = np.arange(len(g))
     dates = g["date"].tolist()
 
-    fig_w = max(10.0, min(18.0, len(g) / 10.0))
-    fig, ax = plt.subplots(figsize=(fig_w, 5.0), dpi=140)
+    fig_w = max(11.0, min(14.0, len(g) / 12.0))
+    fig_h = 6.5
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=170)
 
     up_color = "#2ca02c"
     down_color = "#d62728"
@@ -667,6 +809,9 @@ def _plot_candles(
         rect = Rectangle((x[i] - 0.3, y0), 0.6, height, facecolor=color, edgecolor=color, linewidth=0.6, alpha=0.85)
         ax.add_patch(rect)
 
+    # Close line (faint) helps the eye follow the shape in dense candlesticks.
+    ax.plot(x, g["close"].to_numpy(), color="#111111", linewidth=0.9, alpha=0.28, label="_nolegend_")
+
     # Formation shading
     def _nearest_idx(ts: pd.Timestamp) -> Optional[int]:
         if ts is None or pd.isna(ts):
@@ -682,6 +827,8 @@ def _plot_candles(
     i1 = _nearest_idx(pd.to_datetime(formation_end))
     if i0 is not None and i1 is not None and i1 >= i0:
         ax.axvspan(i0 - 0.5, i1 + 0.5, color="#1f77b4", alpha=0.08, label="Formation")
+        ax.axvline(i0, color="#1f77b4", linewidth=0.8, alpha=0.55, label="_nolegend_")
+        ax.axvline(i1, color="#1f77b4", linewidth=0.8, alpha=0.55, label="_nolegend_")
 
     # Breakout marker
     if breakout_date is not None and not pd.isna(breakout_date):
@@ -689,7 +836,49 @@ def _plot_candles(
         if ib is not None:
             ax.axvline(ib, color="#9467bd", linewidth=1.2, alpha=0.9)
             lbl = f"Breakout ({(breakout_direction or '').lower() or '?'})"
-            ax.text(ib + 0.2, float(g["high"].max()), lbl, fontsize=8, color="#9467bd", va="top")
+            ax.text(ib + 0.2, float(g["high"].max()), lbl, fontsize=8, color="#9467bd", va="bottom")
+
+    # Pivot path overlay (connect the pivots used by the scanner) makes the "pattern" visible.
+    if pivot_local_indices:
+        def _infer_pivot_price(idx: int) -> float:
+            # Try to place pivot on high/low if it's a local extreme; otherwise fall back to close.
+            j0 = max(0, idx - 2)
+            j1 = min(len(g), idx + 3)
+            hi = float(g.iloc[idx]["high"])
+            lo = float(g.iloc[idx]["low"])
+            win = g.iloc[j0:j1]
+            try:
+                if np.isfinite(hi) and hi >= float(win["high"].max()) - 1e-12:
+                    return hi
+                if np.isfinite(lo) and lo <= float(win["low"].min()) + 1e-12:
+                    return lo
+            except Exception:
+                pass
+            return float(g.iloc[idx]["close"])
+
+        piv_x: List[float] = []
+        piv_y: List[float] = []
+        piv_sorted = [int(i) for i in pivot_local_indices if isinstance(i, (int, np.integer))]
+        piv_sorted = [i for i in piv_sorted if 0 <= i < len(g)]
+        for k, idx in enumerate(piv_sorted):
+            px = float(x[idx])
+            py = _infer_pivot_price(idx)
+            piv_x.append(px)
+            piv_y.append(py)
+            ax.scatter([px], [py], s=48, color="#111111", alpha=0.85, zorder=6, label="_nolegend_")
+            ax.text(
+                px,
+                py,
+                str(k + 1),
+                fontsize=7,
+                color="white",
+                ha="center",
+                va="center",
+                zorder=7,
+                bbox={"boxstyle": "circle,pad=0.2", "facecolor": "#111111", "edgecolor": "none", "alpha": 0.65},
+            )
+        if len(piv_x) >= 2:
+            ax.plot(piv_x, piv_y, color="#111111", linewidth=1.25, alpha=0.55, zorder=5, label="Pivots")
 
     # Target / stop
     if target_price is not None and np.isfinite(float(target_price)):
@@ -701,6 +890,17 @@ def _plot_candles(
     ax.set_xlim(-1, len(g))
     ax.grid(True, alpha=0.15)
 
+    # Expand y-limits a bit so annotations don't clip.
+    y_vals = [float(g["low"].min()), float(g["high"].max())]
+    if target_price is not None and np.isfinite(float(target_price)):
+        y_vals.append(float(target_price))
+    if stop_loss_price is not None and np.isfinite(float(stop_loss_price)):
+        y_vals.append(float(stop_loss_price))
+    y_min = float(np.nanmin(y_vals))
+    y_max = float(np.nanmax(y_vals))
+    pad = 0.08 * (y_max - y_min) if y_max > y_min else 1.0
+    ax.set_ylim(y_min - pad, y_max + pad)
+
     # Sparse date ticks
     step = max(1, int(len(g) / 10))
     ticks = list(range(0, len(g), step))
@@ -708,7 +908,15 @@ def _plot_candles(
     ax.set_xticks(ticks)
     ax.set_xticklabels(labels, rotation=45, ha="right", fontsize=8)
 
-    ax.legend(loc="upper left", fontsize=8, frameon=False)
+    handles, labels = ax.get_legend_handles_labels()
+    uniq: Dict[str, Any] = {}
+    for h, l in zip(handles, labels):
+        if not l or l == "_nolegend_":
+            continue
+        if l not in uniq:
+            uniq[l] = h
+    if uniq:
+        ax.legend(uniq.values(), uniq.keys(), loc="upper left", fontsize=8, frameon=False)
 
     os.makedirs(os.path.dirname(os.path.abspath(out_png)), exist_ok=True)
     fig.tight_layout()
@@ -859,6 +1067,12 @@ def main() -> None:
     # === Generate deterministic reports (JSON) ===
     valid_run_id = _run_id_from_results_db(str(args.results_db_valid))
     valid_meta = _pattern_meta_map_from_results_db(str(args.results_db_valid), valid_run_id)
+    valid_case_frame = _filter_case_frame(
+        _load_book_run_frame(str(args.results_db_valid), valid_run_id),
+        price_db_path=str(args.price_db),
+        overlap_policy=str(args.overlap_policy),
+        min_breakout_price=float(args.min_breakout_price) if args.min_breakout_price is not None else None,
+    )
 
     payload_valid_canon = generate_bulkowski_payload(
         results_db_path=str(args.results_db_valid),
@@ -995,13 +1209,6 @@ def main() -> None:
 
         # Optional: build calibration-vs-validation delta (very lightweight).
         calib_groups = calib_by_ck.get(str(canonical_key), [])
-        delta_md = ""
-        if calib_groups:
-            def _safe_int(x: Any) -> int:
-                try:
-                    return int(x or 0)
-                except Exception:
-                    return 0
 
         calib_eval_total_ck = sum(_safe_int(g.get("n_evaluated")) for g in calib_groups)
         valid_eval_total_ck = sum(_safe_int(g.get("n_evaluated")) for g in canon_groups)
@@ -1028,6 +1235,8 @@ def main() -> None:
             "spec_key": spec_key,
             "variant": variant,
             "spec_summary_vi": spec_summary,
+            "has_pattern_key_stats": bool(pk_groups),
+            "has_canonical_stats": bool(canon_groups),
             "valid": {"results_db": os.path.abspath(str(args.results_db_valid)), "run_id": valid_run_id},
             "calib": {"results_db": os.path.abspath(str(args.results_db_calib)), "run_id": calib_run_id} if calib_run_id else None,
         }
@@ -1038,11 +1247,13 @@ def main() -> None:
         fig_md_lines: List[str] = []
         if not bool(args.skip_figures):
             try:
+                spec_for_width = _load_digitized_spec(spec_key)
+                target_width = _target_width_bars_from_spec(spec_for_width) or 90
                 selected_cases = _select_cases(
-                    results_db_path=str(args.results_db_valid),
-                    run_id=valid_run_id,
+                    df=valid_case_frame,
                     pattern_keys=[str(pk)],
                     max_cases_per_direction=int(args.cases_per_direction),
+                    target_width_bars=int(target_width),
                 )
             except Exception:
                 selected_cases = []
@@ -1052,7 +1263,7 @@ def main() -> None:
             _write_json(os.path.join(cases_dir, f"{pk}.json"), case_payload)
             for c in selected_cases:
                 df_sym = _load_symbol_ohlcv(str(args.price_db), c.symbol)
-                df_win, fs, fe, bd = _slice_window(
+                df_win, fs, fe, bd, w0 = _slice_window(
                     df_sym,
                     formation_start=c.formation_start,
                     formation_end=c.formation_end,
@@ -1063,15 +1274,20 @@ def main() -> None:
 
                 safe_id = base64.urlsafe_b64encode(c.pattern_id.encode("utf-8")).decode("utf-8").rstrip("=")
                 out_png = os.path.join(figures_dir, f"{pk}_{safe_id}.png")
-                title = f"{display} | {c.symbol} | conf={c.confidence_score}"
+                w = f" | w={c.pattern_width_bars}" if c.pattern_width_bars is not None else ""
+                t = f" | touch={c.touch_count}" if c.touch_count is not None else ""
+                h = f" | h={c.pattern_height_pct:.1f}%" if c.pattern_height_pct is not None else ""
+                title = f"{display} | {c.symbol} | conf={c.confidence_score}{w}{t}{h}"
+                piv_local = [int(pi) - int(w0) for pi in (c.pivot_indices or []) if (int(w0) <= int(pi) < int(w0) + len(df_win))]
                 _plot_candles(
                     df_win,
                     formation_start=fs,
                     formation_end=fe,
-                    breakout_date=pd.to_datetime(c.breakout_date, errors="coerce") if c.breakout_date else None,
+                    breakout_date=bd if (bd is not None and not pd.isna(bd)) else None,
                     breakout_direction=c.breakout_direction,
                     target_price=c.target_price,
                     stop_loss_price=c.stop_loss_price,
+                    pivot_local_indices=piv_local,
                     title=title,
                     out_png=out_png,
                 )
@@ -1099,7 +1315,16 @@ def main() -> None:
                 narrative_md = _normalize_narrative_headings_md(cached_content)
         else:
             prompt_fingerprint = _sha256_text(
-                json.dumps({"context": context, "table_md": table_md}, sort_keys=True, default=str)
+                json.dumps(
+                    {
+                        "context": context,
+                        "table_md": table_md,
+                        "canon_md": canon_md,
+                        "delta_md": delta_md,
+                    },
+                    sort_keys=True,
+                    default=str,
+                )
             )
             if isinstance(cached, dict) and cached.get("fingerprint") == prompt_fingerprint and cached_content:
                 ai_text = cached_content
@@ -1112,6 +1337,8 @@ def main() -> None:
                         ai_text = _generate_narrative_vi(
                             context=context,
                             table_md=table_md,
+                            canon_md=canon_md,
+                            delta_md=delta_md,
                             api_key=str(args.deepseek_api_key),
                             base_url=str(args.deepseek_base_url),
                             model=str(args.deepseek_model),

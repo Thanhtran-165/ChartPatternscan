@@ -79,6 +79,13 @@ class PatternDetection:
     # Metadata
     config_hash: str
     breakout_idx: Optional[int] = None
+    base_pattern_name: Optional[str] = None
+    variant_code: Optional[str] = None
+    variant_confidence: Optional[int] = None
+    variant_evidence_json: Optional[str] = None
+    first_extreme_width_bars: Optional[int] = None
+    second_extreme_width_bars: Optional[int] = None
+    family_metrics_json: Optional[str] = None
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
     def to_dict(self) -> dict:
