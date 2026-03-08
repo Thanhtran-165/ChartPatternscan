@@ -233,7 +233,8 @@ PHASE3_OVERRIDES: Dict[str, Dict[str, Any]] = {
         "phase3_status": "candidate_after_review",
         "strategy_gate": "candidate",
         "research_lane": "benchmark_candidate",
-        "manual_note": "Tier 3 keeps broadening bottoms as the only live candidate. The branch remains roughly aligned with the Bulkowski baseline on the current unified rerun and now belongs in benchmark-and-strategy evaluation work, not detector expansion.",
+        "manual_note": "The dedicated candidate evaluation confirms broadening bottoms as the only live benchmark candidate. The narrower core cohort preserves strong move and target-hit behavior on both valid and calibration splits, so this branch belongs in benchmark-and-strategy evaluation work rather than more detector expansion.",
+        "checkpoint_sources": ["broadening_bottoms_candidate_eval"],
     },
     "broadening_tops": {
         "phase3_status": "research_only",
@@ -241,16 +242,19 @@ PHASE3_OVERRIDES: Dict[str, Dict[str, Any]] = {
     },
     "gaps": {
         "phase3_status": "research_only",
-        "manual_note": "Gaps remain a broad research family in Tier 3. Coverage is massive and the detector is already stable enough, so the right move is to benchmark and stratify later instead of retuning the scanner now.",
+        "manual_note": "The dedicated gaps pass keeps the family in the research lane but adds explicit subtype stratification: common, continuation, exhaustion, and breakaway by direction. This makes the family benchmarkable without forcing another blunt detector-retuning cycle.",
+        "checkpoint_sources": ["gaps_family_pass1"],
     },
     "measured_move_down": {
         "phase3_status": "research_only",
-        "manual_note": "Tier 2 review keeps measured-move down in research only. The current branch still comes from the shared derived scanner, and the digitized spec needs a dedicated family rewrite before another safe detector pass is justified.",
+        "manual_note": "A dedicated three-phase measured-move family scanner replaces the old shared derived branch. The down-side branch now has materially better coverage, but its KPI profile remains mixed enough that it should stay research-only for now.",
+        "checkpoint_sources": ["measured_move_family_rewrite"],
     },
     "measured_move_up": {
-        "phase3_status": "recalibrate",
-        "research_lane": "recalibration_backlog",
-        "manual_note": "Measured-move up remains a recalibration backlog item after Tier 2 review. The branch still relies on the shared derived scanner, and the digitized spec shows enough structural ambiguity that a proper family scanner should come before further threshold tuning.",
+        "phase3_status": "research_only",
+        "research_lane": "active_research",
+        "manual_note": "The measured-move rewrite materially improves the up-side branch on both valid and calibration splits. It is not a strategy branch yet, but it no longer belongs in recalibration backlog and should now be treated as active research coverage.",
+        "checkpoint_sources": ["measured_move_family_rewrite"],
     },
     "broadening_wedges_ascending": {
         "phase3_status": "research_only",
@@ -303,9 +307,17 @@ PHASE3_OVERRIDES: Dict[str, Dict[str, Any]] = {
         "checkpoint_sources": ["triple_family_batch10_refactor"],
     },
     "island_reversals": {
-        "phase3_status": "recalibrate",
-        "research_lane": "recalibration_backlog",
-        "manual_note": "Island reversals stay in the recalibration backlog after Tier 3 review. The branch still has huge coverage but weak failure behavior, so it should not compete with the cleaner research families until a dedicated island pass exists.",
+        "phase3_status": "research_only",
+        "research_lane": "active_research",
+        "manual_note": "The dedicated island pass replaces the old high-volume proxy with prior-trend and true-isolation gates. Coverage falls sharply, but the surviving island reversals are structurally credible enough to move out of blind recalibration backlog and into the research lane.",
+        "checkpoint_sources": ["islands_family_pass1"],
+    },
+    "islands_long": {
+        "phase3_status": "retire_from_strategy",
+        "strategy_gate": "retired",
+        "research_lane": "reference_only",
+        "manual_note": "The same dedicated island pass leaves no long-island survivors on either split. Keep this chapter as reference-only until a distinct long-island detector earns evidence.",
+        "checkpoint_sources": ["islands_family_pass1"],
     },
     "broadening_formations_right_angled_ascending": {
         "phase3_status": "research_only",
@@ -359,19 +371,19 @@ PHASE3_OVERRIDES: Dict[str, Dict[str, Any]] = {
 NEXT_BATCH_PRIORITY = [
     {
         "canonical_key": "broadening_bottoms",
-        "reason": "Broadening bottoms are now the only live benchmark candidate. The next cycle should test benchmark stability and strategy gating rather than expanding the detector.",
+        "reason": "Broadening bottoms remain the only live benchmark candidate. The next cycle should focus on strategy-evaluation policy and robustness checks, not more detector work.",
     },
     {
         "canonical_key": "measured_move_down_up",
-        "reason": "Measured move still relies on a shared derived scanner. The next real upgrade here is a dedicated family rewrite, not more threshold tuning.",
+        "reason": "Measured move now has a dedicated family scanner. The next cycle should benchmark the new up/down branches separately and decide whether the bearish side needs a targeted tightening pass.",
     },
     {
         "canonical_key": "islands",
-        "reason": "Island reversals still have huge volume but weak failure behavior. They remain the biggest recalibration backlog item after Tier 3 governance cleanup.",
+        "reason": "Island reversals now look like a real research family, but long islands disappeared entirely. The next cycle should decide whether that absence is acceptable or whether a separate long-island detector is warranted.",
     },
     {
         "canonical_key": "gaps",
-        "reason": "Gaps are stable enough for research but too broad as a family. The next cycle should benchmark and stratify subtypes instead of retuning the base detector.",
+        "reason": "Gaps now have subtype labels. The next cycle should compare common, continuation, exhaustion, and breakaway cohorts against each other instead of treating the family as one monolithic benchmark.",
     },
     {
         "canonical_key": "bump_and_run_reversal",

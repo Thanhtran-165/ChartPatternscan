@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 
 import pandas as pd
 
@@ -9,8 +10,12 @@ from scanner.digitized_pattern_engine import (
     CupWithHandleScanner,
     DoubleBottomFamilyScanner,
     DoubleTopFamilyScanner,
+    GapScanner,
     HeadShouldersBottomFamilyScanner,
     InvertedCupWithHandleScanner,
+    IslandScanner,
+    MeasuredMoveScanner,
+    PivotType,
     RoundingBottomsTopsScanner,
     ScallopFamilyScanner,
     TriangleFamilyScanner,
@@ -257,6 +262,105 @@ def test_scallop_ascending_inverted_review_gate_keeps_cleaner_case() -> None:
     assert ok is True
 
 
+def test_gap_classifier_marks_breakaway_from_consolidation() -> None:
+    scanner = GapScanner("gaps", {})
+    result = scanner._classify_gap_variant(
+        {
+            "direction": "up",
+            "gap_pct": 0.85,
+            "volume_ratio": 1.6,
+            "prior_change_10_pct": 2.1,
+            "prior_change_20_pct": 2.4,
+            "recent_range_10_pct": 3.8,
+            "directional_ratio_10": 0.56,
+        }
+    )
+    assert result["variant_code"] == "breakaway_gap_up"
+
+
+def test_gap_classifier_marks_exhaustion_after_extended_trend() -> None:
+    scanner = GapScanner("gaps", {})
+    result = scanner._classify_gap_variant(
+        {
+            "direction": "up",
+            "gap_pct": 1.15,
+            "volume_ratio": 1.9,
+            "prior_change_10_pct": 9.8,
+            "prior_change_20_pct": 14.2,
+            "recent_range_10_pct": 9.0,
+            "directional_ratio_10": 0.81,
+        }
+    )
+    assert result["variant_code"] == "exhaustion_gap_up"
+
+
+def test_gap_classifier_keeps_small_flat_gap_as_common() -> None:
+    scanner = GapScanner("gaps", {})
+    result = scanner._classify_gap_variant(
+        {
+            "direction": "down",
+            "gap_pct": 0.22,
+            "volume_ratio": 0.9,
+            "prior_change_10_pct": -1.0,
+            "prior_change_20_pct": -1.8,
+            "recent_range_10_pct": 5.1,
+            "directional_ratio_10": 0.51,
+        }
+    )
+    assert result["variant_code"] == "common_gap_down"
+
+
+def _island_test_spec() -> dict:
+    return {
+        "geometry_constraints": {
+            "height_ratio_min": 1.0,
+            "height_ratio_max": 20.0,
+            "width_min_bars": 3,
+            "width_max_bars": 10,
+            "gap_constraints": {
+                "min_gap_size_pct": 0.5,
+                "max_gap_size_pct": 10.0,
+                "gap_similarity_pct": 50.0,
+            },
+            "island_duration": {"min_bars": 1, "max_bars": 10},
+            "price_separation": {"min_separation_pct": 0.5},
+        },
+        "duration_constraints": {"min_bars": 3, "max_bars": 12},
+        "prior_trend_requirements": {"min_period_bars": 3, "min_change_pct": 3.0},
+        "breakout_confirmation": {"volume_multiplier_min": 1.1},
+    }
+
+
+def _clean_island_df(overlap: bool) -> pd.DataFrame:
+    lows = [97.0, 98.0, 100.0, 103.0, 108.0, 108.6, 105.6]
+    if overlap:
+        lows[5] = 107.4
+    return pd.DataFrame(
+        {
+            "date": pd.date_range("2024-01-01", periods=7, freq="D"),
+            "open": [98.0, 99.0, 101.0, 104.0, 108.5, 109.5, 106.5],
+            "high": [99.0, 101.0, 104.0, 107.0, 110.0, 111.0, 107.4],
+            "low": lows,
+            "close": [98.0, 100.0, 103.0, 106.0, 109.0, 110.0, 106.0],
+            "volume_ratio": [1.0, 1.0, 1.0, 1.0, 1.3, 1.0, 1.4],
+        }
+    )
+
+
+def test_island_scanner_accepts_clean_island_top_candidate() -> None:
+    scanner = IslandScanner("islands", _island_test_spec())
+    row = scanner._build_candidate(symbol="AAA", df=_clean_island_df(overlap=False), entry_idx=4, exit_idx=6, direction="down")
+    assert row is not None
+    assert row["variant_code"] == "island_top"
+    assert row["breakout_direction"] == "down"
+
+
+def test_island_scanner_rejects_overlap_back_into_mainland() -> None:
+    scanner = IslandScanner("islands", _island_test_spec())
+    row = scanner._build_candidate(symbol="AAA", df=_clean_island_df(overlap=True), entry_idx=4, exit_idx=6, direction="down")
+    assert row is None
+
+
 def test_triangle_ascending_rejects_loose_upper_boundary() -> None:
     scanner = TriangleFamilyScanner("triangles", {})
     metrics = {
@@ -283,6 +387,62 @@ def test_triangle_ascending_keeps_tighter_flat_top_case() -> None:
     resolved = scanner._resolve_variant(metrics)
     assert resolved is not None
     assert resolved["variant_code"] == "ascending"
+
+
+def test_measured_move_up_accepts_balanced_three_phase_candidate() -> None:
+    scanner = MeasuredMoveScanner("measured_move_down_up", {})
+    df = pd.DataFrame(
+        {
+            "date": pd.date_range("2024-01-01", periods=45, freq="D"),
+            "open": [100.0] * 45,
+            "high": [101.0] * 45,
+            "low": [99.0] * 45,
+            "close": [100.0] * 45,
+            "volume_ratio": [1.0] * 45,
+        }
+    )
+    df.loc[0, "low"] = 100.0
+    df.loc[20, "high"] = 120.0
+    df.loc[35, "low"] = 110.0
+    df.loc[38, "close"] = 122.0
+    df.loc[39, "close"] = 123.0
+    df.loc[38, "volume_ratio"] = 1.4
+
+    pivots = [
+        SimpleNamespace(idx=0, type=PivotType.LOW),
+        SimpleNamespace(idx=20, type=PivotType.HIGH),
+        SimpleNamespace(idx=35, type=PivotType.LOW),
+    ]
+    candidate = scanner._candidate(df, pivots)
+    assert candidate is not None
+    assert candidate["variant_code"] == "measured_move_up"
+    assert candidate["breakout_direction"] == "up"
+
+
+def test_measured_move_rejects_shallow_retracement() -> None:
+    scanner = MeasuredMoveScanner("measured_move_down_up", {})
+    df = pd.DataFrame(
+        {
+            "date": pd.date_range("2024-01-01", periods=45, freq="D"),
+            "open": [100.0] * 45,
+            "high": [101.0] * 45,
+            "low": [99.0] * 45,
+            "close": [100.0] * 45,
+            "volume_ratio": [1.0] * 45,
+        }
+    )
+    df.loc[0, "low"] = 100.0
+    df.loc[20, "high"] = 120.0
+    df.loc[35, "low"] = 116.0
+    df.loc[38, "close"] = 122.0
+    df.loc[39, "close"] = 123.0
+
+    pivots = [
+        SimpleNamespace(idx=0, type=PivotType.LOW),
+        SimpleNamespace(idx=20, type=PivotType.HIGH),
+        SimpleNamespace(idx=35, type=PivotType.LOW),
+    ]
+    assert scanner._candidate(df, pivots) is None
 
 
 def test_rounding_top_uses_tighter_second_pass_gate() -> None:

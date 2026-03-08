@@ -3384,7 +3384,220 @@ class InsideDayScanner(BaseDigitizedScanner):
         return out
 
 
-class GapScanner(BaseDigitizedScanner):
+class MeasuredMoveScanner(BaseDigitizedScanner):
+    """
+    Dedicated family scanner for measured moves.
+
+    The previous chapter mapping reused the raw digitized scanner and split only by
+    breakout direction. That anchored detections too late and mixed together several
+    unrelated seven-pivot windows. This family scanner models the textbook structure:
+    phase 1 impulse, phase 2 correction, then a continuation breakout that projects
+    another phase 1 distance.
+    """
+
+    def __init__(self, key: str, spec: Dict[str, Any]):
+        super().__init__(key, spec)
+        self.geom = spec.get("geometry_constraints", {}) or {}
+        self.bo = spec.get("breakout_confirmation", {}) or {}
+        slope = self.geom.get("slope_constraints", {}) or {}
+        phase13 = self.geom.get("phase1_phase3_ratio", {}) or {}
+        retrace = self.geom.get("phase2_retracement_ratio", {}) or {}
+        duration = self.geom.get("phase2_duration_ratio", {}) or {}
+
+        self.width_min_bars = int(self.geom.get("width_min_bars") or 21)
+        self.width_max_bars = min(int(self.geom.get("width_max_bars") or 126), 140)
+        self.phase1_slope_min_deg = float(slope.get("phase1_slope_min_degrees") or 15.0)
+        self.phase1_slope_max_deg = float(slope.get("phase1_slope_max_degrees") or 75.0)
+        self.phase2_slope_max_deg = float(slope.get("phase2_slope_max_degrees") or 30.0)
+        self.phase1_phase3_ratio_min = float(phase13.get("min") or 0.85)
+        self.phase1_phase3_ratio_max = float(phase13.get("max") or 1.15)
+        self.phase2_retracement_min = float(retrace.get("min") or 0.33)
+        self.phase2_retracement_max = float(retrace.get("max") or 0.67)
+        self.phase2_duration_min = float(duration.get("min") or 0.30)
+        self.phase2_duration_max = float(duration.get("max") or 0.80)
+        self.breakout_thr = float(self.bo.get("breakout_threshold_pct") or 1.0) / 100.0
+        self.confirm_bars = int(self.bo.get("confirmation_bars") or 2)
+        self.breakout_search_bars = 42
+        self.vol_required = bool(self.bo.get("volume_required") or False)
+        self.vol_mult_min = float(self.bo.get("volume_multiplier_min") or 1.2)
+
+    def _breakout_ok(
+        self,
+        df: pd.DataFrame,
+        *,
+        start_idx: int,
+        ref_level: float,
+        direction: str,
+    ) -> tuple[Optional[int], Optional[float], bool]:
+        if ref_level <= 0:
+            return None, None, False
+        for i in range(start_idx, min(len(df), start_idx + self.breakout_search_bars)):
+            close = _safe_float(df.iloc[i].get("close"))
+            if close is None:
+                continue
+            if direction == "up":
+                ok = close > ref_level * (1.0 + self.breakout_thr)
+            else:
+                ok = close < ref_level * (1.0 - self.breakout_thr)
+            if not ok:
+                continue
+            if self.confirm_bars > 1:
+                all_ok = True
+                for j in range(i, min(len(df), i + self.confirm_bars)):
+                    c = _safe_float(df.iloc[j].get("close"))
+                    if c is None:
+                        all_ok = False
+                        break
+                    if direction == "up" and not (c > ref_level * (1.0 + self.breakout_thr)):
+                        all_ok = False
+                        break
+                    if direction == "down" and not (c < ref_level * (1.0 - self.breakout_thr)):
+                        all_ok = False
+                        break
+                if not all_ok:
+                    continue
+            vr = df.iloc[i].get("volume_ratio", np.nan)
+            vol_ok = bool(pd.notna(vr) and np.isfinite(vr) and float(vr) >= self.vol_mult_min)
+            if self.vol_required and not vol_ok:
+                continue
+            return int(i), float(close), vol_ok
+        return None, None, False
+
+    def _candidate(self, df: pd.DataFrame, pivots: Sequence[Pivot]) -> Optional[Dict[str, Any]]:
+        if len(pivots) != 3:
+            return None
+        idxs = [int(p.idx) for p in pivots]
+        if not (idxs[0] < idxs[1] < idxs[2]):
+            return None
+        width_bars = idxs[2] - idxs[0] + 1
+        if width_bars < self.width_min_bars or width_bars > self.width_max_bars:
+            return None
+
+        kinds = [p.type for p in pivots]
+        if kinds == [PivotType.LOW, PivotType.HIGH, PivotType.LOW]:
+            direction = "up"
+            phase1_start = float(df.iloc[idxs[0]]["low"])
+            phase1_end = float(df.iloc[idxs[1]]["high"])
+            phase2_end = float(df.iloc[idxs[2]]["low"])
+            pattern_type = "continuation_bullish"
+            variant_code = "measured_move_up"
+            breakout_ref = phase1_end
+            stop_loss_price = phase2_end
+        elif kinds == [PivotType.HIGH, PivotType.LOW, PivotType.HIGH]:
+            direction = "down"
+            phase1_start = float(df.iloc[idxs[0]]["high"])
+            phase1_end = float(df.iloc[idxs[1]]["low"])
+            phase2_end = float(df.iloc[idxs[2]]["high"])
+            pattern_type = "continuation_bearish"
+            variant_code = "measured_move_down"
+            breakout_ref = phase1_end
+            stop_loss_price = phase2_end
+        else:
+            return None
+
+        phase1_abs = abs(phase1_end - phase1_start)
+        if phase1_abs <= 0 or phase1_start <= 0 or phase1_end <= 0 or phase2_end <= 0:
+            return None
+
+        if direction == "up":
+            retracement_abs = phase1_end - phase2_end
+            if retracement_abs <= 0:
+                return None
+            phase2_slope_deg = abs(_slope_degrees(idxs[1], phase1_end, idxs[2], phase2_end))
+        else:
+            retracement_abs = phase2_end - phase1_end
+            if retracement_abs <= 0:
+                return None
+            phase2_slope_deg = abs(_slope_degrees(idxs[1], phase1_end, idxs[2], phase2_end))
+
+        retracement_ratio = retracement_abs / phase1_abs
+        if retracement_ratio < self.phase2_retracement_min or retracement_ratio > self.phase2_retracement_max:
+            return None
+
+        phase1_bars = idxs[1] - idxs[0]
+        phase2_bars = idxs[2] - idxs[1]
+        if phase1_bars <= 0 or phase2_bars <= 0:
+            return None
+        phase2_duration_ratio = phase2_bars / phase1_bars
+        if phase2_duration_ratio < self.phase2_duration_min or phase2_duration_ratio > self.phase2_duration_max:
+            return None
+
+        phase1_slope_deg = abs(_slope_degrees(idxs[0], phase1_start, idxs[1], phase1_end))
+        if phase1_slope_deg < self.phase1_slope_min_deg or phase1_slope_deg > self.phase1_slope_max_deg:
+            return None
+        if phase2_slope_deg > self.phase2_slope_max_deg:
+            return None
+
+        breakout_idx, breakout_price, vol_ok = self._breakout_ok(
+            df,
+            start_idx=idxs[2] + 1,
+            ref_level=breakout_ref,
+            direction=direction,
+        )
+        if breakout_idx is None or breakout_price is None:
+            return None
+
+        breakout_progress_ratio = abs(breakout_price - phase2_end) / phase1_abs if phase1_abs > 0 else None
+        if breakout_progress_ratio is None:
+            return None
+
+        target_price = phase2_end + phase1_abs if direction == "up" else phase2_end - phase1_abs
+
+        confidence = 76
+        if 0.42 <= retracement_ratio <= 0.58:
+            confidence += 5
+        if phase2_duration_ratio <= 0.60:
+            confidence += 3
+        if breakout_progress_ratio <= 0.35:
+            confidence += 3
+        if vol_ok:
+            confidence += 3
+        confidence = max(0, min(100, confidence))
+
+        family_metrics = {
+            "phase1_move_pct": abs((phase1_end - phase1_start) / phase1_start) * 100.0,
+            "phase1_bars": int(phase1_bars),
+            "phase1_slope_deg": float(phase1_slope_deg),
+            "phase2_bars": int(phase2_bars),
+            "phase2_slope_deg": float(phase2_slope_deg),
+            "phase2_retracement_ratio": float(retracement_ratio),
+            "phase2_retracement_pct": float(retracement_ratio * 100.0),
+            "phase2_duration_ratio": float(phase2_duration_ratio),
+            "projected_phase3_ratio": 1.0,
+            "breakout_progress_ratio": float(breakout_progress_ratio),
+            "breakout_lag_bars": int(breakout_idx - idxs[2]),
+        }
+
+        return {
+            "pattern_id": f"{variant_code}_{idxs[0]}_{idxs[2]}",
+            "pattern_type": pattern_type,
+            "breakout_direction": direction,
+            "breakout_idx": int(breakout_idx),
+            "breakout_price": float(breakout_price),
+            "target_price": float(target_price),
+            "stop_loss_price": float(stop_loss_price),
+            "confidence_score": int(confidence),
+            "volume_confirmed": bool(vol_ok),
+            "pattern_height_pct": round(float(abs((target_price - phase2_end) / max(1e-9, phase2_end)) * 100.0), 2),
+            "pattern_width_bars": int(width_bars),
+            "touch_count": 3,
+            "pivot_indices": idxs,
+            "variant_code": variant_code,
+            "variant_confidence": int(confidence),
+            "variant_evidence_json": json.dumps(
+                {
+                    "phase2_retracement_ratio": round(float(retracement_ratio), 3),
+                    "phase2_duration_ratio": round(float(phase2_duration_ratio), 3),
+                    "projected_phase3_ratio": 1.0,
+                    "breakout_progress_ratio": round(float(breakout_progress_ratio), 3),
+                    "phase1_slope_deg": round(float(phase1_slope_deg), 2),
+                },
+                sort_keys=True,
+                ensure_ascii=False,
+            ),
+            "family_metrics_json": json.dumps(family_metrics, sort_keys=True, ensure_ascii=False),
+        }
+
     def scan(
         self,
         *,
@@ -3393,106 +3606,337 @@ class GapScanner(BaseDigitizedScanner):
         pivots_filtered: List[Pivot],
         pivots_raw: List[Pivot],
     ) -> List[Dict[str, Any]]:
-        geom = self.spec.get("geometry_constraints", {}) or {}
-        gap_cfg = (geom.get("gap_constraints") or {}) if isinstance(geom.get("gap_constraints"), dict) else {}
-        min_gap = float((gap_cfg.get("min_gap_size_pct")) or 0.1) / 100.0
-        max_gap_pct = gap_cfg.get("max_gap_size_pct")
-        max_gap = float(max_gap_pct) / 100.0 if max_gap_pct is not None else None
-        hmin = geom.get("height_ratio_min")
-        hmax = geom.get("height_ratio_max")
+        pivots = pivots_filtered or pivots_raw
+        if len(pivots) < 3:
+            return []
 
         out: List[Dict[str, Any]] = []
+        seen: set[tuple[int, int, str]] = set()
+        for i in range(len(pivots) - 2):
+            window = pivots[i : i + 3]
+            candidate = self._candidate(df, window)
+            if not candidate:
+                continue
+            start_idx = int(candidate["pivot_indices"][0])
+            end_idx = int(candidate["pivot_indices"][-1])
+            breakout_idx = int(candidate["breakout_idx"])
+            sig = (start_idx, end_idx, str(candidate["variant_code"]))
+            if sig in seen:
+                continue
+            seen.add(sig)
+            out.append(
+                {
+                    "pattern_id": f"{symbol}_{self.key}_{candidate['pattern_id']}",
+                    "symbol": symbol,
+                    "pattern_name": self.key,
+                    "base_pattern_name": self.key,
+                    "pattern_type": candidate["pattern_type"],
+                    "formation_start": str(df.iloc[start_idx]["date"].date()) if "date" in df.columns else str(start_idx),
+                    "formation_end": str(df.iloc[end_idx]["date"].date()) if "date" in df.columns else str(end_idx),
+                    "breakout_date": str(df.iloc[breakout_idx]["date"].date()) if "date" in df.columns else None,
+                    "breakout_idx": breakout_idx,
+                    "breakout_direction": candidate["breakout_direction"],
+                    "breakout_price": candidate["breakout_price"],
+                    "target_price": candidate["target_price"],
+                    "stop_loss_price": candidate["stop_loss_price"],
+                    "confidence_score": candidate["confidence_score"],
+                    "volume_confirmed": candidate["volume_confirmed"],
+                    "variant_code": candidate["variant_code"],
+                    "variant_confidence": candidate["variant_confidence"],
+                    "variant_evidence_json": candidate["variant_evidence_json"],
+                    "family_metrics_json": candidate["family_metrics_json"],
+                    "pattern_height_pct": candidate["pattern_height_pct"],
+                    "pattern_width_bars": candidate["pattern_width_bars"],
+                    "touch_count": candidate["touch_count"],
+                    "pivot_indices": candidate["pivot_indices"],
+                    "config_hash": self.config_hash,
+                    "created_at": datetime.now().isoformat(),
+                }
+            )
+        return out
+
+
+class GapScanner(BaseDigitizedScanner):
+    def __init__(self, key: str, spec: Dict[str, Any]):
+        super().__init__(key, spec)
+        self.geom = spec.get("geometry_constraints", {}) or {}
+        self.breakout = spec.get("breakout_confirmation", {}) or {}
+        self.prior = spec.get("prior_trend_requirements", {}) or {}
+
+        gap_cfg = self.geom.get("gap_constraints") or {}
+        if not isinstance(gap_cfg, dict):
+            gap_cfg = {}
+
+        self.min_gap = float(gap_cfg.get("min_gap_size_pct") or 0.1) / 100.0
+        max_gap_pct = gap_cfg.get("max_gap_size_pct")
+        self.max_gap = float(max_gap_pct) / 100.0 if max_gap_pct is not None else None
+        self.hmin = self.geom.get("height_ratio_min")
+        self.hmax = self.geom.get("height_ratio_max")
+        self.breakout_thr = float(self.breakout.get("breakout_threshold_pct") or 0.1) / 100.0
+        self.fill_horizon = int(self.breakout.get("max_return_days") or 3)
+        self.min_prior_bars = max(3, int(self.prior.get("min_period_bars") or 5))
+        self.min_prior_change = float(self.prior.get("min_change_pct") or 3.0)
+        self.min_volume_ratio = float(self.breakout.get("volume_multiplier_min") or 1.1)
+
+    def _gap_candidate(self, df: pd.DataFrame, i: int) -> Optional[Dict[str, Any]]:
+        if i <= 0 or i >= len(df):
+            return None
+        prev = df.iloc[i - 1]
+        cur = df.iloc[i]
+
+        prev_high = _safe_float(prev.get("high"))
+        prev_low = _safe_float(prev.get("low"))
+        cur_high = _safe_float(cur.get("high"))
+        cur_low = _safe_float(cur.get("low"))
+        cur_close = _safe_float(cur.get("close"))
+        if None in (prev_high, prev_low, cur_high, cur_low, cur_close):
+            return None
+
+        direction: Optional[str] = None
+        lower_edge: Optional[float] = None
+        upper_edge: Optional[float] = None
+
+        if float(cur_low) > float(prev_high) * (1.0 + self.min_gap):
+            direction = "up"
+            lower_edge = float(prev_high)
+            upper_edge = float(cur_low)
+        elif float(cur_high) < float(prev_low) * (1.0 - self.min_gap):
+            direction = "down"
+            lower_edge = float(cur_high)
+            upper_edge = float(prev_low)
+        else:
+            return None
+
+        height_abs = float(upper_edge - lower_edge)
+        if height_abs <= 0:
+            return None
+        ref = (float(upper_edge) + float(lower_edge)) / 2.0
+        if ref <= 0:
+            return None
+        gap_pct = height_abs / ref
+        if self.max_gap is not None and gap_pct > self.max_gap:
+            return None
+        gap_pct_100 = gap_pct * 100.0
+        if self.hmin is not None and gap_pct_100 < float(self.hmin):
+            return None
+        if self.hmax is not None and gap_pct_100 > float(self.hmax):
+            return None
+
+        return {
+            "direction": direction,
+            "gap_lower_edge": float(lower_edge),
+            "gap_upper_edge": float(upper_edge),
+            "gap_abs": float(height_abs),
+            "gap_pct": float(gap_pct_100),
+            "breakout_price": float(cur_close),
+        }
+
+    def _prior_change_pct(self, df: pd.DataFrame, end_idx: int, bars: int) -> Optional[float]:
+        if end_idx <= 0 or bars <= 0:
+            return None
+        start_idx = end_idx - bars
+        if start_idx < 0:
+            return None
+        p0 = _safe_float(df.iloc[start_idx].get("close"))
+        p1 = _safe_float(df.iloc[end_idx].get("close"))
+        if p0 is None or p1 is None or p0 <= 0:
+            return None
+        return (float(p1) - float(p0)) / float(p0) * 100.0
+
+    def _recent_range_pct(self, df: pd.DataFrame, end_idx: int, bars: int) -> Optional[float]:
+        start_idx = max(0, end_idx - bars + 1)
+        window = df.iloc[start_idx : end_idx + 1]
+        if len(window) < max(3, bars // 2):
+            return None
+        high = _safe_float(window["high"].max())
+        low = _safe_float(window["low"].min())
+        if high is None or low is None or high <= 0 or high <= low:
+            return None
+        ref = (float(high) + float(low)) / 2.0
+        if ref <= 0:
+            return None
+        return (float(high) - float(low)) / ref * 100.0
+
+    def _directional_ratio(self, df: pd.DataFrame, end_idx: int, bars: int, *, direction: str) -> Optional[float]:
+        start_idx = end_idx - bars + 1
+        if start_idx <= 0:
+            return None
+        closes = df.iloc[start_idx - 1 : end_idx + 1]["close"].to_numpy(dtype=float, copy=False)
+        if closes.size < 3 or not np.isfinite(closes).all():
+            return None
+        diffs = np.diff(closes)
+        if diffs.size == 0:
+            return None
+        if direction == "up":
+            return float(np.mean(diffs > 0))
+        return float(np.mean(diffs < 0))
+
+    def _classify_gap_variant(self, metrics: Dict[str, Any]) -> Dict[str, Any]:
+        direction = str(metrics.get("direction") or "up")
+        gap_pct = _safe_float(metrics.get("gap_pct")) or 0.0
+        vol_ratio = _safe_float(metrics.get("volume_ratio")) or 0.0
+        prior10 = _safe_float(metrics.get("prior_change_10_pct"))
+        prior20 = _safe_float(metrics.get("prior_change_20_pct"))
+        recent_range = _safe_float(metrics.get("recent_range_10_pct"))
+        dir_ratio = _safe_float(metrics.get("directional_ratio_10"))
+
+        trend_dir = "flat"
+        trend_strength = 0.0
+        for change in (prior20, prior10):
+            if change is None:
+                continue
+            if abs(change) >= self.min_prior_change:
+                trend_dir = "up" if change > 0 else "down"
+                trend_strength = abs(change)
+                break
+
+        consolidation = (
+            recent_range is not None
+            and recent_range <= max(6.0, gap_pct * 2.8)
+            and (prior10 is None or abs(prior10) <= 4.5)
+        )
+        established_trend = trend_dir == direction and trend_strength >= 5.0
+        extended_trend = trend_dir == direction and (
+            trend_strength >= 12.0
+            or (
+                trend_strength >= 8.0
+                and dir_ratio is not None
+                and dir_ratio >= 0.70
+                and gap_pct >= 0.7
+            )
+        )
+
+        if consolidation and gap_pct >= 0.6 and vol_ratio >= 1.25:
+            subtype = "breakaway_gap"
+            base_conf = 88
+            evidence = ["prior_consolidation", "volume_support", "large_gap"]
+        elif extended_trend and gap_pct >= 0.8 and vol_ratio >= 1.4:
+            subtype = "exhaustion_gap"
+            base_conf = 78
+            evidence = ["extended_trend", "high_volume", "trend_stretch"]
+        elif established_trend and gap_pct >= 0.35:
+            subtype = "continuation_gap"
+            base_conf = 82
+            evidence = ["established_trend", "gap_in_trend_direction"]
+        else:
+            subtype = "common_gap"
+            base_conf = 60
+            evidence = ["weak_context_or_small_gap"]
+
+        confidence = base_conf
+        if gap_pct >= 1.2:
+            confidence += 4
+        if vol_ratio >= 2.0:
+            confidence += 4
+        if subtype == "common_gap" and gap_pct <= 0.35:
+            confidence -= 5
+        if subtype == "common_gap" and vol_ratio < 1.0:
+            confidence -= 3
+        confidence = int(max(45, min(98, confidence)))
+
+        return {
+            "variant_code": f"{subtype}_{direction}",
+            "variant_confidence": confidence,
+            "evidence": evidence,
+            "subtype": subtype,
+        }
+
+    def scan(
+        self,
+        *,
+        symbol: str,
+        df: pd.DataFrame,
+        pivots_filtered: List[Pivot],
+        pivots_raw: List[Pivot],
+    ) -> List[Dict[str, Any]]:
+        out: List[Dict[str, Any]] = []
         for i in range(1, len(df)):
-            prev = df.iloc[i - 1]
-            cur = df.iloc[i]
-            # Gap up: today's low above yesterday's high
-            if cur["low"] > prev["high"] * (1.0 + min_gap):
-                pattern_id = f"{symbol}_{self.key}_{i}_{i}"
-                gap_edge_1 = float(prev["high"])
-                gap_edge_2 = float(cur["low"])
-                height_abs = float(gap_edge_2 - gap_edge_1)
-                if height_abs <= 0:
-                    continue
-                ref = (gap_edge_1 + gap_edge_2) / 2.0
-                if ref <= 0:
-                    continue
-                height_pct = height_abs / ref
-                if max_gap is not None and height_pct > max_gap:
-                    continue
-                height_pct_100 = height_pct * 100.0
-                if hmin is not None and height_pct_100 < float(hmin):
-                    continue
-                if hmax is not None and height_pct_100 > float(hmax):
-                    continue
-                out.append(
-                    {
-                        "pattern_id": pattern_id,
-                        "symbol": symbol,
-                        "pattern_name": self.key,
-                        "pattern_type": self.pattern_type,
-                        "formation_start": str(cur["date"].date()) if "date" in df.columns else str(i),
-                        "formation_end": str(cur["date"].date()) if "date" in df.columns else str(i),
-                        "breakout_date": str(cur["date"].date()) if "date" in df.columns else None,
-                        "breakout_idx": int(i),
-                        "breakout_direction": "up",
-                        "breakout_price": float(cur["close"]),
-                        "target_price": float(cur["close"]) + height_abs,
-                        "stop_loss_price": float(prev["high"]),
-                        "confidence_score": 65,
-                        "volume_confirmed": False,
-                        "pattern_height_pct": round(height_pct_100, 3),
-                        "pattern_width_bars": 1,
-                        "touch_count": 1,
-                        "pivot_indices": [int(i - 1), int(i)],
-                        "config_hash": self.config_hash,
-                        "created_at": datetime.now().isoformat(),
-                    }
-                )
+            candidate = self._gap_candidate(df, i)
+            if not candidate:
                 continue
 
-            # Gap down: today's high below yesterday's low
-            if cur["high"] < prev["low"] * (1.0 - min_gap):
-                pattern_id = f"{symbol}_{self.key}_{i}_{i}"
-                gap_edge_1 = float(cur["high"])
-                gap_edge_2 = float(prev["low"])
-                height_abs = float(gap_edge_2 - gap_edge_1)
-                if height_abs <= 0:
-                    continue
-                ref = (gap_edge_1 + gap_edge_2) / 2.0
-                if ref <= 0:
-                    continue
-                height_pct = height_abs / ref
-                if max_gap is not None and height_pct > max_gap:
-                    continue
-                height_pct_100 = height_pct * 100.0
-                if hmin is not None and height_pct_100 < float(hmin):
-                    continue
-                if hmax is not None and height_pct_100 > float(hmax):
-                    continue
-                out.append(
-                    {
-                        "pattern_id": pattern_id,
-                        "symbol": symbol,
-                        "pattern_name": self.key,
-                        "pattern_type": self.pattern_type,
-                        "formation_start": str(cur["date"].date()) if "date" in df.columns else str(i),
-                        "formation_end": str(cur["date"].date()) if "date" in df.columns else str(i),
-                        "breakout_date": str(cur["date"].date()) if "date" in df.columns else None,
-                        "breakout_idx": int(i),
-                        "breakout_direction": "down",
-                        "breakout_price": float(cur["close"]),
-                        "target_price": float(cur["close"]) - height_abs,
-                        "stop_loss_price": float(prev["low"]),
-                        "confidence_score": 65,
-                        "volume_confirmed": False,
-                        "pattern_height_pct": round(height_pct_100, 3),
-                        "pattern_width_bars": 1,
-                        "touch_count": 1,
-                        "pivot_indices": [int(i - 1), int(i)],
-                        "config_hash": self.config_hash,
-                        "created_at": datetime.now().isoformat(),
-                    }
-                )
+            direction = str(candidate["direction"])
+            prior_change_5 = self._prior_change_pct(df, i - 1, 5)
+            prior_change_10 = self._prior_change_pct(df, i - 1, 10)
+            prior_change_20 = self._prior_change_pct(df, i - 1, 20)
+            recent_range_10 = self._recent_range_pct(df, i - 1, 10)
+            directional_ratio = self._directional_ratio(df, i - 1, 10, direction=direction)
+            volume_ratio = _safe_float(df.iloc[i].get("volume_ratio")) or 0.0
+
+            metrics = {
+                "direction": direction,
+                "gap_pct": candidate["gap_pct"],
+                "prior_change_5_pct": prior_change_5,
+                "prior_change_10_pct": prior_change_10,
+                "prior_change_20_pct": prior_change_20,
+                "recent_range_10_pct": recent_range_10,
+                "directional_ratio_10": directional_ratio,
+                "volume_ratio": volume_ratio,
+            }
+            variant = self._classify_gap_variant(metrics)
+            subtype = str(variant["subtype"])
+            confidence = int(variant["variant_confidence"])
+
+            target_price = (
+                float(candidate["breakout_price"]) + float(candidate["gap_abs"])
+                if direction == "up"
+                else float(candidate["breakout_price"]) - float(candidate["gap_abs"])
+            )
+            stop_loss_price = float(candidate["gap_lower_edge"]) if direction == "up" else float(candidate["gap_upper_edge"])
+
+            family_metrics = {
+                "gap_pct": float(candidate["gap_pct"]),
+                "gap_abs": float(candidate["gap_abs"]),
+                "gap_lower_edge": float(candidate["gap_lower_edge"]),
+                "gap_upper_edge": float(candidate["gap_upper_edge"]),
+                "prior_change_5_pct": prior_change_5,
+                "prior_change_10_pct": prior_change_10,
+                "prior_change_20_pct": prior_change_20,
+                "recent_range_10_pct": recent_range_10,
+                "directional_ratio_10": directional_ratio,
+                "volume_ratio": volume_ratio,
+                "subtype": subtype,
+                "fill_horizon_bars": int(self.fill_horizon),
+            }
+
+            out.append(
+                {
+                    "pattern_id": f"{symbol}_{self.key}_{i}_{direction}",
+                    "symbol": symbol,
+                    "pattern_name": self.key,
+                    "base_pattern_name": self.key,
+                    "pattern_type": self.pattern_type,
+                    "formation_start": str(df.iloc[i]["date"].date()) if "date" in df.columns else str(i),
+                    "formation_end": str(df.iloc[i]["date"].date()) if "date" in df.columns else str(i),
+                    "breakout_date": str(df.iloc[i]["date"].date()) if "date" in df.columns else None,
+                    "breakout_idx": int(i),
+                    "breakout_direction": direction,
+                    "breakout_price": float(candidate["breakout_price"]),
+                    "target_price": float(target_price),
+                    "stop_loss_price": float(stop_loss_price),
+                    "confidence_score": confidence,
+                    "volume_confirmed": bool(volume_ratio >= self.min_volume_ratio),
+                    "pattern_height_pct": round(float(candidate["gap_pct"]), 3),
+                    "pattern_width_bars": 1,
+                    "touch_count": 1,
+                    "pivot_indices": [int(i - 1), int(i)],
+                    "variant_code": variant["variant_code"],
+                    "variant_confidence": confidence,
+                    "variant_evidence_json": json.dumps(
+                        {
+                            "subtype": subtype,
+                            "volume_ratio": round(float(volume_ratio), 3),
+                            "prior_change_10_pct": None if prior_change_10 is None else round(float(prior_change_10), 3),
+                            "prior_change_20_pct": None if prior_change_20 is None else round(float(prior_change_20), 3),
+                        },
+                        sort_keys=True,
+                        ensure_ascii=False,
+                    ),
+                    "family_metrics_json": json.dumps(family_metrics, sort_keys=True, ensure_ascii=False),
+                    "config_hash": self.config_hash,
+                    "created_at": datetime.now().isoformat(),
+                }
+            )
 
         return out
 
@@ -3764,6 +4208,232 @@ class DeadCatBounceInvertedScanner(BaseDigitizedScanner):
 
 
 class IslandScanner(BaseDigitizedScanner):
+    def __init__(self, key: str, spec: Dict[str, Any]):
+        super().__init__(key, spec)
+        self.geom = spec.get("geometry_constraints", {}) or {}
+        self.breakout = spec.get("breakout_confirmation", {}) or {}
+        self.prior = spec.get("prior_trend_requirements", {}) or {}
+        gap_cfg = self.geom.get("gap_constraints") or {}
+        if not isinstance(gap_cfg, dict):
+            gap_cfg = {}
+        island_dur = self.geom.get("island_duration") or {}
+        if not isinstance(island_dur, dict):
+            island_dur = {}
+        duration = self.spec.get("duration_constraints", {}) or {}
+
+        self.min_gap_pct = float(gap_cfg.get("min_gap_size_pct") or 0.5) / 100.0
+        max_gap_pct = gap_cfg.get("max_gap_size_pct")
+        self.max_gap_pct = float(max_gap_pct) / 100.0 if max_gap_pct is not None else None
+        self.min_gap_similarity_ratio = float(gap_cfg.get("gap_similarity_pct") or 50.0) / 100.0
+        price_sep = self.geom.get("price_separation") or {}
+        if not isinstance(price_sep, dict):
+            price_sep = {}
+        self.min_separation_pct = float(price_sep.get("min_separation_pct") or 0.5) / 100.0
+        self.min_island_bars = max(3, int(duration.get("min_bars") or island_dur.get("min_bars") or 3))
+        self.max_island_bars = int(island_dur.get("max_bars") or self.geom.get("width_max_bars") or duration.get("max_bars") or 20)
+        self.width_min_bars = int(self.geom.get("width_min_bars") or self.min_island_bars)
+        self.width_max_bars = int(self.geom.get("width_max_bars") or self.max_island_bars)
+        self.hmin = self.geom.get("height_ratio_min")
+        self.hmax = self.geom.get("height_ratio_max")
+        self.min_prior_bars = max(3, int(self.prior.get("min_period_bars") or 5))
+        self.min_prior_change = float(self.prior.get("min_change_pct") or 3.0)
+        self.min_volume_ratio = float(self.breakout.get("volume_multiplier_min") or 1.1)
+
+    def _gap_up(self, df: pd.DataFrame, i: int) -> Optional[Dict[str, float]]:
+        if i <= 0 or i >= len(df):
+            return None
+        prev_high = _safe_float(df.iloc[i - 1].get("high"))
+        cur_low = _safe_float(df.iloc[i].get("low"))
+        if prev_high is None or cur_low is None:
+            return None
+        if float(cur_low) <= float(prev_high) * (1.0 + self.min_gap_pct):
+            return None
+        ref = (float(prev_high) + float(cur_low)) / 2.0
+        if ref <= 0:
+            return None
+        gap_pct = (float(cur_low) - float(prev_high)) / ref
+        if gap_pct <= 0:
+            return None
+        if self.max_gap_pct is not None and gap_pct > self.max_gap_pct:
+            return None
+        return {
+            "gap_pct": float(gap_pct),
+            "mainland_edge": float(prev_high),
+            "island_edge": float(cur_low),
+        }
+
+    def _gap_down(self, df: pd.DataFrame, i: int) -> Optional[Dict[str, float]]:
+        if i <= 0 or i >= len(df):
+            return None
+        prev_low = _safe_float(df.iloc[i - 1].get("low"))
+        cur_high = _safe_float(df.iloc[i].get("high"))
+        if prev_low is None or cur_high is None:
+            return None
+        if float(cur_high) >= float(prev_low) * (1.0 - self.min_gap_pct):
+            return None
+        ref = (float(prev_low) + float(cur_high)) / 2.0
+        if ref <= 0:
+            return None
+        gap_pct = (float(prev_low) - float(cur_high)) / ref
+        if gap_pct <= 0:
+            return None
+        if self.max_gap_pct is not None and gap_pct > self.max_gap_pct:
+            return None
+        return {
+            "gap_pct": float(gap_pct),
+            "mainland_edge": float(prev_low),
+            "island_edge": float(cur_high),
+        }
+
+    def _prior_trend_ok(self, df: pd.DataFrame, start_idx: int, *, direction: str) -> tuple[bool, Optional[float]]:
+        ref_idx = start_idx - 1
+        if ref_idx < self.min_prior_bars:
+            return False, None
+        start_ref = ref_idx - self.min_prior_bars
+        p0 = _safe_float(df.iloc[start_ref].get("close"))
+        p1 = _safe_float(df.iloc[ref_idx].get("close"))
+        if p0 is None or p1 is None or p0 <= 0:
+            return False, None
+        change_pct = (float(p1) - float(p0)) / float(p0) * 100.0
+        if direction == "up":
+            return change_pct >= self.min_prior_change, float(change_pct)
+        return change_pct <= -self.min_prior_change, float(change_pct)
+
+    def _build_candidate(
+        self,
+        *,
+        symbol: str,
+        df: pd.DataFrame,
+        entry_idx: int,
+        exit_idx: int,
+        direction: str,
+    ) -> Optional[Dict[str, Any]]:
+        width_bars = int(exit_idx - entry_idx + 1)
+        if width_bars < self.min_island_bars or width_bars > self.max_island_bars:
+            return None
+        if width_bars < self.width_min_bars or width_bars > self.width_max_bars:
+            return None
+        if exit_idx - entry_idx < 2:
+            return None
+
+        if direction == "down":
+            first_gap = self._gap_up(df, entry_idx)
+            second_gap = self._gap_down(df, exit_idx)
+            prior_ok, prior_change = self._prior_trend_ok(df, entry_idx, direction="up")
+        else:
+            first_gap = self._gap_down(df, entry_idx)
+            second_gap = self._gap_up(df, exit_idx)
+            prior_ok, prior_change = self._prior_trend_ok(df, entry_idx, direction="down")
+        if not prior_ok or not first_gap or not second_gap:
+            return None
+
+        gap_similarity = min(float(first_gap["gap_pct"]), float(second_gap["gap_pct"])) / max(float(first_gap["gap_pct"]), float(second_gap["gap_pct"]))
+        if gap_similarity < self.min_gap_similarity_ratio:
+            return None
+
+        island_window = df.iloc[entry_idx:exit_idx]
+        if len(island_window) < 1:
+            return None
+        island_high = _safe_float(island_window["high"].max())
+        island_low = _safe_float(island_window["low"].min())
+        if island_high is None or island_low is None or island_high <= island_low:
+            return None
+
+        if direction == "down":
+            mainland_boundary = float(first_gap["mainland_edge"])
+            if not bool((island_window["low"] > mainland_boundary * (1.0 + self.min_separation_pct)).all()):
+                return None
+            separation_pct = (float(island_low) - mainland_boundary) / mainland_boundary * 100.0 if mainland_boundary > 0 else None
+            stop_loss_price = float(island_high)
+            pattern_type = "reversal_bearish"
+            variant_code = "island_top"
+        else:
+            mainland_boundary = float(first_gap["mainland_edge"])
+            if not bool((island_window["high"] < mainland_boundary * (1.0 - self.min_separation_pct)).all()):
+                return None
+            separation_pct = (mainland_boundary - float(island_high)) / mainland_boundary * 100.0 if mainland_boundary > 0 else None
+            stop_loss_price = float(island_low)
+            pattern_type = "reversal_bullish"
+            variant_code = "island_bottom"
+
+        breakout_price = _safe_float(df.iloc[exit_idx].get("close"))
+        if breakout_price is None or breakout_price <= 0:
+            return None
+
+        height_abs = float(island_high - island_low)
+        ref = (float(island_high) + float(island_low)) / 2.0
+        if ref <= 0:
+            return None
+        height_pct = height_abs / ref * 100.0
+        if self.hmin is not None and height_pct < float(self.hmin):
+            return None
+        if self.hmax is not None and height_pct > float(self.hmax):
+            return None
+
+        target_price = float(breakout_price) - height_abs if direction == "down" else float(breakout_price) + height_abs
+        entry_volume = _safe_float(df.iloc[entry_idx].get("volume_ratio")) or 0.0
+        exit_volume = _safe_float(df.iloc[exit_idx].get("volume_ratio")) or 0.0
+        volume_confirmed = max(entry_volume, exit_volume) >= self.min_volume_ratio
+
+        confidence = 74
+        if width_bars <= 6:
+            confidence += 4
+        if gap_similarity >= 0.70:
+            confidence += 5
+        if separation_pct is not None and separation_pct >= 1.0:
+            confidence += 4
+        if volume_confirmed:
+            confidence += 3
+        confidence = int(max(55, min(96, confidence)))
+
+        family_metrics = {
+            "first_gap_pct": float(first_gap["gap_pct"] * 100.0),
+            "second_gap_pct": float(second_gap["gap_pct"] * 100.0),
+            "gap_similarity_ratio": float(gap_similarity),
+            "prior_change_pct": prior_change,
+            "separation_pct": separation_pct,
+            "island_range_pct": float(height_pct),
+            "entry_volume_ratio": float(entry_volume),
+            "exit_volume_ratio": float(exit_volume),
+            "width_bars": int(width_bars),
+        }
+
+        return {
+            "pattern_id": f"{symbol}_{self.key}_{entry_idx}_{exit_idx}_{variant_code}",
+            "symbol": symbol,
+            "pattern_name": self.key,
+            "base_pattern_name": self.key,
+            "pattern_type": pattern_type,
+            "formation_start": str(df.iloc[entry_idx]["date"].date()) if "date" in df.columns else str(entry_idx),
+            "formation_end": str(df.iloc[exit_idx]["date"].date()) if "date" in df.columns else str(exit_idx),
+            "breakout_date": str(df.iloc[exit_idx]["date"].date()) if "date" in df.columns else None,
+            "breakout_idx": int(exit_idx),
+            "breakout_direction": direction,
+            "breakout_price": float(breakout_price),
+            "target_price": float(target_price),
+            "stop_loss_price": float(stop_loss_price),
+            "confidence_score": confidence,
+            "volume_confirmed": bool(volume_confirmed),
+            "pattern_height_pct": round(float(height_pct), 2),
+            "pattern_width_bars": int(width_bars),
+            "touch_count": 2,
+            "pivot_indices": [int(entry_idx), int(exit_idx)],
+            "variant_code": variant_code,
+            "variant_confidence": confidence,
+            "variant_evidence_json": json.dumps(
+                {
+                    "gap_similarity_ratio": round(float(gap_similarity), 3),
+                    "prior_change_pct": None if prior_change is None else round(float(prior_change), 3),
+                    "separation_pct": None if separation_pct is None else round(float(separation_pct), 3),
+                },
+                sort_keys=True,
+                ensure_ascii=False,
+            ),
+            "family_metrics_json": json.dumps(family_metrics, sort_keys=True, ensure_ascii=False),
+            "config_hash": self.config_hash,
+            "created_at": datetime.now().isoformat(),
+        }
+
     def scan(
         self,
         *,
@@ -3772,190 +4442,32 @@ class IslandScanner(BaseDigitizedScanner):
         pivots_filtered: List[Pivot],
         pivots_raw: List[Pivot],
     ) -> List[Dict[str, Any]]:
-        # Simplified island detection: gap up then gap down (top) OR gap down then gap up (bottom).
-        # Respect digitized constraints where possible.
-        geom = self.spec.get("geometry_constraints", {}) or {}
-        gap_cfg = (geom.get("gap_constraints") or {}) if isinstance(geom.get("gap_constraints"), dict) else {}
-        min_gap_pct = float((gap_cfg.get("min_gap_size_pct")) or 0.5) / 100.0
-        max_gap_pct = gap_cfg.get("max_gap_size_pct")
-        max_gap = float(max_gap_pct) / 100.0 if max_gap_pct is not None else None
-
-        dur = self.spec.get("duration_constraints", {}) or {}
-        max_island_bars = int((geom.get("island_duration") or {}).get("max_bars") or geom.get("width_max_bars") or dur.get("max_bars") or 20)
-        min_island_bars = int(dur.get("min_bars") or 1)
-
-        hmin = geom.get("height_ratio_min")
-        hmax = geom.get("height_ratio_max")
-
         out: List[Dict[str, Any]] = []
-
-        def _gap_pct(prev_high: float, cur_low: float) -> Optional[float]:
-            # Return gap size as a fraction of mid-price.
-            height_abs = cur_low - prev_high
-            if height_abs <= 0:
-                return None
-            ref = (prev_high + cur_low) / 2.0
-            if ref <= 0:
-                return None
-            return height_abs / ref
-
-        def is_gap_up(i: int) -> bool:
-            if i <= 0:
-                return False
-            prev_high = float(df.iloc[i - 1]["high"])
-            cur_low = float(df.iloc[i]["low"])
-            if cur_low <= prev_high * (1.0 + min_gap_pct):
-                return False
-            gp = _gap_pct(prev_high, cur_low)
-            if gp is None:
-                return False
-            if max_gap is not None and gp > max_gap:
-                return False
-            return True
-
-        def is_gap_down(i: int) -> bool:
-            if i <= 0:
-                return False
-            prev_low = float(df.iloc[i - 1]["low"])
-            cur_high = float(df.iloc[i]["high"])
-            if cur_high >= prev_low * (1.0 - min_gap_pct):
-                return False
-            # For gap down, swap to reuse _gap_pct (prev_high < cur_low analogue)
-            gp = _gap_pct(cur_high, prev_low)
-            if gp is None:
-                return False
-            if max_gap is not None and gp > max_gap:
-                return False
-            return True
 
         i = 1
         while i < len(df):
-            if is_gap_up(i):
-                # Look for gap down within window
-                j_end = min(len(df), i + max_island_bars)
+            if self._gap_up(df, i):
+                j_end = min(len(df), i + self.max_island_bars)
                 j = i + 1
                 while j < j_end:
-                    if is_gap_down(j):
-                        # Island top
-                        width_bars = int(j - i + 1)
-                        if width_bars < min_island_bars or width_bars > max_island_bars:
-                            j += 1
-                            continue
-                        if (geom.get("width_min_bars") is not None and width_bars < int(geom.get("width_min_bars"))):
-                            j += 1
-                            continue
-                        if (geom.get("width_max_bars") is not None and width_bars > int(geom.get("width_max_bars"))):
-                            j += 1
-                            continue
-                        pattern_id = f"{symbol}_{self.key}_{i}_{j}"
-                        breakout_price = float(df.iloc[j]["close"])
-                        island_high = float(df.iloc[i:j]["high"].max())
-                        island_low = float(df.iloc[i:j]["low"].min())
-                        height_abs = island_high - island_low
-                        if height_abs <= 0:
-                            j += 1
-                            continue
-                        ref = (island_high + island_low) / 2.0
-                        if ref <= 0:
-                            j += 1
-                            continue
-                        height_pct = height_abs / ref * 100.0
-                        if hmin is not None and height_pct < float(hmin):
-                            j += 1
-                            continue
-                        if hmax is not None and height_pct > float(hmax):
-                            j += 1
-                            continue
-                        out.append(
-                            {
-                                "pattern_id": pattern_id,
-                                "symbol": symbol,
-                                "pattern_name": self.key,
-                                "pattern_type": self.pattern_type,
-                                "formation_start": str(df.iloc[i]["date"].date()) if "date" in df.columns else str(i),
-                                "formation_end": str(df.iloc[j]["date"].date()) if "date" in df.columns else str(j),
-                                "breakout_date": str(df.iloc[j]["date"].date()) if "date" in df.columns else None,
-                                "breakout_idx": int(j),
-                                "breakout_direction": "down",
-                                "breakout_price": breakout_price,
-                                "target_price": breakout_price - height_abs,
-                                "stop_loss_price": island_high,
-                                "confidence_score": 75,
-                                "volume_confirmed": False,
-                                "pattern_height_pct": round(height_pct, 2),
-                                "pattern_width_bars": width_bars,
-                                "touch_count": 2,
-                                "pivot_indices": [int(i), int(j)],
-                                "config_hash": self.config_hash,
-                                "created_at": datetime.now().isoformat(),
-                            }
-                        )
+                    if self._gap_down(df, j):
+                        row = self._build_candidate(symbol=symbol, df=df, entry_idx=i, exit_idx=j, direction="down")
+                        if row is not None:
+                            out.append(row)
                         i = j  # skip ahead
                         break
                     j += 1
                 i += 1
                 continue
 
-            if is_gap_down(i):
-                # Look for gap up within window
-                j_end = min(len(df), i + max_island_bars)
+            if self._gap_down(df, i):
+                j_end = min(len(df), i + self.max_island_bars)
                 j = i + 1
                 while j < j_end:
-                    if is_gap_up(j):
-                        # Island bottom
-                        width_bars = int(j - i + 1)
-                        if width_bars < min_island_bars or width_bars > max_island_bars:
-                            j += 1
-                            continue
-                        if (geom.get("width_min_bars") is not None and width_bars < int(geom.get("width_min_bars"))):
-                            j += 1
-                            continue
-                        if (geom.get("width_max_bars") is not None and width_bars > int(geom.get("width_max_bars"))):
-                            j += 1
-                            continue
-                        pattern_id = f"{symbol}_{self.key}_{i}_{j}"
-                        breakout_price = float(df.iloc[j]["close"])
-                        island_high = float(df.iloc[i:j]["high"].max())
-                        island_low = float(df.iloc[i:j]["low"].min())
-                        height_abs = island_high - island_low
-                        if height_abs <= 0:
-                            j += 1
-                            continue
-                        ref = (island_high + island_low) / 2.0
-                        if ref <= 0:
-                            j += 1
-                            continue
-                        height_pct = height_abs / ref * 100.0
-                        if hmin is not None and height_pct < float(hmin):
-                            j += 1
-                            continue
-                        if hmax is not None and height_pct > float(hmax):
-                            j += 1
-                            continue
-                        out.append(
-                            {
-                                "pattern_id": pattern_id,
-                                "symbol": symbol,
-                                "pattern_name": self.key,
-                                "pattern_type": self.pattern_type,
-                                "formation_start": str(df.iloc[i]["date"].date()) if "date" in df.columns else str(i),
-                                "formation_end": str(df.iloc[j]["date"].date()) if "date" in df.columns else str(j),
-                                "breakout_date": str(df.iloc[j]["date"].date()) if "date" in df.columns else None,
-                                "breakout_idx": int(j),
-                                "breakout_direction": "up",
-                                "breakout_price": breakout_price,
-                                "target_price": breakout_price + height_abs,
-                                "stop_loss_price": island_low,
-                                "confidence_score": 75,
-                                "volume_confirmed": False,
-                                "pattern_height_pct": round(height_pct, 2),
-                                "pattern_width_bars": width_bars,
-                                "touch_count": 2,
-                                "pivot_indices": [int(i), int(j)],
-                                "config_hash": self.config_hash,
-                                "created_at": datetime.now().isoformat(),
-                            }
-                        )
+                    if self._gap_up(df, j):
+                        row = self._build_candidate(symbol=symbol, df=df, entry_idx=i, exit_idx=j, direction="up")
+                        if row is not None:
+                            out.append(row)
                         i = j
                         break
                     j += 1
@@ -5871,9 +6383,10 @@ def build_bulkowski_53_scanners(library: DigitizedPatternLibrary) -> Dict[str, A
 
     # Chapter 32-33: measured moves
     if _get("measured_move_down_up"):
-        base = _CachedScanner(_get("measured_move_down_up"))
-        out["measured_move_down"] = _DerivedScanner("measured_move_down", base, keep_if=lambda r, *_: str(r.get("breakout_direction") or "") == "down")
-        out["measured_move_up"] = _DerivedScanner("measured_move_up", base, keep_if=lambda r, *_: str(r.get("breakout_direction") or "") == "up")
+        mm_spec = library.load("measured_move_down_up")
+        mm_base = _CachedScanner(MeasuredMoveScanner("measured_move_down_up", mm_spec))
+        out["measured_move_down"] = _DerivedScanner("measured_move_down", mm_base, keep_if=lambda r, *_: str(r.get("variant_code") or "") == "measured_move_down")
+        out["measured_move_up"] = _DerivedScanner("measured_move_up", mm_base, keep_if=lambda r, *_: str(r.get("variant_code") or "") == "measured_move_up")
 
     # Chapter 34: pennants
     if _get("pennants"):
