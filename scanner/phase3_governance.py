@@ -24,9 +24,9 @@ TARGETED_PATCHES = [
             "double_tops_eve_adam",
             "double_tops_eve_eve",
         ],
-        "valid_db": Path("scan_results/double_family_pass4_valid_20260308.sqlite"),
-        "calib_db": Path("scan_results/double_family_pass4_calib_20260308.sqlite"),
-        "checkpoint": "double_family_pass4",
+        "valid_db": Path("scan_results/double_family_pass5_valid_20260308.sqlite"),
+        "calib_db": Path("scan_results/double_family_pass5_calib_20260308.sqlite"),
+        "checkpoint": "double_family_pass5",
     },
     {
         "patterns": [
@@ -63,9 +63,9 @@ TARGETED_PATCHES = [
             "scallops_descending",
             "scallops_descending_inverted",
         ],
-        "valid_db": Path("scan_results/scallops_family_pass3_valid_20260308.sqlite"),
-        "calib_db": Path("scan_results/scallops_family_pass3_calib_20260308.sqlite"),
-        "checkpoint": "scallops_family_pass3",
+        "valid_db": Path("scan_results/scallops_family_pass4_valid_20260308.sqlite"),
+        "calib_db": Path("scan_results/scallops_family_pass4_calib_20260308.sqlite"),
+        "checkpoint": "scallops_family_pass4",
     },
     {
         "patterns": [
@@ -108,9 +108,9 @@ TARGETED_PATCHES = [
             "rounding_bottoms",
             "rounding_tops",
         ],
-        "valid_db": Path("scan_results/post_phase3_backlog_valid_20260306.sqlite"),
-        "calib_db": Path("scan_results/post_phase3_backlog_calib_20260306.sqlite"),
-        "checkpoint": "post_phase3_rounding_round2",
+        "valid_db": Path("scan_results/rounding_family_pass4_valid_20260308.sqlite"),
+        "calib_db": Path("scan_results/rounding_family_pass4_calib_20260308.sqlite"),
+        "checkpoint": "rounding_family_pass4",
     },
     {
         "patterns": [
@@ -136,29 +136,29 @@ TARGETED_PATCHES = [
 PHASE3_OVERRIDES: Dict[str, Dict[str, Any]] = {
     "double_bottoms_adam_adam": {
         "strategy_gate": "watchlist",
-        "manual_note": "Pass 4 keeps AA as the densest double-bottom branch while allowing only extra-rounded midpoint shapes to drift toward Eve. The AA branch remains watchlist-only, not a production strategy input.",
-        "checkpoint_sources": ["double_family_pass4"],
+        "manual_note": "Pass 5 adds an AA-only flat-microstructure gate. Double-bottom AA is still watchlist-only, but the calibration split now carries a cleaner boundary profile and stronger average excursion.",
+        "checkpoint_sources": ["double_family_pass5"],
     },
     "double_tops_adam_adam": {
         "strategy_gate": "watchlist",
-        "manual_note": "Pass 4 keeps AA as the dominant double-top branch while refusing to revive weak midpoint-width Adam calls. It still owns the watchlist, but the family benchmark drift remains too large for promotion.",
-        "checkpoint_sources": ["double_family_pass4"],
+        "manual_note": "Pass 5 adds a narrow AA-only shallow-uneven gate for double tops. The valid split improved, but calibration still does not justify promotion beyond watchlist.",
+        "checkpoint_sources": ["double_family_pass5"],
     },
     "double_bottoms_eve_adam": {
         "phase3_status": "research_only",
-        "manual_note": "EA still has no surviving branch-level evidence after Pass 4, but it remains part of the reference taxonomy instead of being retired outright.",
-        "checkpoint_sources": ["double_family_pass4"],
+        "manual_note": "EA still has no surviving branch-level evidence after Pass 5, but it remains part of the reference taxonomy instead of being retired outright.",
+        "checkpoint_sources": ["double_family_pass5"],
     },
     "double_bottoms_eve_eve": {
         "phase3_status": "recalibrate",
         "research_lane": "recalibration_backlog",
-        "manual_note": "EE still only produces a calibration-side remnant after Pass 4. Keep it in recalibration backlog rather than treating it as usable research coverage.",
-        "checkpoint_sources": ["double_family_pass4"],
+        "manual_note": "EE still only produces a calibration-side remnant after Pass 5. Keep it in recalibration backlog rather than treating it as usable research coverage.",
+        "checkpoint_sources": ["double_family_pass5"],
     },
     "double_tops_eve_eve": {
         "phase3_status": "research_only",
-        "manual_note": "Top-side EE survives only as a very thin reference branch after Pass 4. Keep it in the research layer, not in strategy work.",
-        "checkpoint_sources": ["double_family_pass4"],
+        "manual_note": "Top-side EE survives only as a very thin reference branch after Pass 5. Keep it in the research layer, not in strategy work.",
+        "checkpoint_sources": ["double_family_pass5"],
     },
     "head_and_shoulders_tops": {
         "phase3_status": "research_only",
@@ -172,12 +172,12 @@ PHASE3_OVERRIDES: Dict[str, Dict[str, Any]] = {
     },
     "head_and_shoulders_bottoms": {
         "phase3_status": "research_only",
-        "manual_note": "The neckline-specific waiver keeps inverse H&S bottoms research-only: calibration still has only one standard survivor, and valid remains complex-only. The branch is cleaner, but still too thin for strategy work.",
+        "manual_note": "The neckline-specific waiver still leaves inverse H&S bottoms research-only: a wider 400-symbol recall search found no new clean near-miss cluster beyond the current survivors, so this branch looks sparse rather than underfit.",
         "checkpoint_sources": ["hs_bottoms_pass3"],
     },
     "head_and_shoulders_bottoms_complex": {
         "phase3_status": "research_only",
-        "manual_note": "Complex inverse H&S still contains only a tiny valid-side remainder after the neckline-specific pass. It belongs in the research lane, not in strategy work.",
+        "manual_note": "Complex inverse H&S still contains only a tiny valid-side remainder after the neckline-specific pass. The broader recall search did not expose a safe new expansion path, so it stays in the research lane only.",
         "checkpoint_sources": ["hs_bottoms_pass3"],
     },
     "triangles_ascending": {
@@ -197,25 +197,25 @@ PHASE3_OVERRIDES: Dict[str, Dict[str, Any]] = {
     },
     "scallops_ascending": {
         "phase3_status": "research_only",
-        "manual_note": "The third scallop pass keeps the bullish ascending branch dense and stable while pushing more mixed noise into the weaker bearish branches. It remains research-only because the family still overlaps rounding semantics.",
-        "checkpoint_sources": ["scallops_family_pass3"],
+        "manual_note": "The fourth scallop pass leaves the bullish ascending branch untouched while trimming only the weakest ascending-inverted spillover. The family still remains research-only because the bearish branches are not clean enough yet.",
+        "checkpoint_sources": ["scallops_family_pass4"],
     },
     "scallops_ascending_inverted": {
         "phase3_status": "recalibrate",
         "research_lane": "recalibration_backlog",
-        "manual_note": "The third branch gate cut ascending-inverted detections again, but calibration remains too weak and unstable. Keep it in the recalibration backlog.",
-        "checkpoint_sources": ["scallops_family_pass3"],
+        "manual_note": "The fourth branch gate trims ascending-inverted again on the valid split without destabilizing calibration, but the branch still remains too weak for promotion beyond recalibration backlog.",
+        "checkpoint_sources": ["scallops_family_pass4"],
     },
     "scallops_descending": {
         "phase3_status": "recalibrate",
         "research_lane": "recalibration_backlog",
-        "manual_note": "The third scallop pass removed another slice of descending false positives, but bearish KPI quality is still too weak for promotion beyond recalibration backlog.",
-        "checkpoint_sources": ["scallops_family_pass3"],
+        "manual_note": "Descending scallops remain the unresolved bearish branch. The fourth pass could not find a safe extra gate, so the branch stays in recalibration backlog.",
+        "checkpoint_sources": ["scallops_family_pass4"],
     },
     "scallops_descending_inverted": {
         "phase3_status": "research_only",
-        "manual_note": "Descending-inverted remains the cleanest reverse-bullish scallop branch after the third pass, with materially better stability than the other mixed scallop branches. Keep it research-only.",
-        "checkpoint_sources": ["scallops_family_pass3"],
+        "manual_note": "Descending-inverted remains the cleanest reverse-bullish scallop branch after the fourth pass. Keep it research-only.",
+        "checkpoint_sources": ["scallops_family_pass4"],
     },
     "cup_with_handle": {
         "phase3_status": "research_only",
@@ -261,13 +261,13 @@ PHASE3_OVERRIDES: Dict[str, Dict[str, Any]] = {
     },
     "rounding_bottoms": {
         "phase3_status": "research_only",
-        "manual_note": "Rounding bottoms remain structurally credible after the top-side tightening pass and stay in the research lane.",
-        "checkpoint_sources": ["post_phase3_rounding_round2"],
+        "manual_note": "Rounding bottoms remain structurally credible after the latest top-side tuning pass and stay in the research lane.",
+        "checkpoint_sources": ["rounding_family_pass4"],
     },
     "rounding_tops": {
         "phase3_status": "research_only",
-        "manual_note": "The second top-side pass cut rounding tops sharply while preserving a usable research sample. Keep the branch in research-only rather than moving it back into recalibration backlog.",
-        "checkpoint_sources": ["post_phase3_rounding_round2"],
+        "manual_note": "The latest top-side tuning keeps a small but usable rounding-top sample on the valid split without opening detector noise back up. Keep the branch in research-only rather than moving it back into recalibration backlog.",
+        "checkpoint_sources": ["rounding_family_pass4"],
     },
     "triple_bottoms": {
         "phase3_status": "research_only",

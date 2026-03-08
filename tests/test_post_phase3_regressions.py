@@ -7,6 +7,8 @@ import pandas as pd
 from scanner.double_pattern_utils import _classify_extreme_shape
 from scanner.digitized_pattern_engine import (
     CupWithHandleScanner,
+    DoubleBottomFamilyScanner,
+    DoubleTopFamilyScanner,
     HeadShouldersBottomFamilyScanner,
     InvertedCupWithHandleScanner,
     RoundingBottomsTopsScanner,
@@ -32,6 +34,58 @@ def test_double_near_threshold_widths_still_resolve() -> None:
     near_eve = _classify_extreme_shape(width=6, reaction_pct=3.0, adam_max=3, eve_min=7)
     assert near_adam["label"] == "A"
     assert near_eve["label"] == "E"
+
+
+def test_double_bottom_aa_rejects_flat_illiquid_microstructure() -> None:
+    scanner = DoubleBottomFamilyScanner("double_bottoms", {})
+    ok = scanner._variant_metrics_ok(
+        {
+            "same_close_ratio": 0.55,
+            "unique_close_ratio": 0.22,
+            "zero_range_ratio": 0.68,
+        },
+        {"variant_code": "AA"},
+    )
+    assert ok is False
+
+
+def test_double_bottom_non_aa_bypasses_aa_flat_microstructure_gate() -> None:
+    scanner = DoubleBottomFamilyScanner("double_bottoms", {})
+    ok = scanner._variant_metrics_ok(
+        {
+            "same_close_ratio": 0.55,
+            "unique_close_ratio": 0.22,
+            "zero_range_ratio": 0.68,
+        },
+        {"variant_code": "AE"},
+    )
+    assert ok is True
+
+
+def test_double_top_aa_rejects_shallow_uneven_twin_peaks() -> None:
+    scanner = DoubleTopFamilyScanner("double_tops", {})
+    ok = scanner._variant_metrics_ok(
+        {
+            "extreme_price_diff_pct": 0.31,
+            "extreme_slope_deg": 0.22,
+            "middle_depth_pct": 12.0,
+        },
+        {"variant_code": "AA"},
+    )
+    assert ok is False
+
+
+def test_double_top_aa_keeps_deeper_twin_peaks() -> None:
+    scanner = DoubleTopFamilyScanner("double_tops", {})
+    ok = scanner._variant_metrics_ok(
+        {
+            "extreme_price_diff_pct": 0.31,
+            "extreme_slope_deg": 0.22,
+            "middle_depth_pct": 18.0,
+        },
+        {"variant_code": "AA"},
+    )
+    assert ok is True
 
 
 def test_hs_bottom_single_extra_shoulder_is_demoted_to_standard(monkeypatch) -> None:
@@ -174,6 +228,34 @@ def test_scallop_ascending_inverted_requires_stronger_positive_shift() -> None:
     assert resolved["variant_code"] == "scallops_ascending_inverted"
 
 
+def test_scallop_ascending_inverted_review_gate_rejects_weak_left_leg() -> None:
+    scanner = ScallopFamilyScanner("scallops", {})
+    ok = scanner._variant_metrics_ok(
+        {
+            "left_share_pct": 64.0,
+            "overall_shift_pct": 7.0,
+            "left_leg_deg": -18.8,
+            "right_directional_ratio": 0.55,
+        },
+        {"variant_code": "scallops_ascending_inverted"},
+    )
+    assert ok is False
+
+
+def test_scallop_ascending_inverted_review_gate_keeps_cleaner_case() -> None:
+    scanner = ScallopFamilyScanner("scallops", {})
+    ok = scanner._variant_metrics_ok(
+        {
+            "left_share_pct": 60.0,
+            "overall_shift_pct": 7.0,
+            "left_leg_deg": -24.0,
+            "right_directional_ratio": 0.58,
+        },
+        {"variant_code": "scallops_ascending_inverted"},
+    )
+    assert ok is True
+
+
 def test_rounding_top_uses_tighter_second_pass_gate() -> None:
     scanner = RoundingBottomsTopsScanner(
         "rounding_bottoms_tops",
@@ -193,8 +275,30 @@ def test_rounding_top_uses_tighter_second_pass_gate() -> None:
     }
     assert scanner._family_metrics_ok(metrics) is False
 
-    metrics["width_bars"] = 90
+    metrics["width_bars"] = 78
     assert scanner._family_metrics_ok(metrics) is True
+
+
+def test_rounding_top_rejects_excess_trend_progress() -> None:
+    scanner = RoundingBottomsTopsScanner(
+        "rounding_bottoms_tops",
+        {"detection_signature": {"pivot_sequence": ["L", "H", "L", "H", "L", "H"]}},
+    )
+    metrics = {
+        "variant_tag": "top",
+        "width_bars": 68,
+        "center_pos_pct": 50.0,
+        "span_balance_ratio": 1.3,
+        "center_clearance_pct": 8.0,
+        "fit_error_pct": 15.0,
+        "monotonic_left_ratio": 0.6,
+        "monotonic_right_ratio": 0.6,
+        "curvature_coeff": -1.0,
+        "expected_curvature_sign": -1.0,
+        "mid_progress_pct": 12.0,
+        "trend_progress_pct": 12.5,
+    }
+    assert scanner._family_metrics_ok(metrics) is False
 
 
 def test_inverted_cup_rejects_handle_that_rebounds_too_high(monkeypatch) -> None:

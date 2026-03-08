@@ -586,6 +586,16 @@ class _DoublePatternFamilyScanner(PivotSequenceScanner):
         self.micro_max_same_close_ratio = 0.70
         self.micro_max_zero_range_ratio = 0.75
         self.micro_min_unique_close_ratio = 0.20
+        # The post-phase-3 audit showed that the AA branches still carry a specific residue:
+        # bottoms are hurt by flat, illiquid repeated-print sequences, while tops are hurt by
+        # shallow twin peaks that are not quite near-equal / near-horizontal enough. Keep these
+        # gates AA-only so they do not suppress already-sparse Eve-side variants.
+        self.aa_bottom_same_close_ratio_min = 0.46
+        self.aa_bottom_zero_range_ratio_min = 0.65
+        self.aa_bottom_unique_close_ratio_max = 0.24
+        self.aa_top_diff_pct_min = 0.20
+        self.aa_top_slope_deg_min = 0.15
+        self.aa_top_shallow_depth_pct_max = 15.0
 
         variant_cfg = spec.get("variant_handling", {}) or {}
         self.variant_adam_max = 3
@@ -761,6 +771,39 @@ class _DoublePatternFamilyScanner(PivotSequenceScanner):
 
         return max(0, min(100, int(confidence)))
 
+    def _variant_metrics_ok(
+        self,
+        metrics: Dict[str, Any],
+        variant_result: Dict[str, Any],
+    ) -> bool:
+        variant_code = str(variant_result.get("variant_code") or "")
+        if variant_code != "AA":
+            return True
+
+        same_close_ratio = _safe_float(metrics.get("same_close_ratio")) or 0.0
+        unique_close_ratio = _safe_float(metrics.get("unique_close_ratio")) or 1.0
+        zero_range_ratio = _safe_float(metrics.get("zero_range_ratio")) or 0.0
+        extreme_price_diff_pct = _safe_float(metrics.get("extreme_price_diff_pct")) or 0.0
+        extreme_slope_deg = _safe_float(metrics.get("extreme_slope_deg")) or 0.0
+        middle_depth_pct = _safe_float(metrics.get("middle_depth_pct")) or 0.0
+
+        if not self.is_top:
+            aa_bottom_flat_micro = (
+                same_close_ratio >= self.aa_bottom_same_close_ratio_min
+                and (
+                    zero_range_ratio >= self.aa_bottom_zero_range_ratio_min
+                    or unique_close_ratio <= self.aa_bottom_unique_close_ratio_max
+                )
+            )
+            return not aa_bottom_flat_micro
+
+        aa_top_shallow_uneven = (
+            extreme_price_diff_pct >= self.aa_top_diff_pct_min
+            and extreme_slope_deg >= self.aa_top_slope_deg_min
+            and middle_depth_pct <= self.aa_top_shallow_depth_pct_max
+        )
+        return not aa_top_shallow_uneven
+
     def scan(
         self,
         *,
@@ -778,6 +821,8 @@ class _DoublePatternFamilyScanner(PivotSequenceScanner):
                 continue
 
             variant_result = self._resolve_variant(df, metrics)
+            if not self._variant_metrics_ok(metrics, variant_result):
+                continue
             first_extreme = variant_result.get("first_extreme") or {}
             second_extreme = variant_result.get("second_extreme") or {}
 
@@ -2154,6 +2199,9 @@ class ScallopFamilyScanner(BaseDigitizedScanner):
         self.ascending_inverted_min_excursion_pct = 75.0
         self.ascending_inverted_directional_ratio_min = 0.48
         self.ascending_inverted_strong_shift_pct = 5.0
+        self.ascending_inverted_review_max_left_share_pct = 68.0
+        self.ascending_inverted_review_min_left_leg_abs_deg = 20.0
+        self.ascending_inverted_review_min_right_directional_ratio = 0.50
 
     def _segment_direction_ratio(
         self,
@@ -2398,6 +2446,26 @@ class ScallopFamilyScanner(BaseDigitizedScanner):
 
         return max(0, min(100, confidence))
 
+    def _variant_metrics_ok(
+        self,
+        metrics: Dict[str, Any],
+        variant_result: Dict[str, Any],
+    ) -> bool:
+        if str(variant_result.get("variant_code") or "") != "scallops_ascending_inverted":
+            return True
+
+        left_share = float(metrics.get("left_share_pct") or 0.0)
+        overall_shift = float(metrics.get("overall_shift_pct") or 0.0)
+        left_deg = abs(float(metrics.get("left_leg_deg") or 0.0))
+        right_ratio = _safe_float(metrics.get("right_directional_ratio")) or 0.0
+
+        return (
+            left_share <= self.ascending_inverted_review_max_left_share_pct
+            and overall_shift >= self.ascending_inverted_strong_shift_pct
+            and left_deg >= self.ascending_inverted_review_min_left_leg_abs_deg
+            and right_ratio >= self.ascending_inverted_review_min_right_directional_ratio
+        )
+
     def scan(
         self,
         *,
@@ -2424,6 +2492,8 @@ class ScallopFamilyScanner(BaseDigitizedScanner):
 
             variant_result = self._resolve_variant(metrics, breakout_direction=row.get("breakout_direction"))
             if not variant_result:
+                continue
+            if not self._variant_metrics_ok(metrics, variant_result):
                 continue
 
             enriched = dict(row)
@@ -2507,10 +2577,11 @@ class RoundingBottomsTopsScanner(BaseDigitizedScanner):
         self.center_pos_min_pct = 28.0
         self.center_pos_max_pct = 72.0
         self.center_clearance_min_pct = 3.0
-        self.top_width_max_bars = 95
+        self.top_width_max_bars = 80
         self.top_fit_error_max_pct = min(self.fit_error_max_pct, 19.0)
         self.top_directional_ratio_min = 0.55
         self.top_center_clearance_min_pct = 4.5
+        self.top_trend_progress_abs_max_pct = 12.0
 
     def _direction_ratio(self, df: pd.DataFrame, *, start_idx: int, end_idx: int, positive: bool) -> Optional[float]:
         if end_idx <= start_idx:
@@ -2648,6 +2719,8 @@ class RoundingBottomsTopsScanner(BaseDigitizedScanner):
             if monotonic_left is not None and monotonic_left < self.top_directional_ratio_min:
                 return False
             if monotonic_right is not None and monotonic_right < self.top_directional_ratio_min:
+                return False
+            if abs(float(metrics.get("trend_progress_pct") or 0.0)) > self.top_trend_progress_abs_max_pct:
                 return False
         return True
 
