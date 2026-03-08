@@ -24,9 +24,9 @@ TARGETED_PATCHES = [
             "double_tops_eve_adam",
             "double_tops_eve_eve",
         ],
-        "valid_db": Path("scan_results/double_family_pass3_valid_20260306.sqlite"),
-        "calib_db": Path("scan_results/double_family_pass3_calib_20260306.sqlite"),
-        "checkpoint": "double_family_pass3",
+        "valid_db": Path("scan_results/double_family_pass4_valid_20260308.sqlite"),
+        "calib_db": Path("scan_results/double_family_pass4_calib_20260308.sqlite"),
+        "checkpoint": "double_family_pass4",
     },
     {
         "patterns": [
@@ -42,9 +42,9 @@ TARGETED_PATCHES = [
             "head_and_shoulders_bottoms",
             "head_and_shoulders_bottoms_complex",
         ],
-        "valid_db": Path("scan_results/post_phase3_backlog_family53_valid_20260306.sqlite"),
-        "calib_db": Path("scan_results/post_phase3_backlog_family53_calib_20260306.sqlite"),
-        "checkpoint": "post_phase3_hs_bottoms_round2",
+        "valid_db": Path("scan_results/hs_bottoms_pass3_valid_20260308.sqlite"),
+        "calib_db": Path("scan_results/hs_bottoms_pass3_calib_20260308.sqlite"),
+        "checkpoint": "hs_bottoms_pass3",
     },
     {
         "patterns": [
@@ -63,9 +63,9 @@ TARGETED_PATCHES = [
             "scallops_descending",
             "scallops_descending_inverted",
         ],
-        "valid_db": Path("scan_results/post_phase3_backlog_valid_20260306.sqlite"),
-        "calib_db": Path("scan_results/post_phase3_backlog_calib_20260306.sqlite"),
-        "checkpoint": "post_phase3_scallops_round2",
+        "valid_db": Path("scan_results/scallops_family_pass3_valid_20260308.sqlite"),
+        "calib_db": Path("scan_results/scallops_family_pass3_calib_20260308.sqlite"),
+        "checkpoint": "scallops_family_pass3",
     },
     {
         "patterns": [
@@ -136,29 +136,29 @@ TARGETED_PATCHES = [
 PHASE3_OVERRIDES: Dict[str, Dict[str, Any]] = {
     "double_bottoms_adam_adam": {
         "strategy_gate": "watchlist",
-        "manual_note": "Pass 3 removes the width=5 Adam coercions, leaving a cleaner AA branch on both calib and valid. It remains a watchlist branch, not a production strategy input.",
-        "checkpoint_sources": ["double_family_pass3"],
+        "manual_note": "Pass 4 keeps AA as the densest double-bottom branch while allowing only extra-rounded midpoint shapes to drift toward Eve. The AA branch remains watchlist-only, not a production strategy input.",
+        "checkpoint_sources": ["double_family_pass4"],
     },
     "double_tops_adam_adam": {
         "strategy_gate": "watchlist",
-        "manual_note": "Pass 3 trims the weakest AA top cases by leaving midpoint-width extremes unresolved. AA still owns the watchlist, but the family benchmark drift remains too large for promotion.",
-        "checkpoint_sources": ["double_family_pass3"],
+        "manual_note": "Pass 4 keeps AA as the dominant double-top branch while refusing to revive weak midpoint-width Adam calls. It still owns the watchlist, but the family benchmark drift remains too large for promotion.",
+        "checkpoint_sources": ["double_family_pass4"],
     },
     "double_bottoms_eve_adam": {
         "phase3_status": "research_only",
-        "manual_note": "EA still has no surviving branch-level evidence after Pass 3, but it remains part of the reference taxonomy instead of being retired outright.",
-        "checkpoint_sources": ["double_family_pass3"],
+        "manual_note": "EA still has no surviving branch-level evidence after Pass 4, but it remains part of the reference taxonomy instead of being retired outright.",
+        "checkpoint_sources": ["double_family_pass4"],
     },
     "double_bottoms_eve_eve": {
         "phase3_status": "recalibrate",
         "research_lane": "recalibration_backlog",
-        "manual_note": "EE still only produces a calibration-side remnant after Pass 3. Keep it in recalibration backlog rather than treating it as usable research coverage.",
-        "checkpoint_sources": ["double_family_pass3"],
+        "manual_note": "EE still only produces a calibration-side remnant after Pass 4. Keep it in recalibration backlog rather than treating it as usable research coverage.",
+        "checkpoint_sources": ["double_family_pass4"],
     },
     "double_tops_eve_eve": {
         "phase3_status": "research_only",
-        "manual_note": "Top-side EE survives only as a very thin reference branch after Pass 3. Keep it in the research layer, not in strategy work.",
-        "checkpoint_sources": ["double_family_pass3"],
+        "manual_note": "Top-side EE survives only as a very thin reference branch after Pass 4. Keep it in the research layer, not in strategy work.",
+        "checkpoint_sources": ["double_family_pass4"],
     },
     "head_and_shoulders_tops": {
         "phase3_status": "research_only",
@@ -172,13 +172,13 @@ PHASE3_OVERRIDES: Dict[str, Dict[str, Any]] = {
     },
     "head_and_shoulders_bottoms": {
         "phase3_status": "research_only",
-        "manual_note": "The second bottoms pass demoted single-extra cases back to standard, but the branch still shows only one calibration survivor and no valid-side breakout evidence. Keep it research-only.",
-        "checkpoint_sources": ["post_phase3_hs_bottoms_round2"],
+        "manual_note": "The neckline-specific waiver keeps inverse H&S bottoms research-only: calibration still has only one standard survivor, and valid remains complex-only. The branch is cleaner, but still too thin for strategy work.",
+        "checkpoint_sources": ["hs_bottoms_pass3"],
     },
     "head_and_shoulders_bottoms_complex": {
         "phase3_status": "research_only",
-        "manual_note": "Complex inverse H&S now contains only a tiny valid-side remainder after the demotion pass. It still belongs in the research lane, not in strategy work.",
-        "checkpoint_sources": ["post_phase3_hs_bottoms_round2"],
+        "manual_note": "Complex inverse H&S still contains only a tiny valid-side remainder after the neckline-specific pass. It belongs in the research lane, not in strategy work.",
+        "checkpoint_sources": ["hs_bottoms_pass3"],
     },
     "triangles_ascending": {
         "phase3_status": "research_only",
@@ -197,25 +197,25 @@ PHASE3_OVERRIDES: Dict[str, Dict[str, Any]] = {
     },
     "scallops_ascending": {
         "phase3_status": "research_only",
-        "manual_note": "The second scallop pass keeps the bullish ascending branch dense and stable while removing much of the mixed inverted and top-side noise. It remains research-only because the family still overlaps rounding semantics.",
-        "checkpoint_sources": ["post_phase3_scallops_round2"],
+        "manual_note": "The third scallop pass keeps the bullish ascending branch dense and stable while pushing more mixed noise into the weaker bearish branches. It remains research-only because the family still overlaps rounding semantics.",
+        "checkpoint_sources": ["scallops_family_pass3"],
     },
     "scallops_ascending_inverted": {
         "phase3_status": "recalibrate",
         "research_lane": "recalibration_backlog",
-        "manual_note": "The stricter branch gate cut ascending-inverted detections sharply, but calibration remains too weak and unstable. Keep it in the recalibration backlog.",
-        "checkpoint_sources": ["post_phase3_scallops_round2"],
+        "manual_note": "The third branch gate cut ascending-inverted detections again, but calibration remains too weak and unstable. Keep it in the recalibration backlog.",
+        "checkpoint_sources": ["scallops_family_pass3"],
     },
     "scallops_descending": {
         "phase3_status": "recalibrate",
         "research_lane": "recalibration_backlog",
-        "manual_note": "The post-phase-3 gate removed a large share of descending false positives, but bearish KPI quality is still too weak for promotion beyond recalibration backlog.",
-        "checkpoint_sources": ["post_phase3_scallops_round2"],
+        "manual_note": "The third scallop pass removed another slice of descending false positives, but bearish KPI quality is still too weak for promotion beyond recalibration backlog.",
+        "checkpoint_sources": ["scallops_family_pass3"],
     },
     "scallops_descending_inverted": {
         "phase3_status": "research_only",
-        "manual_note": "Descending-inverted remains the cleanest reverse-bullish scallop branch after the second pass, with materially better stability than the other mixed scallop branches. Keep it research-only.",
-        "checkpoint_sources": ["post_phase3_scallops_round2"],
+        "manual_note": "Descending-inverted remains the cleanest reverse-bullish scallop branch after the third pass, with materially better stability than the other mixed scallop branches. Keep it research-only.",
+        "checkpoint_sources": ["scallops_family_pass3"],
     },
     "cup_with_handle": {
         "phase3_status": "research_only",
@@ -223,9 +223,10 @@ PHASE3_OVERRIDES: Dict[str, Dict[str, Any]] = {
         "checkpoint_sources": ["post_phase3_cup_round2"],
     },
     "cup_with_handle_inverted": {
-        "phase3_status": "recalibrate",
-        "research_lane": "recalibration_backlog",
-        "manual_note": "The original-space handle gate reduced inverted cups to only two valid-side survivors and zero calibration survivors. This branch remains a recalibration backlog item.",
+        "phase3_status": "retire_from_strategy",
+        "strategy_gate": "retired",
+        "research_lane": "reference_only",
+        "manual_note": "The original-space handle gate reduced inverted cups to only two valid-side survivors and zero calibration survivors. Move this branch to reference-only until a new bearish cup detector earns support.",
         "checkpoint_sources": ["post_phase3_cup_round2"],
     },
     "broadening_wedges_ascending": {
@@ -303,16 +304,12 @@ NEXT_BATCH_PRIORITY = [
         "reason": "Double tops mirror the same post-phase-3 watchlist state as double bottoms: AA is usable for benchmarking, but the non-AA branches remain too thin for promotion.",
     },
     {
-        "canonical_key": "cup_with_handle",
-        "reason": "The bullish cup branch held up, but the inverted branch was almost wiped out by the original-space handle gate and remains a clear recalibration target.",
-    },
-    {
         "canonical_key": "scallop_ascending_descending",
         "reason": "Scallops improved materially, yet ascending-inverted and descending still diverge from the cleaner bullish branches and need another recalibration pass.",
     },
     {
         "canonical_key": "head_and_shoulders_bottom",
-        "reason": "Inverse head-and-shoulders regained only one calibration-side standard survivor after the demotion pass. The next pass should focus on recall search, not broad family work.",
+        "reason": "Inverse head-and-shoulders still has only one calibration-side standard survivor, and recall-search smoke found just one clean near-miss blocked by neckline slope. The next pass should stay neckline-specific, not broaden the whole detector.",
     },
     {
         "canonical_key": "rounding_bottoms_tops",
@@ -747,7 +744,7 @@ def _render_report(payload: Dict[str, Any]) -> str:
     lines.append("- `double_bottoms_adam_adam` và `double_tops_adam_adam` vẫn là hai branch duy nhất ở `watchlist`; phase 3 chưa promote thêm pattern nào vào strategy gate.")
     lines.append("- `broadening_wedges`, `horns`, `pipe`, `rounding`, `triple`, và `flags` đã đi qua full family rerun trong phase 3, và hiện được giữ ở `research_only` thay vì backlog cũ.")
     lines.append("- `flags_high_tight` không còn survivor sau family scanner mới cho `flags`, nên chapter này được giữ ở `reference_only` cho tới khi có detector riêng thuyết phục.")
-    lines.append("- `head_and_shoulders_bottoms` vẫn dùng metric từ `hs_bottoms_redo`, nên phase 3 phản ánh detector bottoms sạch hơn nhưng vẫn quá mỏng cho strategy use.")
+    lines.append("- `head_and_shoulders_bottoms` hiện dùng metric từ `hs_bottoms_pass3`: pass neckline-specific chỉ cứu lại đúng một calibration-side standard survivor và giữ valid ở complex-only, nên branch này vẫn quá mỏng cho strategy use.")
     lines.append("")
 
     return "\n".join(lines).strip() + "\n"

@@ -21,6 +21,12 @@ def test_double_gap_midpoint_width_stays_unresolved() -> None:
     assert "gap_not_resolved" in result["evidence"]
 
 
+def test_double_gap_midpoint_width_can_resolve_to_eve_when_extra_rounded() -> None:
+    result = _classify_extreme_shape(width=5, reaction_pct=2.2, adam_max=3, eve_min=7)
+    assert result["label"] == "E"
+    assert "mid_gap_resolved_toward_eve_by_extra_roundness" in result["evidence"]
+
+
 def test_double_near_threshold_widths_still_resolve() -> None:
     near_adam = _classify_extreme_shape(width=4, reaction_pct=4.5, adam_max=3, eve_min=7)
     near_eve = _classify_extreme_shape(width=6, reaction_pct=3.0, adam_max=3, eve_min=7)
@@ -48,6 +54,66 @@ def test_hs_bottom_single_extra_shoulder_is_demoted_to_standard(monkeypatch) -> 
     assert result["evidence"]["single_extra_demoted_to_standard"] is True
 
 
+def test_hs_bottom_failures_report_clearance_shortfall() -> None:
+    scanner = HeadShouldersBottomFamilyScanner("head_and_shoulders_bottom", {})
+    failures = scanner._family_gate_failures(
+        {
+            "shoulder_diff_pct": 1.0,
+            "shoulder_ratio": 1.0,
+            "head_prominence_pct": 4.0,
+            "shoulder_clearance_pct": 6.5,
+            "height_pct": 16.0,
+            "neckline_slope_deg": 0.5,
+            "side_span_ratio": 1.4,
+            "same_close_ratio": 0.2,
+            "unique_close_ratio": 0.4,
+            "zero_range_ratio": 0.1,
+        }
+    )
+    assert any(f.get("rule") == "bottom_shoulder_clearance_pct" for f in failures)
+
+
+def test_hs_bottom_allows_mild_neckline_slope_when_other_metrics_are_clean() -> None:
+    scanner = HeadShouldersBottomFamilyScanner("head_and_shoulders_bottom", {})
+    failures = scanner._family_gate_failures(
+        {
+            "shoulder_diff_pct": 1.7,
+            "shoulder_ratio": 0.9835,
+            "head_prominence_pct": 6.0,
+            "shoulder_clearance_pct": 8.2,
+            "height_pct": 14.8,
+            "neckline_slope_deg": 2.77,
+            "neckline_diff_pct": 3.56,
+            "side_span_ratio": 1.38,
+            "same_close_ratio": 0.18,
+            "unique_close_ratio": 0.23,
+            "zero_range_ratio": 0.01,
+        }
+    )
+    assert not any(f.get("rule") == "neckline_slope_deg" for f in failures)
+
+
+def test_hs_bottom_relaxed_neckline_does_not_bypass_large_shoulder_mismatch() -> None:
+    scanner = HeadShouldersBottomFamilyScanner("head_and_shoulders_bottom", {})
+    failures = scanner._family_gate_failures(
+        {
+            "shoulder_diff_pct": 9.7,
+            "shoulder_ratio": 0.9116,
+            "head_prominence_pct": 4.7,
+            "shoulder_clearance_pct": 9.5,
+            "height_pct": 14.8,
+            "neckline_slope_deg": 2.57,
+            "neckline_diff_pct": 2.34,
+            "side_span_ratio": 1.42,
+            "same_close_ratio": 0.15,
+            "unique_close_ratio": 0.53,
+            "zero_range_ratio": 0.01,
+        }
+    )
+    assert any(f.get("rule") == "neckline_slope_deg" for f in failures)
+    assert any(f.get("rule") == "shoulder_diff_pct" for f in failures)
+
+
 def test_scallop_descending_requires_stronger_bearish_shift() -> None:
     scanner = ScallopFamilyScanner("scallops", {})
     weak_metrics = {
@@ -66,6 +132,46 @@ def test_scallop_descending_requires_stronger_bearish_shift() -> None:
     resolved = scanner._resolve_variant(strong_metrics, breakout_direction="down")
     assert resolved is not None
     assert resolved["variant_code"] == "scallops_descending"
+
+
+def test_scallop_descending_requires_deeper_arc_excursion() -> None:
+    scanner = ScallopFamilyScanner("scallops", {})
+    metrics = {
+        "sequence_tag": "HLH",
+        "overall_shift_pct": -6.5,
+        "left_share_pct": 60.0,
+        "left_leg_deg": -28.0,
+        "right_leg_deg": 36.0,
+        "arc_excursion_pct": 55.0,
+        "left_directional_ratio": 0.52,
+        "right_directional_ratio": 0.55,
+    }
+    assert scanner._resolve_variant(metrics, breakout_direction="down") is None
+
+    metrics["arc_excursion_pct"] = 68.0
+    resolved = scanner._resolve_variant(metrics, breakout_direction="down")
+    assert resolved is not None
+    assert resolved["variant_code"] == "scallops_descending"
+
+
+def test_scallop_ascending_inverted_requires_stronger_positive_shift() -> None:
+    scanner = ScallopFamilyScanner("scallops", {})
+    metrics = {
+        "sequence_tag": "HLH",
+        "overall_shift_pct": 4.6,
+        "left_share_pct": 60.0,
+        "left_leg_deg": -30.0,
+        "right_leg_deg": 38.0,
+        "arc_excursion_pct": 82.0,
+        "left_directional_ratio": 0.55,
+        "right_directional_ratio": 0.58,
+    }
+    assert scanner._resolve_variant(metrics, breakout_direction="down") is None
+
+    metrics["overall_shift_pct"] = 5.4
+    resolved = scanner._resolve_variant(metrics, breakout_direction="down")
+    assert resolved is not None
+    assert resolved["variant_code"] == "scallops_ascending_inverted"
 
 
 def test_rounding_top_uses_tighter_second_pass_gate() -> None:

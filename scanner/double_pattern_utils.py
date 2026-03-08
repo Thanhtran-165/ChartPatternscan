@@ -190,9 +190,21 @@ def _classify_extreme_shape(
             "evidence": evidence,
         }
 
-    # Do not force the midpoint of the gap zone into either label. With the current
-    # Bulkowski-style thresholds (Adam<=3, Eve>=7), width=5 is still semantically murky
-    # and has been the main source of weak AA classifications.
+    # Do not force the midpoint of the gap zone into Adam. Width=5 remains semantically
+    # murky, but it can still behave like a rounded Eve when local reaction stays muted.
+    if int(width) == int(adam_max) + 2 and sharpness <= 0.55 and reaction <= 2.8:
+        evidence.append("mid_gap_resolved_toward_eve_by_extra_roundness")
+        return {
+            "label": "E",
+            "confidence": 54,
+            "width_bars": int(width),
+            "reaction_pct": round(reaction, 3),
+            "sharpness_score": round(sharpness, 3),
+            "evidence": evidence,
+        }
+
+    # Keep the rest of the midpoint gap unresolved unless local reaction is unusually
+    # decisive. This avoids reviving the old tendency to overproduce weak AA branches.
     if near_adam and (sharpness >= 1.15 or reaction >= 4.0):
         evidence.append("gap_resolved_toward_adam_by_local_reaction")
         return {

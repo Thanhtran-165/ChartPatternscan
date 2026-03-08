@@ -863,6 +863,10 @@ class _HeadShouldersFamilyScanner(PivotSequenceScanner):
         self.bottom_micro_max_zero_range_ratio = 0.84
         self.bottom_micro_same_close_ratio_max = 0.75
         self.bottom_micro_unique_close_ratio_min = 0.18
+        self.bottom_relaxed_neckline_max_deg = 3.0
+        self.bottom_relaxed_neckline_diff_pct = 4.0
+        self.bottom_relaxed_shoulder_diff_pct = min(self.shoulder_tol_pct, 2.5)
+        self.bottom_relaxed_span_ratio_max = 1.6
 
     def _family_metrics(self, df: pd.DataFrame, pivot_indices: Sequence[Any]) -> Optional[Dict[str, Any]]:
         if len(pivot_indices) < 5:
@@ -943,6 +947,10 @@ class _HeadShouldersFamilyScanner(PivotSequenceScanner):
         }
 
     def _family_metrics_ok(self, metrics: Dict[str, Any]) -> bool:
+        return len(self._family_gate_failures(metrics)) == 0
+
+    def _family_gate_failures(self, metrics: Dict[str, Any]) -> List[Dict[str, Any]]:
+        failures: List[Dict[str, Any]] = []
         try:
             shoulder_diff_pct = float(metrics["shoulder_diff_pct"])
             shoulder_ratio = float(metrics["shoulder_ratio"])
@@ -950,40 +958,140 @@ class _HeadShouldersFamilyScanner(PivotSequenceScanner):
             shoulder_clearance_pct = float(metrics["shoulder_clearance_pct"])
             height_pct = float(metrics["height_pct"])
             neckline_slope_deg = float(metrics["neckline_slope_deg"])
+            neckline_diff_pct = float(metrics.get("neckline_diff_pct") or 0.0)
             span_ratio = float(metrics["side_span_ratio"])
         except Exception:
-            return False
+            return [{"rule": "invalid_metrics"}]
 
         if shoulder_diff_pct > self.shoulder_tol_pct:
-            return False
+            failures.append(
+                {
+                    "rule": "shoulder_diff_pct",
+                    "actual": round(shoulder_diff_pct, 3),
+                    "limit": round(float(self.shoulder_tol_pct), 3),
+                    "margin": round(shoulder_diff_pct - float(self.shoulder_tol_pct), 3),
+                }
+            )
         if shoulder_ratio < self.shoulder_ratio_min or shoulder_ratio > self.shoulder_ratio_max:
             # The digitized ratio bounds are broader than symmetry_tolerance, but still reject
             # extreme asymmetric shoulders.
-            return False
+            if shoulder_ratio < self.shoulder_ratio_min:
+                failures.append(
+                    {
+                        "rule": "shoulder_ratio_min",
+                        "actual": round(shoulder_ratio, 4),
+                        "limit": round(float(self.shoulder_ratio_min), 4),
+                        "margin": round(float(self.shoulder_ratio_min) - shoulder_ratio, 4),
+                    }
+                )
+            else:
+                failures.append(
+                    {
+                        "rule": "shoulder_ratio_max",
+                        "actual": round(shoulder_ratio, 4),
+                        "limit": round(float(self.shoulder_ratio_max), 4),
+                        "margin": round(shoulder_ratio - float(self.shoulder_ratio_max), 4),
+                    }
+                )
         if head_prominence_pct < self.head_prominence_min_pct:
-            return False
+            failures.append(
+                {
+                    "rule": "head_prominence_pct",
+                    "actual": round(head_prominence_pct, 3),
+                    "limit": round(float(self.head_prominence_min_pct), 3),
+                    "margin": round(float(self.head_prominence_min_pct) - head_prominence_pct, 3),
+                }
+            )
         if shoulder_clearance_pct <= 0:
-            return False
+            failures.append(
+                {
+                    "rule": "shoulder_clearance_nonpositive",
+                    "actual": round(shoulder_clearance_pct, 3),
+                    "limit": 0.0,
+                    "margin": round(0.0 - shoulder_clearance_pct, 3),
+                }
+            )
         if height_pct < self.height_min_pct or height_pct > self.height_max_pct:
-            return False
-        if neckline_slope_deg > self.neckline_max_slope_deg:
-            return False
+            if height_pct < self.height_min_pct:
+                failures.append(
+                    {
+                        "rule": "height_pct_min",
+                        "actual": round(height_pct, 3),
+                        "limit": round(float(self.height_min_pct), 3),
+                        "margin": round(float(self.height_min_pct) - height_pct, 3),
+                    }
+                )
+            else:
+                failures.append(
+                    {
+                        "rule": "height_pct_max",
+                        "actual": round(height_pct, 3),
+                        "limit": round(float(self.height_max_pct), 3),
+                        "margin": round(height_pct - float(self.height_max_pct), 3),
+                    }
+                )
+        relaxed_bottom_neckline = (
+            (not self.is_top)
+            and neckline_slope_deg <= self.bottom_relaxed_neckline_max_deg
+            and neckline_diff_pct <= self.bottom_relaxed_neckline_diff_pct
+            and shoulder_diff_pct <= self.bottom_relaxed_shoulder_diff_pct
+            and span_ratio <= self.bottom_relaxed_span_ratio_max
+            and shoulder_clearance_pct >= self.bottom_min_shoulder_clearance_pct
+        )
+        if neckline_slope_deg > self.neckline_max_slope_deg and not relaxed_bottom_neckline:
+            failures.append(
+                {
+                    "rule": "neckline_slope_deg",
+                    "actual": round(neckline_slope_deg, 3),
+                    "limit": round(float(self.neckline_max_slope_deg), 3),
+                    "margin": round(neckline_slope_deg - float(self.neckline_max_slope_deg), 3),
+                }
+            )
         if span_ratio > self.side_span_ratio_max:
-            return False
+            failures.append(
+                {
+                    "rule": "side_span_ratio",
+                    "actual": round(span_ratio, 3),
+                    "limit": round(float(self.side_span_ratio_max), 3),
+                    "margin": round(span_ratio - float(self.side_span_ratio_max), 3),
+                }
+            )
         if not self.is_top:
             same_close_ratio = float(metrics.get("same_close_ratio") or 0.0)
             unique_close_ratio = float(metrics.get("unique_close_ratio") or 0.0)
             zero_range_ratio = float(metrics.get("zero_range_ratio") or 0.0)
             if shoulder_clearance_pct < self.bottom_min_shoulder_clearance_pct:
-                return False
+                failures.append(
+                    {
+                        "rule": "bottom_shoulder_clearance_pct",
+                        "actual": round(shoulder_clearance_pct, 3),
+                        "limit": round(float(self.bottom_min_shoulder_clearance_pct), 3),
+                        "margin": round(float(self.bottom_min_shoulder_clearance_pct) - shoulder_clearance_pct, 3),
+                    }
+                )
             if zero_range_ratio >= self.bottom_micro_max_zero_range_ratio:
-                return False
+                failures.append(
+                    {
+                        "rule": "bottom_zero_range_ratio",
+                        "actual": round(zero_range_ratio, 3),
+                        "limit": round(float(self.bottom_micro_max_zero_range_ratio), 3),
+                        "margin": round(zero_range_ratio - float(self.bottom_micro_max_zero_range_ratio), 3),
+                    }
+                )
             if (
                 same_close_ratio >= self.bottom_micro_same_close_ratio_max
                 and unique_close_ratio <= self.bottom_micro_unique_close_ratio_min
             ):
-                return False
-        return True
+                failures.append(
+                    {
+                        "rule": "bottom_flat_microstructure",
+                        "same_close_ratio": round(same_close_ratio, 3),
+                        "same_close_limit": round(float(self.bottom_micro_same_close_ratio_max), 3),
+                        "unique_close_ratio": round(unique_close_ratio, 3),
+                        "unique_close_limit": round(float(self.bottom_micro_unique_close_ratio_min), 3),
+                    }
+                )
+        return failures
 
     def _dedupe_extra_pivots(self, pivots: List[Pivot], *, head_idx: int) -> Dict[str, List[Pivot]]:
         left: List[Pivot] = []
@@ -2038,12 +2146,14 @@ class ScallopFamilyScanner(BaseDigitizedScanner):
         self.descending_min_left_leg_abs_deg = 18.0
         self.descending_min_right_leg_deg = 22.0
         self.descending_directional_ratio_min = 0.46
+        self.descending_min_excursion_pct = 60.0
         self.ascending_inverted_min_shift_pct = 4.0
         self.ascending_inverted_min_left_leg_abs_deg = 18.0
         self.ascending_inverted_min_right_leg_deg = 34.0
         self.ascending_inverted_max_left_share_pct = 72.0
         self.ascending_inverted_min_excursion_pct = 75.0
         self.ascending_inverted_directional_ratio_min = 0.48
+        self.ascending_inverted_strong_shift_pct = 5.0
 
     def _segment_direction_ratio(
         self,
@@ -2220,6 +2330,8 @@ class ScallopFamilyScanner(BaseDigitizedScanner):
             if overall_shift <= -self.min_overall_shift_pct:
                 if overall_shift > -self.descending_min_shift_pct:
                     return None
+                if excursion < self.descending_min_excursion_pct:
+                    return None
                 if abs(left_deg) < self.descending_min_left_leg_abs_deg or right_deg < self.descending_min_right_leg_deg:
                     return None
                 if left_ratio is not None and left_ratio < self.descending_directional_ratio_min:
@@ -2233,7 +2345,7 @@ class ScallopFamilyScanner(BaseDigitizedScanner):
                     "evidence": evidence,
                 }
             if overall_shift >= self.min_overall_shift_pct:
-                if overall_shift < self.ascending_inverted_min_shift_pct:
+                if overall_shift < self.ascending_inverted_strong_shift_pct:
                     return None
                 if abs(left_deg) < self.ascending_inverted_min_left_leg_abs_deg:
                     return None
