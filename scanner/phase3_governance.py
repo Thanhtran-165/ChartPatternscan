@@ -229,6 +229,20 @@ PHASE3_OVERRIDES: Dict[str, Dict[str, Any]] = {
         "manual_note": "The original-space handle gate reduced inverted cups to only two valid-side survivors and zero calibration survivors. Move this branch to reference-only until a new bearish cup detector earns support.",
         "checkpoint_sources": ["post_phase3_cup_round2"],
     },
+    "broadening_bottoms": {
+        "phase3_status": "candidate_after_review",
+        "strategy_gate": "candidate",
+        "research_lane": "benchmark_candidate",
+        "manual_note": "Tier 3 keeps broadening bottoms as the only live candidate. The branch remains roughly aligned with the Bulkowski baseline on the current unified rerun and now belongs in benchmark-and-strategy evaluation work, not detector expansion.",
+    },
+    "broadening_tops": {
+        "phase3_status": "research_only",
+        "manual_note": "Broadening tops stay in active research during Tier 3. The branch is no longer a detector problem, but the benchmark remains mixed rather than strong enough for promotion.",
+    },
+    "gaps": {
+        "phase3_status": "research_only",
+        "manual_note": "Gaps remain a broad research family in Tier 3. Coverage is massive and the detector is already stable enough, so the right move is to benchmark and stratify later instead of retuning the scanner now.",
+    },
     "measured_move_down": {
         "phase3_status": "research_only",
         "manual_note": "Tier 2 review keeps measured-move down in research only. The current branch still comes from the shared derived scanner, and the digitized spec needs a dedicated family rewrite before another safe detector pass is justified.",
@@ -288,6 +302,31 @@ PHASE3_OVERRIDES: Dict[str, Dict[str, Any]] = {
         "manual_note": "Triple tops now require flat, near-equal highs and balanced spacing. They remain noisier than bottoms, but still clear the bar for research-only use.",
         "checkpoint_sources": ["triple_family_batch10_refactor"],
     },
+    "island_reversals": {
+        "phase3_status": "recalibrate",
+        "research_lane": "recalibration_backlog",
+        "manual_note": "Island reversals stay in the recalibration backlog after Tier 3 review. The branch still has huge coverage but weak failure behavior, so it should not compete with the cleaner research families until a dedicated island pass exists.",
+    },
+    "broadening_formations_right_angled_ascending": {
+        "phase3_status": "research_only",
+        "manual_note": "Right-angled ascending broadening stays as thin research/reference coverage in Tier 3. Sample size is too small to justify detector changes, so the chapter is frozen rather than expanded.",
+    },
+    "broadening_formations_right_angled_descending": {
+        "phase3_status": "research_only",
+        "manual_note": "Right-angled descending broadening also stays frozen in Tier 3. The auditable sample is too small for any safe scanner tuning pass.",
+    },
+    "bump_and_run_reversal_bottoms": {
+        "phase3_status": "research_only",
+        "manual_note": "Bump-and-run bottoms remain sparse research coverage in Tier 3. There is not enough repeatable evidence yet to justify family-specific detector work.",
+    },
+    "bump_and_run_reversal_tops": {
+        "phase3_status": "research_only",
+        "manual_note": "Bump-and-run tops stay frozen for the same reason as bottoms: the branch is too sparse for a safe detector iteration right now.",
+    },
+    "diamond_tops": {
+        "phase3_status": "research_only",
+        "manual_note": "Diamond tops remain thin research/reference coverage in Tier 3. The detector is not obviously wrong, but the branch is too sparse to deserve active tuning.",
+    },
     "rectangle_bottoms": {
         "phase3_status": "research_only",
         "manual_note": "Rectangle bottoms stay frozen in the research lane after Tier 2 review. The branch only has two valid-side evals, so there is not enough evidence to justify detector expansion.",
@@ -303,6 +342,10 @@ PHASE3_OVERRIDES: Dict[str, Dict[str, Any]] = {
         "manual_note": "Batch 11 reintroduces the missing flagpole and parallel-channel semantics. The surviving flags look much closer to textbook continuation structures and belong in the research lane.",
         "checkpoint_sources": ["flags_family_batch11_refactor"],
     },
+    "pennants": {
+        "phase3_status": "research_only",
+        "manual_note": "Pennants stay in Tier 3 as a low-volume research family. The current sample is enough to keep the chapter alive, but not enough to justify a dedicated scanner pass yet.",
+    },
     "flags_high_tight": {
         "phase3_status": "retire_from_strategy",
         "strategy_gate": "retired",
@@ -315,24 +358,24 @@ PHASE3_OVERRIDES: Dict[str, Dict[str, Any]] = {
 
 NEXT_BATCH_PRIORITY = [
     {
-        "canonical_key": "double_bottoms",
-        "reason": "Double bottoms remain on the watchlist after the second resolver pass, but only AA has meaningful density and the Eve-side variants still need more evidence.",
+        "canonical_key": "broadening_bottoms",
+        "reason": "Broadening bottoms are now the only live benchmark candidate. The next cycle should test benchmark stability and strategy gating rather than expanding the detector.",
     },
     {
-        "canonical_key": "double_tops",
-        "reason": "Double tops mirror the same post-phase-3 watchlist state as double bottoms: AA is usable for benchmarking, but the non-AA branches remain too thin for promotion.",
+        "canonical_key": "measured_move_down_up",
+        "reason": "Measured move still relies on a shared derived scanner. The next real upgrade here is a dedicated family rewrite, not more threshold tuning.",
     },
     {
-        "canonical_key": "scallop_ascending_descending",
-        "reason": "Scallops improved materially, yet ascending-inverted and descending still diverge from the cleaner bullish branches and need another recalibration pass.",
+        "canonical_key": "islands",
+        "reason": "Island reversals still have huge volume but weak failure behavior. They remain the biggest recalibration backlog item after Tier 3 governance cleanup.",
     },
     {
-        "canonical_key": "head_and_shoulders_bottom",
-        "reason": "Inverse head-and-shoulders still has only one calibration-side standard survivor, and recall-search smoke found just one clean near-miss blocked by neckline slope. The next pass should stay neckline-specific, not broaden the whole detector.",
+        "canonical_key": "gaps",
+        "reason": "Gaps are stable enough for research but too broad as a family. The next cycle should benchmark and stratify subtypes instead of retuning the base detector.",
     },
     {
-        "canonical_key": "rounding_bottoms_tops",
-        "reason": "Rounding tops are cleaner after the second pass, but the family is still a good candidate for later benchmark tuning once the higher-risk watchlist families are addressed.",
+        "canonical_key": "bump_and_run_reversal",
+        "reason": "Bump-and-run remains sparse research/reference coverage. It should only re-enter active work if later data provides a usable sample.",
     },
 ]
 
