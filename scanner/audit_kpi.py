@@ -5,8 +5,8 @@ This script is intentionally lightweight: it reads digitized specs (width/height
 and summarizes how well the *results DB* complies, plus a few outcome KPIs.
 
 Examples:
-  python3 scanner/audit_kpi.py --results-db scan_results/full_classic_1715_v2.sqlite
-  python3 scanner/audit_kpi.py --results-db scan_results/audit_kpi.sqlite --run-id scan_...
+  python3 scanner/audit_kpi.py --results-db scan_results/databases/final/full_classic_1715_v2.sqlite
+  python3 scanner/audit_kpi.py --results-db scan_results/databases/final/audit_kpi.sqlite --run-id scan_...
 """
 
 from __future__ import annotations

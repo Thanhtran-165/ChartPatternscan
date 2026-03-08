@@ -1,5 +1,5 @@
 """
-Build a Vietnamese Bulkowski-style "book" from scan results.
+Legacy Book v1 builder for the Vietnamese Bulkowski-style publication flow.
 
 This script assembles:
   - deterministic tables/statistics (from results DBs)
@@ -12,16 +12,18 @@ Typical workflow:
   2) Generate book Markdown (and optionally PDF):
        export DEEPSEEK_API_KEY=...
        python3 scanner/build_book_vi.py \\
-         --results-db-valid scan_results/valid_2022_2025_vn30_eval.sqlite \\
-         --results-db-calib scan_results/calib_2018_2021_vn30_eval.sqlite \\
+         --results-db-valid scan_results/databases/final/valid_2022_2025_vn30_eval.sqlite \\
+         --results-db-calib scan_results/databases/final/calib_2018_2021_vn30_eval.sqlite \\
          --price-db vietnam_stocks.db \\
          --index-symbol VN30 \\
-         --out-dir scan_results/book_vi
+         --out-dir scan_results/books/book-v1/manual-run
 
 Notes:
   - If pandoc isn't installed, the script will still generate Markdown outputs.
   - Narrative generation is designed to avoid inventing statistics: numbers live in tables
     we generate deterministically; the AI is instructed to write only qualitative text.
+  - This script is now a legacy publication path. New research/publication work should
+    move toward the Book v2 flow documented in `docs/publication/book-v2/architecture.md`.
 """
 
 from __future__ import annotations
@@ -35,6 +37,7 @@ import re
 import sqlite3
 import subprocess
 import shutil
+import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -49,13 +52,13 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
 try:
-    from .bulkowski_report import (  # type: ignore
+    from .report_bulkowski import (  # type: ignore
         _apply_overlap_policy as _report_apply_overlap_policy,
         _load_index_symbols as _report_load_index_symbols,
         generate_bulkowski_payload,
     )
 except Exception:  # pragma: no cover
-    from bulkowski_report import (  # type: ignore
+    from report_bulkowski import (  # type: ignore
         _apply_overlap_policy as _report_apply_overlap_policy,
         _load_index_symbols as _report_load_index_symbols,
         generate_bulkowski_payload,
@@ -1017,7 +1020,13 @@ def _try_build_pdf(*, book_md_path: str, out_pdf_path: str, mainfont: Optional[s
 def main() -> None:
     _load_dotenv_if_present()
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description=(
+            "Legacy Book v1 builder. This path is kept for reference and comparison; "
+            "new publication work should move to the deterministic Book v2 flow."
+        ),
+        epilog="See docs/publication/book-v2/architecture.md for the replacement architecture.",
+    )
     parser.add_argument("--results-db-valid", required=True, help="Validation results DB (SQLite) from run_full_scan.py")
     parser.add_argument("--results-db-calib", default=None, help="Optional calibration results DB (SQLite)")
     parser.add_argument("--price-db", default="vietnam_stocks.db", help="Price DB used for market regime and figures")
@@ -1056,6 +1065,12 @@ def main() -> None:
     parser.add_argument("--skip-pdf", action="store_true", help="Skip PDF build even if pandoc exists")
     parser.add_argument("--pdf-mainfont", default=None, help="Optional mainfont for pandoc/xelatex (e.g. 'Noto Serif')")
     args = parser.parse_args()
+
+    print(
+        "[legacy] scanner/build_book_vi.py is a legacy Book v1 path. "
+        "Use docs/publication/book-v2/architecture.md and the Book v2 contracts for new publication work.",
+        file=sys.stderr,
+    )
 
     out_dir = _ensure_dir(str(args.out_dir))
     reports_dir = _ensure_dir(os.path.join(out_dir, "reports"))

@@ -42,6 +42,10 @@ def _fmt(v: Any) -> str:
     return str(v)
 
 
+def _is_vi(language: str) -> bool:
+    return str(language).strip().lower() == "vi"
+
+
 def _latest_run_id(conn: sqlite3.Connection) -> str:
     row = conn.execute("SELECT run_id FROM scanner_runs ORDER BY created_at DESC LIMIT 1").fetchone()
     if not row:
@@ -168,6 +172,7 @@ def build_report(
     phase3_matrix: Path,
     benchmark_matrix: Path,
     out_dir: Path,
+    language: str,
 ) -> Dict[str, Any]:
     meta = base_metadata_for_pattern_set("bulkowski_53_strict")
     phase3 = _load_phase3_matrix(phase3_matrix)
@@ -213,6 +218,7 @@ def build_report(
         "summary": {
             "valid_db": str(valid_db.resolve()),
             "calib_db": str(calib_db.resolve()),
+            "language": language,
             "pattern_count": len(rows),
             "family_count": len(families),
             "phase3_status_counts": {
@@ -234,26 +240,32 @@ def build_report(
 
     out_dir.mkdir(parents=True, exist_ok=True)
     _write_json(out_dir / "vietnam_research_report.json", payload)
-    _write_text(out_dir / "vietnam_research_report.md", _render(payload))
+    _write_text(out_dir / "vietnam_research_report.md", _render(payload, language=language))
     return payload
 
 
-def _render(payload: Dict[str, Any]) -> str:
+def _render(payload: Dict[str, Any], *, language: str) -> str:
     lines: List[str] = []
     summary = payload["summary"]
-    lines.append("# Vietnam Pattern Research Report")
+    vi = _is_vi(language)
+    lines.append("# Báo cáo nghiên cứu mẫu hình tại Việt Nam" if vi else "# Vietnam Pattern Research Report")
     lines.append("")
-    lines.append("## Summary")
+    lines.append("## Tóm tắt" if vi else "## Summary")
     lines.append("")
     lines.append(f"- pattern_count: `{summary['pattern_count']}`")
     lines.append(f"- family_count: `{summary['family_count']}`")
     lines.append(f"- phase3_status_counts: `{summary['phase3_status_counts']}`")
     lines.append(f"- benchmark_status_counts: `{summary['benchmark_status_counts']}`")
+    lines.append(f"- language: `{language}`")
     lines.append("")
 
-    lines.append("## Candidate / Watchlist")
+    lines.append("## Candidate / Watchlist" if not vi else "## Candidate / Watchlist")
     lines.append("")
-    lines.append("| Pattern | Family | Phase 3 | Strategy | Valid evals | Valid move | Fail<5 | Target |")
+    lines.append(
+        "| Pattern | Family | Phase 3 | Strategy | Valid evals | Valid move | Fail<5 | Target |"
+        if not vi
+        else "| Pattern | Family | Phase 3 | Strategy | Valid evals | Median move | Fail<5 | Target |"
+    )
     lines.append("|---|---|---|---|---:|---:|---:|---:|")
     for row in payload["candidate_and_watchlist"]:
         valid = row["valid"]
@@ -275,9 +287,13 @@ def _render(payload: Dict[str, Any]) -> str:
         )
     lines.append("")
 
-    lines.append("## Common Patterns In Vietnam (By Valid Evals)")
+    lines.append("## Các pattern phổ biến tại Việt Nam (theo valid evals)" if vi else "## Common Patterns In Vietnam (By Valid Evals)")
     lines.append("")
-    lines.append("| Pattern | Family | Valid evals | Symbols | Move | Fail<5 | Target | Benchmark |")
+    lines.append(
+        "| Pattern | Family | Valid evals | Symbols | Move | Fail<5 | Target | Benchmark |"
+        if not vi
+        else "| Pattern | Family | Valid evals | Số mã | Median move | Fail<5 | Target | Benchmark |"
+    )
     lines.append("|---|---|---:|---:|---:|---:|---:|---|")
     for row in payload["top_patterns_by_valid_evals"]:
         valid = row["valid"]
@@ -299,9 +315,13 @@ def _render(payload: Dict[str, Any]) -> str:
         )
     lines.append("")
 
-    lines.append("## Common Patterns In Vietnam (By Symbol Coverage)")
+    lines.append("## Các pattern phổ biến tại Việt Nam (theo độ phủ mã)" if vi else "## Common Patterns In Vietnam (By Symbol Coverage)")
     lines.append("")
-    lines.append("| Pattern | Family | Symbols | Detections | Valid evals | Move |")
+    lines.append(
+        "| Pattern | Family | Symbols | Detections | Valid evals | Move |"
+        if not vi
+        else "| Pattern | Family | Số mã | Số phát hiện | Valid evals | Median move |"
+    )
     lines.append("|---|---|---:|---:|---:|---:|")
     for row in payload["top_patterns_by_symbol_count"]:
         valid = row["valid"]
@@ -321,9 +341,13 @@ def _render(payload: Dict[str, Any]) -> str:
         )
     lines.append("")
 
-    lines.append("## Stronger Patterns Excluding Gaps")
+    lines.append("## Các pattern mạnh hơn khi bỏ gaps" if vi else "## Stronger Patterns Excluding Gaps")
     lines.append("")
-    lines.append("| Pattern | Family | Valid evals | Move | Fail<5 | Target | Strategy |")
+    lines.append(
+        "| Pattern | Family | Valid evals | Move | Fail<5 | Target | Strategy |"
+        if not vi
+        else "| Pattern | Family | Valid evals | Median move | Fail<5 | Target | Strategy |"
+    )
     lines.append("|---|---|---:|---:|---:|---:|---|")
     for row in payload["top_patterns_by_strength_ex_gaps"]:
         valid = row["valid"]
@@ -344,9 +368,13 @@ def _render(payload: Dict[str, Any]) -> str:
         )
     lines.append("")
 
-    lines.append("## Family Prevalence")
+    lines.append("## Mức độ phổ biến theo family" if vi else "## Family Prevalence")
     lines.append("")
-    lines.append("| Family | Pattern count | Valid detections | Valid evals | Calib detections | Calib evals |")
+    lines.append(
+        "| Family | Pattern count | Valid detections | Valid evals | Calib detections | Calib evals |"
+        if not vi
+        else "| Family | Số pattern | Valid detections | Valid evals | Calib detections | Calib evals |"
+    )
     lines.append("|---|---:|---:|---:|---:|---:|")
     for row in payload["family_prevalence"]:
         lines.append(
@@ -374,6 +402,7 @@ def main() -> None:
     parser.add_argument("--phase3-pattern-matrix", required=True)
     parser.add_argument("--benchmark-pattern-matrix", required=True)
     parser.add_argument("--out-dir", required=True)
+    parser.add_argument("--language", default="en", choices=["en", "vi"])
     args = parser.parse_args()
 
     payload = build_report(
@@ -382,6 +411,7 @@ def main() -> None:
         phase3_matrix=Path(args.phase3_pattern_matrix).resolve(),
         benchmark_matrix=Path(args.benchmark_pattern_matrix).resolve(),
         out_dir=Path(args.out_dir).resolve(),
+        language=str(args.language),
     )
     print("=== Vietnam Pattern Research Report ===")
     print(f"out_dir: {Path(args.out_dir).resolve()}")

@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PHASE3_MATRIX = ROOT / "scan_results" / "spec_audit_20260306" / "phase3" / "phase3_pattern_matrix.json"
+PHASE3_MATRIX = ROOT / "scan_results" / "audits" / "spec-audit-20260306" / "phase3" / "phase3_pattern_matrix.json"
 SPEC_DIR = ROOT / "extraction_phase_1" / "digitization" / "patterns_digitized"
 
 
@@ -297,7 +297,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--valid-db", required=True)
     parser.add_argument("--calib-db", required=True)
-    parser.add_argument("--out-dir", default="scan_results/spec_audit_20260306/benchmark")
+    parser.add_argument("--out-dir", default="scan_results/audits/spec-audit-20260306/benchmark/cycle-1")
     args = parser.parse_args()
     payload = build_report(
         valid_db=Path(args.valid_db).resolve(),

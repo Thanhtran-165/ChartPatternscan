@@ -5,7 +5,7 @@ to a separate results DB with run_id tracking.
 Usage examples:
   python3 scanner/run_full_scan.py --limit 50
   python3 scanner/run_full_scan.py --patterns double_tops,head_and_shoulders_top
-  python3 scanner/run_full_scan.py --results-db scan_results/pattern_scans.sqlite
+  python3 scanner/run_full_scan.py --results-db scan_results/databases/final/pattern_scans.sqlite
 """
 
 from __future__ import annotations

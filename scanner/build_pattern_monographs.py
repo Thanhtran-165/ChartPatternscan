@@ -1,0 +1,900 @@
+from __future__ import annotations
+
+import argparse
+import json
+import sqlite3
+from collections import defaultdict
+from datetime import datetime, timezone
+from pathlib import Path
+from statistics import median
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+try:
+    from .pattern_set_metadata import base_metadata_for_pattern_set  # type: ignore
+except Exception:  # pragma: no cover
+    from pattern_set_metadata import base_metadata_for_pattern_set  # type: ignore
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _write_json(path: Path, obj: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(obj, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _write_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def _read_json(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _is_vi(language: str) -> bool:
+    return str(language).strip().lower() == "vi"
+
+
+def _safe_float(x: Any) -> Optional[float]:
+    try:
+        v = float(x)
+    except Exception:
+        return None
+    if v != v:
+        return None
+    return v
+
+
+def _fmt(v: Any) -> str:
+    if v is None:
+        return ""
+    if isinstance(v, float):
+        return f"{v:.2f}"
+    return str(v)
+
+
+def _latest_run_id(conn: sqlite3.Connection) -> str:
+    row = conn.execute("SELECT run_id FROM scanner_runs ORDER BY created_at DESC LIMIT 1").fetchone()
+    if not row:
+        raise SystemExit("No scanner_runs found.")
+    return str(row[0])
+
+
+def _load_matrix(path: Path) -> Dict[str, Dict[str, Any]]:
+    rows = _read_json(path)
+    return {str(row["pattern_key"]): row for row in rows if isinstance(row, dict) and row.get("pattern_key") is not None}
+
+
+def _load_digitized_spec(spec_key: Optional[str]) -> Optional[Dict[str, Any]]:
+    if not spec_key:
+        return None
+    path = Path("extraction_phase_1") / "digitization" / "patterns_digitized" / f"{spec_key}_digitized.json"
+    if not path.exists():
+        return None
+    try:
+        payload = _read_json(path)
+    except Exception:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _variant_scope(pattern_key: str, meta: Dict[str, Any], all_meta: Dict[str, Dict[str, Any]], spec: Optional[Dict[str, Any]]) -> List[str]:
+    explicit_variant = meta.get("variant")
+    if explicit_variant:
+        return [str(explicit_variant)]
+
+    canonical_key = str(meta.get("canonical_key") or pattern_key)
+    sibling_variants = sorted(
+        {
+            str(m.get("variant"))
+            for m in all_meta.values()
+            if str(m.get("canonical_key") or "") == canonical_key and m.get("variant") is not None
+        }
+    )
+    if sibling_variants:
+        return sibling_variants
+
+    variants = []
+    if isinstance(spec, dict):
+        variant_handling = spec.get("variant_handling")
+        if isinstance(variant_handling, dict):
+            for row in variant_handling.get("variants", []):
+                if isinstance(row, dict) and row.get("name"):
+                    variants.append(str(row["name"]))
+    return variants or ["standard"]
+
+
+def _describe_reference(meta: Dict[str, Any], spec: Optional[Dict[str, Any]], *, language: str) -> str:
+    parts: List[str] = []
+    chapter = meta.get("bulkowski_chapter")
+    bulkowski_name = str(meta.get("bulkowski_name") or meta.get("pattern_key") or "")
+    vi = _is_vi(language)
+    if chapter is not None:
+        if vi:
+            parts.append(f"{bulkowski_name} (chương {chapter} theo Bulkowski)")
+        else:
+            parts.append(f"{bulkowski_name} (Bulkowski chapter {chapter})")
+    else:
+        parts.append(bulkowski_name)
+
+    if isinstance(spec, dict):
+        pattern_type = spec.get("pattern_type")
+        sig = spec.get("detection_signature") or {}
+        prior = spec.get("prior_trend_requirements") or {}
+        breakout = spec.get("breakout_confirmation") or {}
+        seq = sig.get("sequence_description")
+        if pattern_type:
+            parts.append(f"loại digitized: `{pattern_type}`" if vi else f"digitized type: `{pattern_type}`")
+        if seq:
+            parts.append(f"chuỗi hình thái: `{seq}`" if vi else f"sequence: `{seq}`")
+        if prior.get("description"):
+            parts.append(
+                f"xu hướng trước mẫu: {prior.get('description')}"
+                if vi
+                else f"prior trend: {prior.get('description')}"
+            )
+        if breakout.get("breakout_direction"):
+            parts.append(
+                f"hướng breakout kỳ vọng: `{breakout.get('breakout_direction')}`"
+                if vi
+                else f"expected breakout direction: `{breakout.get('breakout_direction')}`"
+            )
+    else:
+        parts.append(
+            "được ánh xạ thông qua metadata scanner nội bộ, không có payload spec digitized trực tiếp"
+            if vi
+            else "mapped through internal scanner metadata without a digitized spec payload"
+        )
+
+    head = parts[0].strip().rstrip(".")
+    tail = [part.strip().rstrip(".") for part in parts[1:] if part]
+    if not tail:
+        return head + "."
+    return f"{head}: " + "; ".join(tail) + "."
+
+
+def _describe_detector(pattern_key: str, meta: Dict[str, Any], spec: Optional[Dict[str, Any]], *, language: str) -> str:
+    canonical = str(meta.get("canonical_key") or pattern_key)
+    spec_key = meta.get("spec_key")
+    vi = _is_vi(language)
+    parts = [
+        f"Dự án này ánh xạ `{pattern_key}` vào family chuẩn `{canonical}`"
+        if vi
+        else f"This project maps `{pattern_key}` to canonical family `{canonical}`"
+    ]
+    if spec_key:
+        parts.append(f"spec: `{spec_key}`")
+    if meta.get("variant") is not None:
+        parts.append(f"biến thể: `{meta.get('variant')}`" if vi else f"variant: `{meta.get('variant')}`")
+
+    if isinstance(spec, dict):
+        geom = spec.get("geometry_constraints") or {}
+        breakout = spec.get("breakout_confirmation") or {}
+        width_min = geom.get("width_min_bars")
+        width_max = geom.get("width_max_bars")
+        height_min = geom.get("height_ratio_min")
+        height_max = geom.get("height_ratio_max")
+        if width_min is not None or width_max is not None:
+            parts.append(
+                f"độ rộng điển hình `{width_min}`-`{width_max}` bar"
+                if vi
+                else f"typical width `{width_min}`-`{width_max}` bars"
+            )
+        if height_min is not None or height_max is not None:
+            parts.append(
+                f"biên độ chiều cao `{height_min}`-`{height_max}` phần trăm"
+                if vi
+                else f"height envelope `{height_min}`-`{height_max}` percent"
+            )
+        if breakout.get("breakout_direction"):
+            volume_required = breakout.get("volume_required")
+            if vi:
+                volume_text = "có yêu cầu xác nhận khối lượng" if volume_required else "không bắt buộc xác nhận khối lượng"
+                parts.append(f"hướng breakout `{breakout.get('breakout_direction')}` {volume_text}")
+            else:
+                volume_text = "with volume confirmation required" if volume_required else "without mandatory volume confirmation"
+                parts.append(f"breakout direction `{breakout.get('breakout_direction')}` {volume_text}")
+    head = parts[0].strip().rstrip(".")
+    tail = [part.strip().rstrip(".") for part in parts[1:] if part]
+    if not tail:
+        return head + "."
+    return f"{head}: " + "; ".join(tail) + "."
+
+
+class SplitView:
+    def __init__(self, db_path: Path) -> None:
+        self.db_path = db_path
+        self.conn = sqlite3.connect(str(db_path))
+        self.conn.row_factory = sqlite3.Row
+        self.run_id = _latest_run_id(self.conn)
+
+    def close(self) -> None:
+        self.conn.close()
+
+    def pattern_rows(self, pattern_key: str) -> List[sqlite3.Row]:
+        return self.conn.execute(
+            """
+            SELECT
+                d.symbol,
+                d.pattern_id,
+                d.formation_start,
+                d.formation_end,
+                d.breakout_date,
+                d.breakout_direction,
+                d.breakout_price,
+                d.target_price,
+                d.confidence_score,
+                d.pattern_height_pct,
+                d.pattern_width_bars,
+                d.variant_code,
+                d.variant_confidence,
+                d.variant_evidence_json,
+                d.family_metrics_json,
+                p.max_favorable_excursion_pct,
+                p.max_adverse_excursion_pct,
+                p.target_achieved_intraday,
+                p.boundary_invalidated,
+                p.throwback_pullback_occurred
+            FROM pattern_detections d
+            LEFT JOIN post_breakout_results p
+              ON p.run_id = d.run_id AND p.pattern_id = d.pattern_id
+            WHERE d.run_id = ? AND d.pattern_name = ?
+            """,
+            (self.run_id, pattern_key),
+        ).fetchall()
+
+    def metrics(self, pattern_key: str) -> Dict[str, Any]:
+        det_rows = self.conn.execute(
+            """
+            SELECT symbol
+            FROM pattern_detections
+            WHERE run_id = ? AND pattern_name = ?
+            """,
+            (self.run_id, pattern_key),
+        ).fetchall()
+        eval_rows = self.conn.execute(
+            """
+            SELECT
+                d.symbol,
+                p.max_favorable_excursion_pct,
+                p.boundary_invalidated,
+                p.target_achieved_intraday,
+                p.throwback_pullback_occurred
+            FROM pattern_detections d
+            JOIN post_breakout_results p
+              ON p.run_id = d.run_id AND p.pattern_id = d.pattern_id
+            WHERE d.run_id = ? AND d.pattern_name = ?
+            """,
+            (self.run_id, pattern_key),
+        ).fetchall()
+
+        symbols = {str(row["symbol"]) for row in det_rows}
+        eval_symbols = {str(row["symbol"]) for row in eval_rows}
+        moves: List[float] = []
+        boundary: List[float] = []
+        target: List[float] = []
+        tbpb: List[float] = []
+        for row in eval_rows:
+            move = _safe_float(row["max_favorable_excursion_pct"])
+            if move is not None:
+                moves.append(move)
+            for src, bucket in (
+                ("boundary_invalidated", boundary),
+                ("target_achieved_intraday", target),
+                ("throwback_pullback_occurred", tbpb),
+            ):
+                val = _safe_float(row[src])
+                if val is not None:
+                    bucket.append(val)
+        return {
+            "detections": len(det_rows),
+            "evals": len(eval_rows),
+            "symbol_count": len(symbols),
+            "eval_symbol_count": len(eval_symbols),
+            "median_move_pct": float(median(moves)) if moves else None,
+            "failure_rate_5pct": (sum(1.0 for x in moves if x < 5.0) / len(moves) * 100.0) if moves else None,
+            "boundary_pct": (sum(boundary) / len(boundary) * 100.0) if boundary else None,
+            "target_hit_pct": (sum(target) / len(target) * 100.0) if target else None,
+            "tbpb_pct": (sum(tbpb) / len(tbpb) * 100.0) if tbpb else None,
+        }
+
+    def symbol_tendencies(self, pattern_key: str) -> List[Dict[str, Any]]:
+        rows = self.conn.execute(
+            """
+            SELECT
+                d.symbol,
+                COUNT(*) AS detections,
+                COUNT(p.pattern_id) AS evals,
+                AVG(p.target_achieved_intraday) * 100.0 AS target_hit_pct
+            FROM pattern_detections d
+            LEFT JOIN post_breakout_results p
+              ON p.run_id = d.run_id AND p.pattern_id = d.pattern_id
+            WHERE d.run_id = ? AND d.pattern_name = ?
+            GROUP BY d.symbol
+            """,
+            (self.run_id, pattern_key),
+        ).fetchall()
+
+        move_rows = self.conn.execute(
+            """
+            SELECT d.symbol, p.max_favorable_excursion_pct
+            FROM pattern_detections d
+            JOIN post_breakout_results p
+              ON p.run_id = d.run_id AND p.pattern_id = d.pattern_id
+            WHERE d.run_id = ? AND d.pattern_name = ?
+            """,
+            (self.run_id, pattern_key),
+        ).fetchall()
+        moves_by_symbol: Dict[str, List[float]] = defaultdict(list)
+        for row in move_rows:
+            move = _safe_float(row["max_favorable_excursion_pct"])
+            if move is not None:
+                moves_by_symbol[str(row["symbol"])].append(move)
+
+        out: List[Dict[str, Any]] = []
+        for row in rows:
+            symbol = str(row["symbol"])
+            out.append(
+                {
+                    "symbol": symbol,
+                    "detections": int(row["detections"] or 0),
+                    "evals": int(row["evals"] or 0),
+                    "median_move_pct": float(median(moves_by_symbol[symbol])) if moves_by_symbol[symbol] else None,
+                    "target_hit_pct": _safe_float(row["target_hit_pct"]),
+                }
+            )
+        out.sort(key=lambda item: (-int(item["evals"]), -int(item["detections"]), str(item["symbol"])))
+        return out
+
+
+def _delta_notes(
+    benchmark_row: Dict[str, Any],
+    valid_metrics: Dict[str, Any],
+    calib_metrics: Dict[str, Any],
+    *,
+    language: str,
+) -> List[str]:
+    notes: List[str] = []
+    benchmark = benchmark_row.get("benchmark")
+    vi = _is_vi(language)
+    if not isinstance(benchmark, dict):
+        notes.append("Không có baseline benchmark cho pattern này." if vi else "No benchmark baseline is available for this pattern.")
+        return notes
+
+    b_move = _safe_float(benchmark.get("median_move_pct") or benchmark.get("average_rise_pct"))
+    b_fail = _safe_float(benchmark.get("failure_rate_5pct"))
+    b_tbpb = _safe_float(benchmark.get("tbpb_pct") or benchmark.get("pullback_rate_pct"))
+    v_move = _safe_float(valid_metrics.get("median_move_pct"))
+    v_fail = _safe_float(valid_metrics.get("failure_rate_5pct"))
+    v_tbpb = _safe_float(valid_metrics.get("tbpb_pct"))
+    if b_move is not None and v_move is not None:
+        notes.append(
+            f"Median move của split valid là `{v_move:.2f}%`, so với baseline Bulkowski `{b_move:.2f}%`."
+            if vi
+            else f"Valid median move is `{v_move:.2f}%` versus Bulkowski baseline `{b_move:.2f}%`."
+        )
+    if b_fail is not None and v_fail is not None:
+        notes.append(
+            f"Tỷ lệ fail-under-5 của split valid là `{v_fail:.2f}%`, so với baseline `{b_fail:.2f}%`."
+            if vi
+            else f"Valid fail-under-5 rate is `{v_fail:.2f}%` versus baseline `{b_fail:.2f}%`."
+        )
+    if b_tbpb is not None and v_tbpb is not None:
+        notes.append(
+            f"Tỷ lệ throwback/pullback của split valid là `{v_tbpb:.2f}%`, so với baseline `{b_tbpb:.2f}%`."
+            if vi
+            else f"Valid throwback/pullback rate is `{v_tbpb:.2f}%` versus baseline `{b_tbpb:.2f}%`."
+        )
+    if int(calib_metrics.get("evals") or 0) == 0:
+        notes.append(
+            "Split calibration hiện không có case evaluated trong final snapshot."
+            if vi
+            else "Calibration split has no evaluated cases in the current final snapshot."
+        )
+    elif int(valid_metrics.get("evals") or 0) == 0:
+        notes.append(
+            "Split validation hiện không có case evaluated trong final snapshot."
+            if vi
+            else "Validation split has no evaluated cases in the current final snapshot."
+        )
+    return notes
+
+
+def _case_note(row: Dict[str, Any], *, language: str) -> str:
+    parts: List[str] = []
+    vi = _is_vi(language)
+    if row.get("target_achieved_intraday") == 1:
+        parts.append("đạt target" if vi else "target hit")
+    if row.get("boundary_invalidated") == 1:
+        parts.append("vi phạm boundary" if vi else "boundary invalidated")
+    move = _safe_float(row.get("max_favorable_excursion_pct"))
+    if move is not None:
+        parts.append(f"MFE `{move:.2f}%`")
+    adverse = _safe_float(row.get("max_adverse_excursion_pct"))
+    if adverse is not None:
+        parts.append(f"MAE `{adverse:.2f}%`")
+    return ", ".join(parts)
+
+
+def _pick_case(
+    rows: Sequence[Dict[str, Any]],
+    *,
+    used_ids: set[str],
+    label: str,
+    rule: str,
+    language: str,
+) -> Optional[Dict[str, Any]]:
+    if not rows:
+        return None
+    for row in rows:
+        pid = str(row["pattern_id"])
+        if pid in used_ids:
+            continue
+        used_ids.add(pid)
+        return {
+            "symbol": str(row["symbol"]),
+            "split": str(row["split"]),
+            "breakout_date": row.get("breakout_date"),
+            "pattern_variant": row.get("variant_code"),
+            "quality_label": label,
+            "note": f"{rule}; {_case_note(row, language=language)}".strip("; "),
+            "image_path": None,
+        }
+    return None
+
+
+def _select_cases(valid_rows: List[Dict[str, Any]], calib_rows: List[Dict[str, Any]], *, language: str) -> List[Dict[str, Any]]:
+    used: set[str] = set()
+    out: List[Dict[str, Any]] = []
+    vi = _is_vi(language)
+
+    best_valid = sorted(
+        [
+            row for row in valid_rows
+            if _safe_float(row.get("max_favorable_excursion_pct")) is not None
+            and int(row.get("target_achieved_intraday") or 0) == 1
+            and int(row.get("boundary_invalidated") or 0) == 0
+        ],
+        key=lambda row: (
+            -float(_safe_float(row.get("max_favorable_excursion_pct")) or -1e9),
+            float(_safe_float(row.get("max_adverse_excursion_pct")) or 1e9),
+        ),
+    )
+    picked = _pick_case(
+        best_valid,
+        used_ids=used,
+        label="best_case",
+        rule=(
+            "Mẫu valid chất lượng cao nhất với target hit và không vi phạm boundary"
+            if vi
+            else "Highest-quality valid survivor with target hit and no boundary invalidation"
+        ),
+        language=language,
+    )
+    if picked is not None:
+        out.append(picked)
+
+    valid_moves = [_safe_float(row.get("max_favorable_excursion_pct")) for row in valid_rows]
+    valid_moves = [row for row in valid_moves if row is not None]
+    if valid_moves:
+        med = float(median(valid_moves))
+        typical_valid = sorted(
+            [row for row in valid_rows if _safe_float(row.get("max_favorable_excursion_pct")) is not None],
+            key=lambda row: (
+                abs(float(_safe_float(row.get("max_favorable_excursion_pct")) or 0.0) - med)
+                + (5.0 if int(row.get("boundary_invalidated") or 0) == 1 else 0.0)
+                + (2.0 if int(row.get("target_achieved_intraday") or 0) == 0 else 0.0),
+                int(row.get("boundary_invalidated") or 0),
+                -int(row.get("target_achieved_intraday") or 0),
+            ),
+        )
+        picked = _pick_case(
+            typical_valid,
+            used_ids=used,
+            label="typical_case",
+            rule="Mẫu valid gần median move nhất" if vi else "Valid case closest to median move",
+            language=language,
+        )
+        if picked is not None:
+            out.append(picked)
+
+    stress_valid = sorted(
+        [
+            row for row in valid_rows
+            if int(row.get("boundary_invalidated") or 0) == 1
+            or int(row.get("target_achieved_intraday") or 0) == 0
+            or float(_safe_float(row.get("max_adverse_excursion_pct")) or 0.0) >= 10.0
+        ],
+        key=lambda row: (
+            -int(row.get("boundary_invalidated") or 0),
+            -(float(_safe_float(row.get("max_adverse_excursion_pct")) or 0.0)),
+            float(_safe_float(row.get("max_favorable_excursion_pct")) or 0.0),
+        ),
+    )
+    picked = _pick_case(
+        stress_valid,
+        used_ids=used,
+        label="stress_case",
+        rule=(
+            "Mẫu valid stress thể hiện invalidation hoặc adverse excursion cao"
+            if vi
+            else "Valid stress case showing invalidation or elevated adverse excursion"
+        ),
+        language=language,
+    )
+    if picked is not None:
+        out.append(picked)
+
+    calib_reference = sorted(
+        [row for row in calib_rows if _safe_float(row.get("max_favorable_excursion_pct")) is not None],
+        key=lambda row: (
+            -int(row.get("target_achieved_intraday") or 0),
+            int(row.get("boundary_invalidated") or 0),
+            -float(_safe_float(row.get("max_favorable_excursion_pct")) or -1e9),
+        ),
+    )
+    picked = _pick_case(
+        calib_reference,
+        used_ids=used,
+        label="calib_reference",
+        rule="Mẫu tham chiếu calibration để so với split valid" if vi else "Calibration reference case for split comparison",
+        language=language,
+    )
+    if picked is not None:
+        out.append(picked)
+
+    for row in out:
+        if row.get("note"):
+            # Replace English case-note suffixes with localized terms when needed.
+            row["note"] = str(row["note"])
+            if vi:
+                row["note"] = (
+                    row["note"]
+                    .replace("target hit", "đạt target")
+                    .replace("boundary invalidated", "vi phạm boundary")
+                )
+    return out
+
+
+def _rows_as_dicts(rows: Sequence[sqlite3.Row], *, split: str) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for row in rows:
+        d = dict(row)
+        d["split"] = split
+        out.append(d)
+    return out
+
+
+def _merge_symbol_tendencies(valid_rows: List[Dict[str, Any]], calib_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    merged: Dict[str, Dict[str, Any]] = {}
+    for row in list(valid_rows) + list(calib_rows):
+        symbol = str(row["symbol"])
+        cur = merged.setdefault(symbol, {"symbol": symbol, "detections": 0, "evals": 0, "moves": [], "targets": []})
+        cur["detections"] += int(row.get("detections") or 0)
+        cur["evals"] += int(row.get("evals") or 0)
+        move = _safe_float(row.get("median_move_pct"))
+        if move is not None:
+            cur["moves"].append(move)
+        target = _safe_float(row.get("target_hit_pct"))
+        if target is not None:
+            cur["targets"].append(target)
+
+    out: List[Dict[str, Any]] = []
+    for symbol, row in merged.items():
+        out.append(
+            {
+                "symbol": symbol,
+                "detections": int(row["detections"]),
+                "evals": int(row["evals"]),
+                "median_move_pct": float(median(row["moves"])) if row["moves"] else None,
+                "target_hit_pct": float(median(row["targets"])) if row["targets"] else None,
+            }
+        )
+    out.sort(key=lambda row: (-int(row["evals"]), -int(row["detections"]), str(row["symbol"])))
+    return out
+
+
+def _render_core(payload: Dict[str, Any], *, language: str) -> str:
+    summary = payload["summary"]
+    reference = payload["reference"]
+    governance = payload["governance"]
+    benchmark = payload["benchmark"]
+    prevalence = payload["vietnam_prevalence"]
+    outcomes = payload["vietnam_outcomes"]
+    cases = payload["representative_cases"]
+    symbols = payload["symbol_tendencies"]
+    vi = _is_vi(language)
+
+    lines: List[str] = []
+    lines.append(f"# {summary['bulkowski_name'] or summary['pattern_key']}")
+    lines.append("")
+    lines.append(f"- pattern_key: `{summary['pattern_key']}`")
+    lines.append(f"- canonical_key: `{summary['canonical_key']}`")
+    lines.append(f"- bulkowski_chapter: `{summary.get('bulkowski_chapter')}`")
+    lines.append(f"- phase3_status: `{governance['phase3_status']}`")
+    lines.append(f"- strategy_gate: `{governance['strategy_gate']}`")
+    lines.append(f"- benchmark_status: `{benchmark['benchmark_status']}`")
+    lines.append(f"- language: `{language}`")
+    lines.append("")
+
+    lines.append("## Định nghĩa mẫu hình" if vi else "## Pattern Definition")
+    lines.append("")
+    lines.append(reference["bulkowski_reference"])
+    lines.append("")
+    lines.append(reference["detector_interpretation"])
+    lines.append("")
+    lines.append(f"- phạm vi biến thể: `{reference['variant_scope']}`" if vi else f"- variant_scope: `{reference['variant_scope']}`")
+    lines.append("")
+
+    lines.append("## Mức độ phổ biến tại Việt Nam" if vi else "## Vietnam Prevalence")
+    lines.append("")
+    lines.append("| Split | Detections | Evals | Symbols |" if not vi else "| Split | Số phát hiện | Số eval | Số mã |")
+    lines.append("|---|---:|---:|---:|")
+    for split in ("valid", "calib"):
+        row = prevalence[split]
+        lines.append(f"| {split} | {int(row['detections'])} | {int(row['evals'])} | {int(row['symbol_count'])} |")
+    lines.append("")
+
+    lines.append("## Hồ sơ kết quả tại Việt Nam" if vi else "## Vietnam Outcome Profile")
+    lines.append("")
+    lines.append(
+        "| Split | Median move | Fail<5 | Boundary | Target | TB/PB |"
+        if not vi
+        else "| Split | Median move | Fail<5 | Boundary | Target | TB/PB |"
+    )
+    lines.append("|---|---:|---:|---:|---:|---:|")
+    for split in ("valid", "calib"):
+        row = outcomes[split]
+        lines.append(
+            f"| {split} | {_fmt(row.get('median_move_pct'))} | {_fmt(row.get('failure_rate_5pct'))} | "
+            f"{_fmt(row.get('boundary_pct'))} | {_fmt(row.get('target_hit_pct'))} | {_fmt(row.get('tbpb_pct'))} |"
+        )
+    lines.append("")
+
+    lines.append("## So với benchmark Bulkowski" if vi else "## Benchmark Versus Bulkowski")
+    lines.append("")
+    lines.append(f"- benchmark_status: `{benchmark['benchmark_status']}`")
+    baseline = benchmark.get("bulkowski_baseline") or {}
+    if isinstance(baseline, dict) and baseline:
+        lines.append("")
+        lines.append("| Chỉ số baseline | Giá trị |" if vi else "| Baseline metric | Value |")
+        lines.append("|---|---:|")
+        for key in ("median_move_pct", "average_rise_pct", "failure_rate_5pct", "tbpb_pct", "pullback_rate_pct"):
+            if baseline.get(key) is not None:
+                lines.append(f"| {key} | {_fmt(_safe_float(baseline.get(key)))} |")
+        if baseline.get("source_spec"):
+            lines.append("")
+            lines.append(
+                f"- nguồn spec benchmark: `{baseline.get('source_spec')}`"
+                if vi
+                else f"- benchmark_source_spec: `{baseline.get('source_spec')}`"
+            )
+        lines.append("")
+    for note in benchmark.get("delta_notes", []):
+        lines.append(f"- {note}")
+    lines.append("")
+
+    lines.append("## Mẫu đại diện" if vi else "## Representative Cases")
+    lines.append("")
+    if cases:
+        lines.append(
+            "| Nhãn | Split | Mã | Ngày breakout | Biến thể | Ghi chú |"
+            if vi
+            else "| Label | Split | Symbol | Breakout date | Variant | Note |"
+        )
+        lines.append("|---|---|---|---|---|---|")
+        for row in cases:
+            lines.append(
+                f"| {row.get('quality_label') or ''} | {row.get('split') or ''} | {row.get('symbol') or ''} | "
+                f"{row.get('breakout_date') or ''} | {row.get('pattern_variant') or ''} | {row.get('note') or ''} |"
+            )
+    else:
+        lines.append("Không tìm thấy mẫu evaluated đại diện trong final snapshot." if vi else "No representative evaluated cases were found in the final snapshot.")
+    lines.append("")
+
+    lines.append("## Xu hướng theo mã cổ phiếu" if vi else "## Symbol Tendencies")
+    lines.append("")
+    if symbols:
+        lines.append(
+            "| Mã | Số phát hiện | Số eval | Median move | Target |"
+            if vi
+            else "| Symbol | Detections | Evals | Median move | Target |"
+        )
+        lines.append("|---|---:|---:|---:|---:|")
+        for row in symbols[:10]:
+            lines.append(
+                f"| {row['symbol']} | {int(row['detections'])} | {int(row['evals'])} | "
+                f"{_fmt(row.get('median_move_pct'))} | {_fmt(row.get('target_hit_pct'))} |"
+            )
+    else:
+        lines.append("Không có thống kê xu hướng theo mã." if vi else "No symbol tendencies were available.")
+    lines.append("")
+
+    lines.append("## Trạng thái nghiên cứu hiện tại" if vi else "## Current Research Status")
+    lines.append("")
+    lines.append(f"- phase3_status: `{governance['phase3_status']}`")
+    lines.append(f"- strategy_gate: `{governance['strategy_gate']}`")
+    if governance.get("family_action"):
+        lines.append(f"- research_lane: `{governance['family_action']}`")
+    lines.append("")
+
+    return "\n".join(lines).strip() + "\n"
+
+
+def build_monographs(
+    *,
+    valid_db: Path,
+    calib_db: Path,
+    phase3_matrix: Path,
+    benchmark_matrix: Path,
+    out_dir: Path,
+    patterns: Optional[List[str]],
+    language: str,
+) -> Dict[str, Any]:
+    meta = base_metadata_for_pattern_set("bulkowski_53_strict")
+    phase3 = _load_matrix(phase3_matrix)
+    benchmark = _load_matrix(benchmark_matrix)
+
+    selected = patterns or sorted(meta.keys(), key=lambda key: (int(meta[key].get("bulkowski_chapter") or 10**9), key))
+    valid_view = SplitView(valid_db)
+    calib_view = SplitView(calib_db)
+    try:
+        index_rows: List[Dict[str, Any]] = []
+        for pattern_key in selected:
+            pattern_meta = dict(meta.get(pattern_key, {}))
+            pattern_meta["pattern_key"] = pattern_key
+            spec = _load_digitized_spec(pattern_meta.get("spec_key"))
+            valid_metrics = valid_view.metrics(pattern_key)
+            calib_metrics = calib_view.metrics(pattern_key)
+            valid_case_rows = _rows_as_dicts(valid_view.pattern_rows(pattern_key), split="valid")
+            calib_case_rows = _rows_as_dicts(calib_view.pattern_rows(pattern_key), split="calib")
+            cases = _select_cases(valid_case_rows, calib_case_rows, language=language)
+            symbol_rows = _merge_symbol_tendencies(
+                valid_view.symbol_tendencies(pattern_key),
+                calib_view.symbol_tendencies(pattern_key),
+            )[:10]
+            phase3_row = phase3.get(pattern_key, {})
+            benchmark_row = benchmark.get(pattern_key, {})
+
+            payload = {
+                "summary": {
+                    "pattern_key": pattern_key,
+                    "canonical_key": str(pattern_meta.get("canonical_key") or pattern_key),
+                    "bulkowski_name": pattern_meta.get("bulkowski_name"),
+                    "bulkowski_chapter": pattern_meta.get("bulkowski_chapter"),
+                    "generated_at": _utc_now_iso(),
+                    "language": language,
+                },
+                "reference": {
+                    "bulkowski_reference": _describe_reference(pattern_meta, spec, language=language),
+                    "detector_interpretation": _describe_detector(pattern_key, pattern_meta, spec, language=language),
+                    "variant_scope": _variant_scope(pattern_key, pattern_meta, meta, spec),
+                },
+                "governance": {
+                    "phase3_status": str(phase3_row.get("phase3_status") or "unknown"),
+                    "strategy_gate": str(phase3_row.get("strategy_gate") or "blocked"),
+                    "family_action": phase3_row.get("research_lane"),
+                },
+                "benchmark": {
+                    "benchmark_status": str(benchmark_row.get("benchmark_status") or "no_benchmark"),
+                    "bulkowski_baseline": benchmark_row.get("benchmark"),
+                    "vietnam_observed": {
+                        "valid": valid_metrics,
+                        "calib": calib_metrics,
+                    },
+                    "delta_notes": _delta_notes(benchmark_row, valid_metrics, calib_metrics, language=language),
+                },
+                "vietnam_prevalence": {
+                    "valid": {
+                        "detections": int(valid_metrics.get("detections") or 0),
+                        "evals": int(valid_metrics.get("evals") or 0),
+                        "symbol_count": int(valid_metrics.get("symbol_count") or 0),
+                    },
+                    "calib": {
+                        "detections": int(calib_metrics.get("detections") or 0),
+                        "evals": int(calib_metrics.get("evals") or 0),
+                        "symbol_count": int(calib_metrics.get("symbol_count") or 0),
+                    },
+                },
+                "vietnam_outcomes": {
+                    "valid": {
+                        "median_move_pct": valid_metrics.get("median_move_pct"),
+                        "failure_rate_5pct": valid_metrics.get("failure_rate_5pct"),
+                        "boundary_pct": valid_metrics.get("boundary_pct"),
+                        "target_hit_pct": valid_metrics.get("target_hit_pct"),
+                        "tbpb_pct": valid_metrics.get("tbpb_pct"),
+                    },
+                    "calib": {
+                        "median_move_pct": calib_metrics.get("median_move_pct"),
+                        "failure_rate_5pct": calib_metrics.get("failure_rate_5pct"),
+                        "boundary_pct": calib_metrics.get("boundary_pct"),
+                        "target_hit_pct": calib_metrics.get("target_hit_pct"),
+                        "tbpb_pct": calib_metrics.get("tbpb_pct"),
+                    },
+                },
+                "representative_cases": cases,
+                "symbol_tendencies": symbol_rows,
+            }
+
+            pattern_dir = out_dir / pattern_key
+            _write_json(pattern_dir / "chapter_payload.json", payload)
+            _write_text(pattern_dir / "chapter_core.md", _render_core(payload, language=language))
+            index_rows.append(
+                {
+                    "pattern_key": pattern_key,
+                    "bulkowski_name": pattern_meta.get("bulkowski_name"),
+                    "canonical_key": pattern_meta.get("canonical_key"),
+                    "bulkowski_chapter": pattern_meta.get("bulkowski_chapter"),
+                    "phase3_status": payload["governance"]["phase3_status"],
+                    "strategy_gate": payload["governance"]["strategy_gate"],
+                    "benchmark_status": payload["benchmark"]["benchmark_status"],
+                    "payload_path": str((pattern_dir / "chapter_payload.json").resolve()),
+                    "chapter_core_path": str((pattern_dir / "chapter_core.md").resolve()),
+                }
+            )
+    finally:
+        valid_view.close()
+        calib_view.close()
+
+    index_payload = {
+        "generated_at": _utc_now_iso(),
+        "language": language,
+        "pattern_count": len(index_rows),
+        "patterns": index_rows,
+    }
+    _write_json(out_dir / "index.json", index_payload)
+    lines = [
+        "# Chỉ mục monograph deterministic của Book V2" if _is_vi(language) else "# Book V2 Deterministic Monograph Index",
+        "",
+        f"- pattern_count: `{len(index_rows)}`",
+        f"- language: `{language}`",
+        "",
+        "| Chương | Pattern | Family | Phase 3 | Strategy | Benchmark |"
+        if _is_vi(language)
+        else "| Chapter | Pattern | Family | Phase 3 | Strategy | Benchmark |",
+        "|---:|---|---|---|---|---|",
+    ]
+    for row in index_rows:
+        lines.append(
+            f"| {row.get('bulkowski_chapter') or ''} | {row['pattern_key']} | {row.get('canonical_key') or ''} | "
+            f"{row['phase3_status']} | {row['strategy_gate']} | {row['benchmark_status']} |"
+        )
+    lines.append("")
+    _write_text(out_dir / "index.md", "\n".join(lines))
+    return index_payload
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Build deterministic Book v2 monograph payloads and core chapters.")
+    parser.add_argument("--valid-db", required=True, help="Final unified valid results DB")
+    parser.add_argument("--calib-db", required=True, help="Final unified calib results DB")
+    parser.add_argument("--phase3-pattern-matrix", required=True, help="Final phase3 pattern matrix JSON")
+    parser.add_argument("--benchmark-pattern-matrix", required=True, help="Final benchmark pattern matrix JSON")
+    parser.add_argument("--out-dir", required=True, help="Output directory for deterministic monographs")
+    parser.add_argument(
+        "--patterns",
+        default=None,
+        help="Optional comma-separated pattern list. Defaults to all bulkowski_53_strict patterns.",
+    )
+    parser.add_argument("--language", default="en", choices=["en", "vi"], help="Output language for the chapter core renderer")
+    args = parser.parse_args()
+
+    patterns = None
+    if args.patterns:
+        patterns = [part.strip() for part in str(args.patterns).split(",") if part.strip()]
+
+    build_monographs(
+        valid_db=Path(args.valid_db),
+        calib_db=Path(args.calib_db),
+        phase3_matrix=Path(args.phase3_pattern_matrix),
+        benchmark_matrix=Path(args.benchmark_pattern_matrix),
+        out_dir=Path(args.out_dir),
+        patterns=patterns,
+        language=str(args.language),
+    )
+
+
+if __name__ == "__main__":
+    main()
