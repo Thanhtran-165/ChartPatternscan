@@ -13,6 +13,7 @@ from scanner.digitized_pattern_engine import (
     InvertedCupWithHandleScanner,
     RoundingBottomsTopsScanner,
     ScallopFamilyScanner,
+    TriangleFamilyScanner,
     _HeadShouldersFamilyScanner,
 )
 
@@ -254,6 +255,34 @@ def test_scallop_ascending_inverted_review_gate_keeps_cleaner_case() -> None:
         {"variant_code": "scallops_ascending_inverted"},
     )
     assert ok is True
+
+
+def test_triangle_ascending_rejects_loose_upper_boundary() -> None:
+    scanner = TriangleFamilyScanner("triangles", {})
+    metrics = {
+        "upper_slope_deg": 1.8,
+        "lower_slope_deg": 9.0,
+        "apex_progress_pct": 62.0,
+        "compression_ratio": 0.36,
+        "boundary_fit_error_pct": 12.0,
+        "sequence_tag": "HLHLH",
+    }
+    assert scanner._resolve_variant(metrics) is None
+
+
+def test_triangle_ascending_keeps_tighter_flat_top_case() -> None:
+    scanner = TriangleFamilyScanner("triangles", {})
+    metrics = {
+        "upper_slope_deg": 0.8,
+        "lower_slope_deg": 9.0,
+        "apex_progress_pct": 62.0,
+        "compression_ratio": 0.36,
+        "boundary_fit_error_pct": 12.0,
+        "sequence_tag": "HLHLH",
+    }
+    resolved = scanner._resolve_variant(metrics)
+    assert resolved is not None
+    assert resolved["variant_code"] == "ascending"
 
 
 def test_rounding_top_uses_tighter_second_pass_gate() -> None:

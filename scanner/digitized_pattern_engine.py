@@ -1407,6 +1407,10 @@ class TriangleFamilyScanner(BaseDigitizedScanner):
         self.compression_min_ratio = 0.05
         self.compression_max_ratio = 0.85
         self.boundary_fit_error_max_pct = 30.0
+        self.ascending_upper_deg_max = 1.0
+        self.ascending_lower_deg_min = 7.0
+        self.ascending_progress_min_pct = 55.0
+        self.ascending_compression_max_ratio = 0.45
 
         high_first = copy.deepcopy(spec)
         high_first.setdefault("detection_signature", {})
@@ -1580,6 +1584,14 @@ class TriangleFamilyScanner(BaseDigitizedScanner):
         }
 
         if abs(upper_deg) <= self.flat_deg_max and lower_deg >= self.rising_deg_min:
+            if upper_deg > self.ascending_upper_deg_max:
+                return None
+            if lower_deg < self.ascending_lower_deg_min:
+                return None
+            if progress < self.ascending_progress_min_pct:
+                return None
+            if compression_ratio > self.ascending_compression_max_ratio:
+                return None
             conf = 76
             if abs(upper_deg) <= 1.5 and lower_deg >= 5.0:
                 conf += 8

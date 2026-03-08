@@ -52,9 +52,9 @@ TARGETED_PATCHES = [
             "triangles_descending",
             "triangles_symmetrical",
         ],
-        "valid_db": Path("scan_results/triangles_family_valid_refactor_20260306.sqlite"),
-        "calib_db": Path("scan_results/triangles_family_calib_refactor_20260306.sqlite"),
-        "checkpoint": "triangles_batch3_refactor",
+        "valid_db": Path("scan_results/triangles_family_pass3_valid_20260308.sqlite"),
+        "calib_db": Path("scan_results/triangles_family_pass3_calib_20260308.sqlite"),
+        "checkpoint": "triangles_pass3_tier2",
     },
     {
         "patterns": [
@@ -182,18 +182,18 @@ PHASE3_OVERRIDES: Dict[str, Dict[str, Any]] = {
     },
     "triangles_ascending": {
         "phase3_status": "research_only",
-        "manual_note": "Batch 3 restored credible ascending-triangle structure and removed the earlier retire decision, but the refactored branch still shows weak valid-side performance. Keep it in the research layer.",
-        "checkpoint_sources": ["triangles_batch3_refactor"],
+        "manual_note": "Tier 2 keeps the family refactor but adds a narrow ascending-only gate: flatter resistance, stronger rising support, and later-stage compression. The branch is materially cleaner now, but still remains research-only.",
+        "checkpoint_sources": ["triangles_pass3_tier2"],
     },
     "triangles_descending": {
         "phase3_status": "research_only",
-        "manual_note": "Descending triangles now look structurally defensible after Batch 3, but valid-side KPI drift remains too large for strategy use.",
-        "checkpoint_sources": ["triangles_batch3_refactor"],
+        "manual_note": "Descending triangles stay on the family-scanner baseline after Tier 2 review. The extra descending-side gate tested worse than the baseline, so the branch remains research-only without further tightening.",
+        "checkpoint_sources": ["triangles_pass3_tier2"],
     },
     "triangles_symmetrical": {
         "phase3_status": "research_only",
-        "manual_note": "Symmetrical triangles survived the family refactor with plausible geometry, yet the calibration-valid drift still blocks promotion beyond research.",
-        "checkpoint_sources": ["triangles_batch3_refactor"],
+        "manual_note": "Symmetrical triangles inherit the cleaner family split after the ascending-only Tier 2 pass, but the calibration-valid drift still blocks promotion beyond research.",
+        "checkpoint_sources": ["triangles_pass3_tier2"],
     },
     "scallops_ascending": {
         "phase3_status": "research_only",
@@ -228,6 +228,15 @@ PHASE3_OVERRIDES: Dict[str, Dict[str, Any]] = {
         "research_lane": "reference_only",
         "manual_note": "The original-space handle gate reduced inverted cups to only two valid-side survivors and zero calibration survivors. Move this branch to reference-only until a new bearish cup detector earns support.",
         "checkpoint_sources": ["post_phase3_cup_round2"],
+    },
+    "measured_move_down": {
+        "phase3_status": "research_only",
+        "manual_note": "Tier 2 review keeps measured-move down in research only. The current branch still comes from the shared derived scanner, and the digitized spec needs a dedicated family rewrite before another safe detector pass is justified.",
+    },
+    "measured_move_up": {
+        "phase3_status": "recalibrate",
+        "research_lane": "recalibration_backlog",
+        "manual_note": "Measured-move up remains a recalibration backlog item after Tier 2 review. The branch still relies on the shared derived scanner, and the digitized spec shows enough structural ambiguity that a proper family scanner should come before further threshold tuning.",
     },
     "broadening_wedges_ascending": {
         "phase3_status": "research_only",
@@ -278,6 +287,16 @@ PHASE3_OVERRIDES: Dict[str, Dict[str, Any]] = {
         "phase3_status": "research_only",
         "manual_note": "Triple tops now require flat, near-equal highs and balanced spacing. They remain noisier than bottoms, but still clear the bar for research-only use.",
         "checkpoint_sources": ["triple_family_batch10_refactor"],
+    },
+    "rectangle_bottoms": {
+        "phase3_status": "research_only",
+        "manual_note": "Rectangle bottoms stay frozen in the research lane after Tier 2 review. The branch only has two valid-side evals, so there is not enough evidence to justify detector expansion.",
+    },
+    "rectangle_tops": {
+        "phase3_status": "retire_from_strategy",
+        "strategy_gate": "retired",
+        "research_lane": "reference_only",
+        "manual_note": "Rectangle tops remain retired after Tier 2 review. The branch still has zero valid-side evals, so keeping it out of strategy work is the correct default.",
     },
     "flags": {
         "phase3_status": "research_only",
