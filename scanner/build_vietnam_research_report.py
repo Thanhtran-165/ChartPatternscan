@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sqlite3
 from collections import defaultdict
 from pathlib import Path
@@ -40,6 +41,112 @@ def _fmt(v: Any) -> str:
     if isinstance(v, float):
         return f"{v:.2f}"
     return str(v)
+
+
+def _count_evals(*buckets: List[float]) -> int:
+    return max((len(bucket) for bucket in buckets), default=0)
+
+
+_PHASE3_LABELS_VI = {
+    "candidate_after_review": "ứng viên sau review",
+    "research_only": "chỉ nghiên cứu",
+    "recalibrate": "cần hiệu chỉnh",
+    "retire_from_strategy": "loại khỏi chiến lược",
+}
+
+_PHASE3_SHORT_LABELS_VI = {
+    "candidate_after_review": "ứng viên",
+    "research_only": "nghiên cứu",
+    "recalibrate": "hiệu chỉnh",
+    "retire_from_strategy": "loại bỏ",
+}
+
+_STRATEGY_LABELS_VI = {
+    "candidate": "ứng viên",
+    "watchlist": "theo dõi",
+    "blocked": "chặn",
+}
+
+_BENCHMARK_LABELS_VI = {
+    "materially_weaker": "yếu hơn đáng kể",
+    "mixed": "pha trộn",
+    "no_benchmark": "không có benchmark",
+    "roughly_aligned": "tương đối sát",
+    "sparse": "mẫu thưa",
+}
+
+_BENCHMARK_SHORT_LABELS_VI = {
+    "materially_weaker": "yếu",
+    "mixed": "pha trộn",
+    "no_benchmark": "không chuẩn",
+    "roughly_aligned": "sát",
+    "sparse": "thưa",
+}
+
+
+def _map_vi(value: Any, mapping: Dict[str, str]) -> str:
+    key = str(value or "").strip()
+    return mapping.get(key, key.replace("_", " "))
+
+
+def _format_counts(d: Dict[str, Any], *, language: str) -> str:
+    items = []
+    for key, value in d.items():
+        label = _map_vi(key, _PHASE3_LABELS_VI if "candidate" in key or "research" in key or "recalibrate" in key or "retire" in key else _BENCHMARK_LABELS_VI) if _is_vi(language) else key
+        items.append(f"{label}: {value}")
+    return "; ".join(items)
+
+
+def _human_label(value: Any) -> str:
+    text = str(value or "").strip().replace("_", " ")
+    if not text:
+        return ""
+    return re.sub(r"\s+", " ", text)
+
+
+def _variant_suffix(pattern_key: str, canonical_key: str) -> str:
+    prefix = f"{canonical_key}_"
+    if not pattern_key.startswith(prefix):
+        return ""
+    tail = pattern_key[len(prefix) :]
+    if not tail:
+        return ""
+    parts = [p for p in tail.split("_") if p]
+    mapped = []
+    for part in parts:
+        low = part.lower()
+        if low == "adam":
+            mapped.append("A")
+        elif low == "eve":
+            mapped.append("E")
+        else:
+            mapped.append(part.capitalize())
+    if mapped and all(len(x) == 1 for x in mapped):
+        return "".join(mapped)
+    return " ".join(mapped)
+
+
+def _display_pattern(row: Dict[str, Any], *, language: str) -> str:
+    pattern_key = str(row.get("pattern_key") or "")
+    canonical_key = str(row.get("canonical_key") or "")
+    base = _human_label(row.get("bulkowski_name") or canonical_key or pattern_key)
+    variant = _variant_suffix(pattern_key, canonical_key)
+    if variant and variant not in base:
+        return f"{base} {variant}"
+    return base
+
+
+def _display_family(row: Dict[str, Any], *, language: str) -> str:
+    family = str(row.get("canonical_key") or row.get("family_label") or "")
+    return _human_label(family)
+
+
+def _short_phase3(value: Any, *, language: str) -> str:
+    return _map_vi(value, _PHASE3_SHORT_LABELS_VI) if _is_vi(language) else str(value or "")
+
+
+def _short_benchmark(value: Any, *, language: str) -> str:
+    return _map_vi(value, _BENCHMARK_SHORT_LABELS_VI) if _is_vi(language) else str(value or "")
 
 
 def _is_vi(language: str) -> bool:
@@ -128,7 +235,7 @@ def _pattern_metrics(db_path: Path) -> Dict[str, Dict[str, Any]]:
         boundary = buckets.get(pat, {}).get("boundary", [])
         target = buckets.get(pat, {}).get("target", [])
         tbpb = buckets.get(pat, {}).get("tbpb", [])
-        cur["evals"] = len(moves) or max(len(boundary), len(target), len(tbpb))
+        cur["evals"] = _count_evals(moves, boundary, target, tbpb)
         cur["median_move_pct"] = float(median(moves)) if moves else None
         cur["failure_rate_5pct"] = (sum(1.0 for x in moves if float(x) < 5.0) / len(moves) * 100.0) if moves else None
         cur["boundary_pct"] = (sum(boundary) / len(boundary) * 100.0) if boundary else None
@@ -254,32 +361,30 @@ def _render(payload: Dict[str, Any], *, language: str) -> str:
     lines.append("")
     lines.append(f"- pattern_count: `{summary['pattern_count']}`")
     lines.append(f"- family_count: `{summary['family_count']}`")
-    lines.append(f"- phase3_status_counts: `{summary['phase3_status_counts']}`")
-    lines.append(f"- benchmark_status_counts: `{summary['benchmark_status_counts']}`")
+    lines.append(f"- phase3_status_counts: `{_format_counts(summary['phase3_status_counts'], language=language)}`")
+    lines.append(f"- benchmark_status_counts: `{_format_counts(summary['benchmark_status_counts'], language=language)}`")
     lines.append(f"- language: `{language}`")
     lines.append("")
 
     lines.append("## Candidate / Watchlist" if not vi else "## Candidate / Watchlist")
     lines.append("")
     lines.append(
-        "| Pattern | Family | Phase 3 | Strategy | Valid evals | Valid move | Fail<5 | Target |"
+        "| Pattern | Phase 3 | Strategy | Valid evals | Valid move | Target |"
         if not vi
-        else "| Pattern | Family | Phase 3 | Strategy | Valid evals | Median move | Fail<5 | Target |"
+        else "| Pattern | Phase 3 | Strategy | Valid evals | Median move | Target |"
     )
-    lines.append("|---|---|---|---|---:|---:|---:|---:|")
+    lines.append("|---|---|---|---:|---:|---:|")
     for row in payload["candidate_and_watchlist"]:
         valid = row["valid"]
         lines.append(
             "| "
             + " | ".join(
                 [
-                    str(row["pattern_key"]),
-                    str(row["canonical_key"]),
-                    str(row["phase3_status"]),
-                    str(row["strategy_gate"]),
+                    _display_pattern(row, language=language),
+                    _short_phase3(row["phase3_status"], language=language) if vi else str(row["phase3_status"]),
+                    _map_vi(row["strategy_gate"], _STRATEGY_LABELS_VI) if vi else str(row["strategy_gate"]),
                     str(int(valid.get("evals") or 0)),
                     _fmt(valid.get("median_move_pct")),
-                    _fmt(valid.get("failure_rate_5pct")),
                     _fmt(valid.get("target_hit_pct")),
                 ]
             )
@@ -290,25 +395,22 @@ def _render(payload: Dict[str, Any], *, language: str) -> str:
     lines.append("## Các pattern phổ biến tại Việt Nam (theo valid evals)" if vi else "## Common Patterns In Vietnam (By Valid Evals)")
     lines.append("")
     lines.append(
-        "| Pattern | Family | Valid evals | Symbols | Move | Fail<5 | Target | Benchmark |"
+        "| Pattern | Valid evals | Symbols | Move | Benchmark |"
         if not vi
-        else "| Pattern | Family | Valid evals | Số mã | Median move | Fail<5 | Target | Benchmark |"
+        else "| Pattern | Valid evals | Số mã | Median move | Benchmark |"
     )
-    lines.append("|---|---|---:|---:|---:|---:|---:|---|")
+    lines.append("|---|---:|---:|---:|---|")
     for row in payload["top_patterns_by_valid_evals"]:
         valid = row["valid"]
         lines.append(
             "| "
             + " | ".join(
                 [
-                    str(row["pattern_key"]),
-                    str(row["canonical_key"]),
+                    _display_pattern(row, language=language),
                     str(int(valid.get("evals") or 0)),
                     str(int(valid.get("eval_symbol_count") or 0)),
                     _fmt(valid.get("median_move_pct")),
-                    _fmt(valid.get("failure_rate_5pct")),
-                    _fmt(valid.get("target_hit_pct")),
-                    str(row.get("benchmark_status")),
+                    _short_benchmark(row.get("benchmark_status"), language=language) if vi else str(row.get("benchmark_status")),
                 ]
             )
             + " |"
@@ -318,19 +420,18 @@ def _render(payload: Dict[str, Any], *, language: str) -> str:
     lines.append("## Các pattern phổ biến tại Việt Nam (theo độ phủ mã)" if vi else "## Common Patterns In Vietnam (By Symbol Coverage)")
     lines.append("")
     lines.append(
-        "| Pattern | Family | Symbols | Detections | Valid evals | Move |"
+        "| Pattern | Symbols | Detections | Valid evals | Move |"
         if not vi
-        else "| Pattern | Family | Số mã | Số phát hiện | Valid evals | Median move |"
+        else "| Pattern | Số mã | Số phát hiện | Valid evals | Median move |"
     )
-    lines.append("|---|---|---:|---:|---:|---:|")
+    lines.append("|---|---:|---:|---:|---:|")
     for row in payload["top_patterns_by_symbol_count"]:
         valid = row["valid"]
         lines.append(
             "| "
             + " | ".join(
                 [
-                    str(row["pattern_key"]),
-                    str(row["canonical_key"]),
+                    _display_pattern(row, language=language),
                     str(int(valid.get("symbol_count") or 0)),
                     str(int(valid.get("detections") or 0)),
                     str(int(valid.get("evals") or 0)),
@@ -344,24 +445,22 @@ def _render(payload: Dict[str, Any], *, language: str) -> str:
     lines.append("## Các pattern mạnh hơn khi bỏ gaps" if vi else "## Stronger Patterns Excluding Gaps")
     lines.append("")
     lines.append(
-        "| Pattern | Family | Valid evals | Move | Fail<5 | Target | Strategy |"
+        "| Pattern | Valid evals | Move | Target | Strategy |"
         if not vi
-        else "| Pattern | Family | Valid evals | Median move | Fail<5 | Target | Strategy |"
+        else "| Pattern | Valid evals | Median move | Target | Strategy |"
     )
-    lines.append("|---|---|---:|---:|---:|---:|---|")
+    lines.append("|---|---:|---:|---:|---|")
     for row in payload["top_patterns_by_strength_ex_gaps"]:
         valid = row["valid"]
         lines.append(
             "| "
             + " | ".join(
                 [
-                    str(row["pattern_key"]),
-                    str(row["canonical_key"]),
+                    _display_pattern(row, language=language),
                     str(int(valid.get("evals") or 0)),
                     _fmt(valid.get("median_move_pct")),
-                    _fmt(valid.get("failure_rate_5pct")),
                     _fmt(valid.get("target_hit_pct")),
-                    str(row.get("strategy_gate")),
+                    _map_vi(row.get("strategy_gate"), _STRATEGY_LABELS_VI) if vi else str(row.get("strategy_gate")),
                 ]
             )
             + " |"
@@ -371,21 +470,19 @@ def _render(payload: Dict[str, Any], *, language: str) -> str:
     lines.append("## Mức độ phổ biến theo family" if vi else "## Family Prevalence")
     lines.append("")
     lines.append(
-        "| Family | Pattern count | Valid detections | Valid evals | Calib detections | Calib evals |"
+        "| Family | Pattern count | Valid evals | Calib evals |"
         if not vi
-        else "| Family | Số pattern | Valid detections | Valid evals | Calib detections | Calib evals |"
+        else "| Family | Số pattern | Valid evals | Calib evals |"
     )
-    lines.append("|---|---:|---:|---:|---:|---:|")
+    lines.append("|---|---:|---:|---:|")
     for row in payload["family_prevalence"]:
         lines.append(
             "| "
             + " | ".join(
                 [
-                    str(row["canonical_key"]),
+                    _display_family(row, language=language),
                     str(int(row["pattern_count"])),
-                    str(int(row["valid_detections"])),
                     str(int(row["valid_evals"])),
-                    str(int(row["calib_detections"])),
                     str(int(row["calib_evals"])),
                 ]
             )

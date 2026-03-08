@@ -281,6 +281,17 @@ def _render_final_chapter(core_md: str, commentary_md: str, *, language: str) ->
     return core + "\n\n" + heading + "\n\n" + commentary + "\n"
 
 
+def _normalize_market_report_md(market_report_md: str) -> str:
+    lines = market_report_md.strip().splitlines()
+    while lines and not lines[0].strip():
+        lines.pop(0)
+    if lines and lines[0].startswith("# "):
+        lines.pop(0)
+        while lines and not lines[0].strip():
+            lines.pop(0)
+    return "\n".join(lines).strip()
+
+
 def _render_book(
     *,
     title: str,
@@ -323,7 +334,7 @@ def _render_book(
     if market_report_md:
         lines.append("# Tổng quan thị trường Việt Nam" if vi else "# Vietnam Market Overview")
         lines.append("")
-        lines.append(market_report_md.strip())
+        lines.append(_normalize_market_report_md(market_report_md))
         lines.append("")
         lines.append("\\newpage")
         lines.append("")
@@ -360,10 +371,12 @@ def _try_build_pdf(*, book_md_path: Path, out_pdf_path: Path, mainfont: Optional
                 "\\usepackage{etoolbox}",
                 "\\sloppy",
                 "\\setlength{\\emergencystretch}{3em}",
-                "\\setlength{\\tabcolsep}{3pt}",
+                "\\setlength{\\tabcolsep}{2pt}",
                 "\\renewcommand{\\arraystretch}{0.9}",
-                "\\AtBeginEnvironment{longtable}{\\small}",
-                "\\AtBeginEnvironment{table}{\\small}",
+                "\\setlength{\\LTleft}{0pt}",
+                "\\setlength{\\LTright}{0pt}",
+                "\\AtBeginEnvironment{longtable}{\\footnotesize}",
+                "\\AtBeginEnvironment{table}{\\footnotesize}",
                 "",
             ]
         )

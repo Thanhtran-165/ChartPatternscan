@@ -55,6 +55,151 @@ def _fmt(v: Any) -> str:
     return str(v)
 
 
+_PATTERN_TYPE_LABELS_VI = {
+    "reversal_bullish": "đảo chiều tăng",
+    "reversal_bearish": "đảo chiều giảm",
+    "continuation_bullish": "tiếp diễn tăng",
+    "continuation_bearish": "tiếp diễn giảm",
+    "continuation_both": "tiếp diễn hai chiều",
+    "indeterminate": "không xác định",
+}
+
+_BREAKOUT_DIRECTION_LABELS_VI = {
+    "up": "tăng",
+    "down": "giảm",
+    "both": "hai chiều",
+    "varies": "phụ thuộc bối cảnh",
+    "depends_on_prior_trend": "phụ thuộc xu hướng trước mẫu",
+}
+
+_BENCHMARK_STATUS_LABELS_VI = {
+    "roughly_aligned": "tương đối sát mốc tham chiếu",
+    "mixed": "kết quả pha trộn",
+    "materially_weaker": "yếu hơn đáng kể so với tham chiếu",
+    "sparse": "mẫu còn thưa",
+    "no_benchmark": "chưa có benchmark đối chiếu trực tiếp",
+}
+
+_PHASE3_STATUS_LABELS_VI = {
+    "candidate_after_review": "ứng viên sau review",
+    "research_only": "chỉ dùng cho nghiên cứu",
+    "recalibrate": "cần hiệu chỉnh thêm",
+    "retire_from_strategy": "loại khỏi lớp chiến lược",
+}
+
+_STRATEGY_GATE_LABELS_VI = {
+    "candidate": "ứng viên chiến lược",
+    "watchlist": "theo dõi thêm",
+    "blocked": "chưa mở cho chiến lược",
+}
+
+_RESEARCH_LANE_LABELS_VI = {
+    "benchmark_candidate": "ứng viên benchmark/strategy",
+    "active_research": "đang trong lớp nghiên cứu hoạt động",
+    "recalibration_backlog": "nằm trong backlog hiệu chỉnh",
+    "reference_only": "chỉ giữ làm tham chiếu",
+}
+
+_VARIANT_LABELS_VI = {
+    "standard": "chuẩn",
+    "extended": "mở rộng",
+    "five_point": "năm điểm",
+    "ascending_triangle": "tam giác tăng",
+    "descending_triangle": "tam giác giảm",
+    "symmetrical_triangle": "tam giác cân",
+    "common_gap": "gap thường",
+    "continuation_gap": "gap tiếp diễn",
+    "exhaustion_gap": "gap kiệt sức",
+    "breakaway_gap": "gap phá vỡ",
+    "common_gap_up": "gap thường tăng",
+    "common_gap_down": "gap thường giảm",
+    "continuation_gap_up": "gap tiếp diễn tăng",
+    "continuation_gap_down": "gap tiếp diễn giảm",
+    "exhaustion_gap_up": "gap kiệt sức tăng",
+    "exhaustion_gap_down": "gap kiệt sức giảm",
+    "breakaway_gap_up": "gap phá vỡ tăng",
+    "breakaway_gap_down": "gap phá vỡ giảm",
+}
+
+_PRIOR_DESC_LABELS_VI = {
+    "Must have prior downtrend before pattern formation": "cần có xu hướng giảm trước khi mẫu hình hình thành",
+    "Must have prior uptrend before pattern formation": "cần có xu hướng tăng trước khi mẫu hình hình thành",
+    "Must have downtrend of at least 2 months with 15%+ decline": "cần có xu hướng giảm ít nhất 2 tháng với mức giảm từ 15% trở lên",
+    "Must have uptrend of at least 2 months with 15%+ advance": "cần có xu hướng tăng ít nhất 2 tháng với mức tăng từ 15% trở lên",
+    "Prior trend can be up or down": "xu hướng trước mẫu có thể tăng hoặc giảm",
+    "Prior trend determines expected breakout direction but not strictly required": "xu hướng trước mẫu giúp định hướng breakout kỳ vọng nhưng không bắt buộc tuyệt đối",
+    "Prior trend requirements vary significantly by gap type": "yêu cầu xu hướng trước mẫu thay đổi theo từng loại gap",
+}
+
+_BASELINE_METRIC_LABELS_VI = {
+    "median_move_pct": "Move TB",
+    "average_rise_pct": "Rise TB",
+    "failure_rate_5pct": "Fail<5",
+    "tbpb_pct": "TB/PB",
+    "pullback_rate_pct": "Pullback",
+}
+
+_CASE_LABELS_VI = {
+    "best_case": "tốt nhất",
+    "typical_case": "điển hình",
+    "stress_case": "stress",
+    "calib_reference": "đối chiếu calib",
+}
+
+_CASE_LABELS_EN = {
+    "best_case": "best",
+    "typical_case": "typical",
+    "stress_case": "stress",
+    "calib_reference": "calib ref",
+}
+
+
+def _count_evals(*buckets: List[float]) -> int:
+    return max((len(bucket) for bucket in buckets), default=0)
+
+
+def _map_vi(value: Any, mapping: Dict[str, str]) -> str:
+    key = str(value or "").strip()
+    return mapping.get(key, key.replace("_", " "))
+
+
+def _human_label(value: Any) -> str:
+    text = str(value or "").strip().replace("_", " ")
+    return " ".join(part for part in text.split())
+
+
+def _format_variant_scope(scope: Sequence[str], *, language: str) -> str:
+    items = [str(item) for item in scope if str(item).strip()]
+    if not items:
+        return "standard" if not _is_vi(language) else "chuẩn"
+    if _is_vi(language):
+        return ", ".join(_map_vi(item, _VARIANT_LABELS_VI) for item in items)
+    return ", ".join(items)
+
+
+def _display_variant(value: Any, *, language: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    return _map_vi(text, _VARIANT_LABELS_VI) if _is_vi(language) else text.replace("_", " ")
+
+
+def _display_case_label(value: Any, *, language: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if _is_vi(language):
+        return _CASE_LABELS_VI.get(text, text.replace("_", " "))
+    return _CASE_LABELS_EN.get(text, text.replace("_", " "))
+
+
+def _prior_description_vi(description: Optional[str]) -> str:
+    if not description:
+        return "có điều kiện xu hướng trước mẫu theo spec digitized"
+    desc = str(description).strip()
+    return _PRIOR_DESC_LABELS_VI.get(desc, "có điều kiện xu hướng trước mẫu theo spec digitized")
+
+
 def _latest_run_id(conn: sqlite3.Connection) -> str:
     row = conn.execute("SELECT run_id FROM scanner_runs ORDER BY created_at DESC LIMIT 1").fetchone()
     if not row:
@@ -126,18 +271,26 @@ def _describe_reference(meta: Dict[str, Any], spec: Optional[Dict[str, Any]], *,
         breakout = spec.get("breakout_confirmation") or {}
         seq = sig.get("sequence_description")
         if pattern_type:
-            parts.append(f"loại digitized: `{pattern_type}`" if vi else f"digitized type: `{pattern_type}`")
+            parts.append(
+                f"thuộc nhóm `{_map_vi(pattern_type, _PATTERN_TYPE_LABELS_VI)}`"
+                if vi
+                else f"digitized type: `{pattern_type}`"
+            )
         if seq:
-            parts.append(f"chuỗi hình thái: `{seq}`" if vi else f"sequence: `{seq}`")
+            parts.append(
+                "được mô tả bằng chuỗi pivot trong spec digitized của mẫu này"
+                if vi
+                else f"sequence: `{seq}`"
+            )
         if prior.get("description"):
             parts.append(
-                f"xu hướng trước mẫu: {prior.get('description')}"
+                f"xu hướng trước mẫu: {_prior_description_vi(prior.get('description'))}"
                 if vi
                 else f"prior trend: {prior.get('description')}"
             )
         if breakout.get("breakout_direction"):
             parts.append(
-                f"hướng breakout kỳ vọng: `{breakout.get('breakout_direction')}`"
+                f"hướng breakout kỳ vọng: `{_map_vi(breakout.get('breakout_direction'), _BREAKOUT_DIRECTION_LABELS_VI)}`"
                 if vi
                 else f"expected breakout direction: `{breakout.get('breakout_direction')}`"
             )
@@ -160,14 +313,14 @@ def _describe_detector(pattern_key: str, meta: Dict[str, Any], spec: Optional[Di
     spec_key = meta.get("spec_key")
     vi = _is_vi(language)
     parts = [
-        f"Dự án này ánh xạ `{pattern_key}` vào family chuẩn `{canonical}`"
+        f"Dự án này ánh xạ mẫu hình này vào family chuẩn `{_human_label(canonical)}`"
         if vi
         else f"This project maps `{pattern_key}` to canonical family `{canonical}`"
     ]
     if spec_key:
-        parts.append(f"spec: `{spec_key}`")
+        parts.append("được triển khai bằng spec digitized tương ứng của family này" if vi else f"spec: `{spec_key}`")
     if meta.get("variant") is not None:
-        parts.append(f"biến thể: `{meta.get('variant')}`" if vi else f"variant: `{meta.get('variant')}`")
+        parts.append(f"biến thể: `{_map_vi(meta.get('variant'), _VARIANT_LABELS_VI)}`" if vi else f"variant: `{meta.get('variant')}`")
 
     if isinstance(spec, dict):
         geom = spec.get("geometry_constraints") or {}
@@ -192,7 +345,7 @@ def _describe_detector(pattern_key: str, meta: Dict[str, Any], spec: Optional[Di
             volume_required = breakout.get("volume_required")
             if vi:
                 volume_text = "có yêu cầu xác nhận khối lượng" if volume_required else "không bắt buộc xác nhận khối lượng"
-                parts.append(f"hướng breakout `{breakout.get('breakout_direction')}` {volume_text}")
+                parts.append(f"hướng breakout `{_map_vi(breakout.get('breakout_direction'), _BREAKOUT_DIRECTION_LABELS_VI)}` {volume_text}")
             else:
                 volume_text = "with volume confirmation required" if volume_required else "without mandatory volume confirmation"
                 parts.append(f"breakout direction `{breakout.get('breakout_direction')}` {volume_text}")
@@ -290,7 +443,7 @@ class SplitView:
                     bucket.append(val)
         return {
             "detections": len(det_rows),
-            "evals": len(eval_rows),
+            "evals": _count_evals(moves, boundary, target, tbpb),
             "symbol_count": len(symbols),
             "eval_symbol_count": len(eval_symbols),
             "median_move_pct": float(median(moves)) if moves else None,
@@ -408,14 +561,24 @@ def _case_note(row: Dict[str, Any], *, language: str) -> str:
     if row.get("target_achieved_intraday") == 1:
         parts.append("đạt target" if vi else "target hit")
     if row.get("boundary_invalidated") == 1:
-        parts.append("vi phạm boundary" if vi else "boundary invalidated")
+        parts.append("vi phạm boundary" if vi else "boundary break")
     move = _safe_float(row.get("max_favorable_excursion_pct"))
     if move is not None:
         parts.append(f"MFE `{move:.2f}%`")
     adverse = _safe_float(row.get("max_adverse_excursion_pct"))
     if adverse is not None:
         parts.append(f"MAE `{adverse:.2f}%`")
-    return ", ".join(parts)
+    return "; ".join(parts)
+
+
+def _case_outcome(row: Dict[str, Any], *, language: str) -> str:
+    vi = _is_vi(language)
+    flags: List[str] = []
+    if row.get("target_achieved_intraday") == 1:
+        flags.append("target" if vi else "target")
+    if row.get("boundary_invalidated") == 1:
+        flags.append("boundary" if vi else "boundary")
+    return "/".join(flags)
 
 
 def _pick_case(
@@ -439,7 +602,10 @@ def _pick_case(
             "breakout_date": row.get("breakout_date"),
             "pattern_variant": row.get("variant_code"),
             "quality_label": label,
-            "note": f"{rule}; {_case_note(row, language=language)}".strip("; "),
+            "note": _case_note(row, language=language),
+            "outcome": _case_outcome(row, language=language),
+            "mfe_pct": _safe_float(row.get("max_favorable_excursion_pct")),
+            "mae_pct": _safe_float(row.get("max_adverse_excursion_pct")),
             "image_path": None,
         }
     return None
@@ -545,16 +711,6 @@ def _select_cases(valid_rows: List[Dict[str, Any]], calib_rows: List[Dict[str, A
     if picked is not None:
         out.append(picked)
 
-    for row in out:
-        if row.get("note"):
-            # Replace English case-note suffixes with localized terms when needed.
-            row["note"] = str(row["note"])
-            if vi:
-                row["note"] = (
-                    row["note"]
-                    .replace("target hit", "đạt target")
-                    .replace("boundary invalidated", "vi phạm boundary")
-                )
     return out
 
 
@@ -606,17 +762,27 @@ def _render_core(payload: Dict[str, Any], *, language: str) -> str:
     cases = payload["representative_cases"]
     symbols = payload["symbol_tendencies"]
     vi = _is_vi(language)
+    benchmark_label = _map_vi(benchmark["benchmark_status"], _BENCHMARK_STATUS_LABELS_VI) if vi else benchmark["benchmark_status"]
+    phase3_label = _map_vi(governance["phase3_status"], _PHASE3_STATUS_LABELS_VI) if vi else governance["phase3_status"]
+    strategy_label = _map_vi(governance["strategy_gate"], _STRATEGY_GATE_LABELS_VI) if vi else governance["strategy_gate"]
+    family_action = governance.get("family_action")
+    family_action_label = _map_vi(family_action, _RESEARCH_LANE_LABELS_VI) if (vi and family_action) else family_action
 
     lines: List[str] = []
     lines.append(f"# {summary['bulkowski_name'] or summary['pattern_key']}")
     lines.append("")
-    lines.append(f"- pattern_key: `{summary['pattern_key']}`")
-    lines.append(f"- canonical_key: `{summary['canonical_key']}`")
-    lines.append(f"- bulkowski_chapter: `{summary.get('bulkowski_chapter')}`")
-    lines.append(f"- phase3_status: `{governance['phase3_status']}`")
-    lines.append(f"- strategy_gate: `{governance['strategy_gate']}`")
-    lines.append(f"- benchmark_status: `{benchmark['benchmark_status']}`")
-    lines.append(f"- language: `{language}`")
+    if vi:
+        lines.append(
+            f"*Chương `{summary.get('bulkowski_chapter')}`, family `{_human_label(summary['canonical_key'])}`, "
+            f"trạng thái nghiên cứu `{phase3_label}`, cửa chiến lược `{strategy_label}`, "
+            f"mức benchmark `{benchmark_label}`.*"
+        )
+    else:
+        lines.append(
+            f"*Chapter `{summary.get('bulkowski_chapter')}`, family `{summary['canonical_key']}`, "
+            f"research status `{phase3_label}`, strategy gate `{strategy_label}`, "
+            f"benchmark status `{benchmark_label}`.*"
+        )
     lines.append("")
 
     lines.append("## Định nghĩa mẫu hình" if vi else "## Pattern Definition")
@@ -625,12 +791,16 @@ def _render_core(payload: Dict[str, Any], *, language: str) -> str:
     lines.append("")
     lines.append(reference["detector_interpretation"])
     lines.append("")
-    lines.append(f"- phạm vi biến thể: `{reference['variant_scope']}`" if vi else f"- variant_scope: `{reference['variant_scope']}`")
+    lines.append(
+        f"- phạm vi biến thể: `{_format_variant_scope(reference['variant_scope'], language=language)}`"
+        if vi
+        else f"- variant_scope: `{_format_variant_scope(reference['variant_scope'], language=language)}`"
+    )
     lines.append("")
 
     lines.append("## Mức độ phổ biến tại Việt Nam" if vi else "## Vietnam Prevalence")
     lines.append("")
-    lines.append("| Split | Detections | Evals | Symbols |" if not vi else "| Split | Số phát hiện | Số eval | Số mã |")
+    lines.append("| Split | Detect | Eval | Symbols |" if not vi else "| Split | Phát hiện | Eval | Mã |")
     lines.append("|---|---:|---:|---:|")
     for split in ("valid", "calib"):
         row = prevalence[split]
@@ -655,22 +825,23 @@ def _render_core(payload: Dict[str, Any], *, language: str) -> str:
 
     lines.append("## So với benchmark Bulkowski" if vi else "## Benchmark Versus Bulkowski")
     lines.append("")
-    lines.append(f"- benchmark_status: `{benchmark['benchmark_status']}`")
+    lines.append(f"- mức benchmark hiện tại: `{benchmark_label}`" if vi else f"- benchmark_status: `{benchmark_label}`")
     baseline = benchmark.get("bulkowski_baseline") or {}
+    baseline_rows: List[Tuple[str, str]] = []
     if isinstance(baseline, dict) and baseline:
+        for key in ("median_move_pct", "average_rise_pct", "failure_rate_5pct", "tbpb_pct", "pullback_rate_pct"):
+            if baseline.get(key) is not None:
+                label = _BASELINE_METRIC_LABELS_VI.get(key, key) if vi else key
+                baseline_rows.append((label, _fmt(_safe_float(baseline.get(key)))))
+    if baseline_rows:
         lines.append("")
         lines.append("| Chỉ số baseline | Giá trị |" if vi else "| Baseline metric | Value |")
         lines.append("|---|---:|")
-        for key in ("median_move_pct", "average_rise_pct", "failure_rate_5pct", "tbpb_pct", "pullback_rate_pct"):
-            if baseline.get(key) is not None:
-                lines.append(f"| {key} | {_fmt(_safe_float(baseline.get(key)))} |")
-        if baseline.get("source_spec"):
-            lines.append("")
-            lines.append(
-                f"- nguồn spec benchmark: `{baseline.get('source_spec')}`"
-                if vi
-                else f"- benchmark_source_spec: `{baseline.get('source_spec')}`"
-            )
+        for key, value in baseline_rows:
+            lines.append(f"| {key} | {value} |")
+        lines.append("")
+    elif vi and benchmark["benchmark_status"] == "no_benchmark":
+        lines.append("- chưa có benchmark số liệu trực tiếp để đối chiếu cho mẫu này")
         lines.append("")
     for note in benchmark.get("delta_notes", []):
         lines.append(f"- {note}")
@@ -680,15 +851,15 @@ def _render_core(payload: Dict[str, Any], *, language: str) -> str:
     lines.append("")
     if cases:
         lines.append(
-            "| Nhãn | Split | Mã | Ngày breakout | Biến thể | Ghi chú |"
+            "| Nhãn | Split | Mã | Ngày | KQ | MFE | MAE |"
             if vi
-            else "| Label | Split | Symbol | Breakout date | Variant | Note |"
+            else "| Label | Split | Symbol | Date | Outcome | MFE | MAE |"
         )
-        lines.append("|---|---|---|---|---|---|")
+        lines.append("|---|---|---|---|---|---:|---:|")
         for row in cases:
             lines.append(
-                f"| {row.get('quality_label') or ''} | {row.get('split') or ''} | {row.get('symbol') or ''} | "
-                f"{row.get('breakout_date') or ''} | {row.get('pattern_variant') or ''} | {row.get('note') or ''} |"
+                f"| {_display_case_label(row.get('quality_label'), language=language)} | {row.get('split') or ''} | {row.get('symbol') or ''} | "
+                f"{row.get('breakout_date') or ''} | {row.get('outcome') or ''} | {_fmt(row.get('mfe_pct'))} | {_fmt(row.get('mae_pct'))} |"
             )
     else:
         lines.append("Không tìm thấy mẫu evaluated đại diện trong final snapshot." if vi else "No representative evaluated cases were found in the final snapshot.")
@@ -698,14 +869,14 @@ def _render_core(payload: Dict[str, Any], *, language: str) -> str:
     lines.append("")
     if symbols:
         lines.append(
-            "| Mã | Số phát hiện | Số eval | Median move | Target |"
+            "| Mã | Eval | Median move | Target |"
             if vi
-            else "| Symbol | Detections | Evals | Median move | Target |"
+            else "| Symbol | Evals | Median move | Target |"
         )
-        lines.append("|---|---:|---:|---:|---:|")
+        lines.append("|---|---:|---:|---:|")
         for row in symbols[:10]:
             lines.append(
-                f"| {row['symbol']} | {int(row['detections'])} | {int(row['evals'])} | "
+                f"| {row['symbol']} | {int(row['evals'])} | "
                 f"{_fmt(row.get('median_move_pct'))} | {_fmt(row.get('target_hit_pct'))} |"
             )
     else:
@@ -714,10 +885,10 @@ def _render_core(payload: Dict[str, Any], *, language: str) -> str:
 
     lines.append("## Trạng thái nghiên cứu hiện tại" if vi else "## Current Research Status")
     lines.append("")
-    lines.append(f"- phase3_status: `{governance['phase3_status']}`")
-    lines.append(f"- strategy_gate: `{governance['strategy_gate']}`")
-    if governance.get("family_action"):
-        lines.append(f"- research_lane: `{governance['family_action']}`")
+    lines.append(f"- trạng thái phase 3: `{phase3_label}`" if vi else f"- phase3_status: `{phase3_label}`")
+    lines.append(f"- cửa chiến lược: `{strategy_label}`" if vi else f"- strategy_gate: `{strategy_label}`")
+    if family_action_label:
+        lines.append(f"- lớp nghiên cứu: `{family_action_label}`" if vi else f"- research_lane: `{family_action_label}`")
     lines.append("")
 
     return "\n".join(lines).strip() + "\n"
