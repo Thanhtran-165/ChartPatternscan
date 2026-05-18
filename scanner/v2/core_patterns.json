@@ -1,0 +1,853 @@
+{
+  "version": "scanner_v2_core_provenance_seed_2026_05_15",
+  "source_document": {
+    "title": "Encyclopedia of Chart Patterns",
+    "edition": "2nd",
+    "author": "Thomas N. Bulkowski",
+    "local_reference": "references/encyclopedia-of-chart-patterns-2nbsped-9786468600-3175723993-9780471668268-0471668265_compress.pdf"
+  },
+  "official_policy": {
+    "no_provenance_no_official": true,
+    "unsupported_rule_type_blocks_compile": true,
+    "golden_fixtures_required_for_activation": true,
+    "spec_hash_scope": "full normalized pattern object"
+  },
+  "patterns": {
+    "broadening_bottoms": {
+      "pattern_key": "broadening_bottoms",
+      "display_name": "Broadening Bottoms",
+      "status": "official_candidate",
+      "official_candidate": true,
+      "book_chapters": [
+        {
+          "chapter": 1,
+          "name": "Broadening Bottoms",
+          "source_page_start": 11,
+          "source_pdf_page_start": 34
+        }
+      ],
+      "golden_fixtures": [
+        {
+          "fixture_id": "bb_valid_up_breakout",
+          "description": "Prior downtrend, rising highs, falling lows, close above formation high.",
+          "expected_match": true,
+          "expected_breakout_direction": "up",
+          "prior_trend": {
+            "direction": "down"
+          },
+          "pivots": [
+            {"idx": 10, "type": "H", "price": 100.0},
+            {"idx": 20, "type": "L", "price": 90.0},
+            {"idx": 30, "type": "H", "price": 106.0},
+            {"idx": 40, "type": "L", "price": 85.0}
+          ],
+          "post_formation_closes": [
+            {"idx": 45, "close": 102.0},
+            {"idx": 46, "close": 107.0}
+          ]
+        },
+        {
+          "fixture_id": "bb_valid_down_breakout",
+          "description": "Prior downtrend, rising highs, falling lows, close below formation low.",
+          "expected_match": true,
+          "expected_breakout_direction": "down",
+          "prior_trend": {
+            "direction": "down"
+          },
+          "pivots": [
+            {"idx": 10, "type": "H", "price": 100.0},
+            {"idx": 20, "type": "L", "price": 90.0},
+            {"idx": 30, "type": "H", "price": 106.0},
+            {"idx": 40, "type": "L", "price": 85.0}
+          ],
+          "post_formation_closes": [
+            {"idx": 45, "close": 91.0},
+            {"idx": 46, "close": 84.0}
+          ]
+        },
+        {
+          "fixture_id": "bb_reject_flat_bottom_raw_v1_error",
+          "description": "Reject the old raw-extraction mistake: flat bottoms are not broadening bottoms.",
+          "expected_match": false,
+          "expected_breakout_direction": null,
+          "prior_trend": {
+            "direction": "down"
+          },
+          "pivots": [
+            {"idx": 10, "type": "H", "price": 100.0},
+            {"idx": 20, "type": "L", "price": 90.0},
+            {"idx": 30, "type": "H", "price": 106.0},
+            {"idx": 40, "type": "L", "price": 90.0}
+          ],
+          "post_formation_closes": [
+            {"idx": 46, "close": 107.0}
+          ]
+        },
+        {
+          "fixture_id": "bb_reject_missing_prior_downtrend",
+          "description": "Reject a megaphone that does not follow a downward prior trend.",
+          "expected_match": false,
+          "expected_breakout_direction": null,
+          "prior_trend": {
+            "direction": "up"
+          },
+          "pivots": [
+            {"idx": 10, "type": "H", "price": 100.0},
+            {"idx": 20, "type": "L", "price": 90.0},
+            {"idx": 30, "type": "H", "price": 106.0},
+            {"idx": 40, "type": "L", "price": 85.0}
+          ],
+          "post_formation_closes": [
+            {"idx": 46, "close": 107.0}
+          ]
+        },
+        {
+          "fixture_id": "bb_reject_no_close_breakout",
+          "description": "Reject a valid formation before price closes beyond either boundary.",
+          "expected_match": false,
+          "expected_breakout_direction": null,
+          "prior_trend": {
+            "direction": "down"
+          },
+          "pivots": [
+            {"idx": 10, "type": "H", "price": 100.0},
+            {"idx": 20, "type": "L", "price": 90.0},
+            {"idx": 30, "type": "H", "price": 106.0},
+            {"idx": 40, "type": "L", "price": 85.0}
+          ],
+          "post_formation_closes": [
+            {"idx": 45, "close": 96.0},
+            {"idx": 46, "close": 100.0}
+          ]
+        }
+      ],
+      "rules": [
+        {
+          "rule_id": "bb.prior_trend.down",
+          "rule_type": "prior_trend",
+          "book_chapter": 1,
+          "source_page": 14,
+          "source_pdf_page": 37,
+          "source_section": "Table 1.1 Identification Characteristics",
+          "evidence_excerpt": "short-term price trend should be downward",
+          "interpreted_rule": "Require a downward prior trend before the broadening-bottom formation starts.",
+          "numeric_threshold": {
+            "operator": "is",
+            "value": "down",
+            "unit": "trend_direction"
+          },
+          "confidence": 0.95,
+          "notes_when_ambiguous": "The source says short-term but does not define a numeric lookback in this table."
+        },
+        {
+          "rule_id": "bb.shape.megaphone",
+          "rule_type": "shape_geometry",
+          "book_chapter": 1,
+          "source_page": 14,
+          "source_pdf_page": 37,
+          "source_section": "Table 1.1 Identification Characteristics",
+          "evidence_excerpt": "higher highs and lower lows",
+          "interpreted_rule": "Require expanding swing extremes: highs rise while lows fall.",
+          "numeric_threshold": {
+            "operator": "sequence",
+            "value": "higher_highs_and_lower_lows",
+            "unit": "pivot_relation"
+          },
+          "confidence": 0.98,
+          "notes_when_ambiguous": "This supersedes the old raw extraction note that incorrectly described a flat bottom."
+        },
+        {
+          "rule_id": "bb.trendlines.diverge",
+          "rule_type": "trendline_geometry",
+          "book_chapter": 1,
+          "source_page": 14,
+          "source_pdf_page": 37,
+          "source_section": "Table 1.1 Identification Characteristics",
+          "evidence_excerpt": "top one slopes up and the bottom one slopes down",
+          "interpreted_rule": "Fit an upper upward boundary and lower downward boundary across the formation.",
+          "numeric_threshold": {
+            "operator": "sign",
+            "value": "upper_positive_lower_negative",
+            "unit": "trendline_slope"
+          },
+          "confidence": 0.98,
+          "notes_when_ambiguous": "Exact slope degrees are scanner-calibration parameters, not stated as hard book thresholds here."
+        },
+        {
+          "rule_id": "bb.touches.min_two_each",
+          "rule_type": "pivot_sequence",
+          "book_chapter": 1,
+          "source_page": 14,
+          "source_pdf_page": 37,
+          "source_section": "Table 1.1 Identification Characteristics",
+          "evidence_excerpt": "at least two minor highs and two minor lows",
+          "interpreted_rule": "Require at least two high touches and two low touches in the formation.",
+          "numeric_threshold": {
+            "operator": "min_count",
+            "value": 2,
+            "unit": "highs_and_lows_each"
+          },
+          "confidence": 0.96,
+          "notes_when_ambiguous": "The source says touches need not alternate, so V2 must not require strict alternation."
+        },
+        {
+          "rule_id": "bb.volume.context",
+          "rule_type": "volume",
+          "book_chapter": 1,
+          "source_page": 14,
+          "source_pdf_page": 37,
+          "source_section": "Table 1.1 Identification Characteristics",
+          "evidence_excerpt": "overall trend is usually upward, sometimes with a U shape",
+          "interpreted_rule": "Record volume trend/shape as context, but do not make volume mandatory for structural identification.",
+          "numeric_threshold": {
+            "operator": "optional_context",
+            "value": "upward_or_u_shape",
+            "unit": "volume_pattern"
+          },
+          "confidence": 0.82,
+          "notes_when_ambiguous": "Nearby prose says there is nothing magical in the volume trend, so this is not an official hard filter."
+        },
+        {
+          "rule_id": "bb.breakout.close_either_side",
+          "rule_type": "breakout",
+          "book_chapter": 1,
+          "source_page": 14,
+          "source_pdf_page": 37,
+          "source_section": "Table 1.1 Identification Characteristics",
+          "evidence_excerpt": "closes above the formation's high",
+          "interpreted_rule": "Breakout is confirmed by a close above the formation high or below the formation low.",
+          "numeric_threshold": {
+            "operator": "close_beyond",
+            "value": 0,
+            "unit": "formation_boundary"
+          },
+          "confidence": 0.95,
+          "notes_when_ambiguous": "A scanner may add a market-noise buffer, but that buffer must be labeled as implementation policy."
+        },
+        {
+          "rule_id": "bb.measure.height_from_recent_extreme",
+          "rule_type": "measurement",
+          "book_chapter": 1,
+          "source_page": 24,
+          "source_pdf_page": 47,
+          "source_section": "Table 1.8 Trading Tactics",
+          "evidence_excerpt": "Compute the difference between the highest high and the lowest low in the formation.",
+          "interpreted_rule": "Measure formation height, then add it to the most recent minor high for upward breakouts or subtract it from the most recent minor low for downward breakouts.",
+          "numeric_threshold": {
+            "operator": "add_or_subtract_height",
+            "value": "highest_high_minus_lowest_low_from_recent_minor_extreme",
+            "unit": "price"
+          },
+          "confidence": 0.94,
+          "notes_when_ambiguous": "The source gives a target-price rule, not a full stop/position-management system. Partial rise/decline tactics remain a later rule family."
+        },
+        {
+          "rule_id": "bb.invalidation.not_broadening",
+          "rule_type": "invalidation",
+          "book_chapter": 1,
+          "source_page": 14,
+          "source_pdf_page": 37,
+          "source_section": "Table 1.1 Identification Characteristics",
+          "evidence_excerpt": "Megaphone shape with higher highs and lower lows.",
+          "interpreted_rule": "Invalidate the formation if highs do not rise or lows do not fall.",
+          "numeric_threshold": {
+            "operator": "requires",
+            "value": "higher_highs_and_lower_lows",
+            "unit": "pivot_relation"
+          },
+          "confidence": 0.9,
+          "notes_when_ambiguous": "This is the explicit structural inverse of the source shape rule."
+        }
+      ]
+    },
+    "bull_flags": {
+      "pattern_key": "bull_flags",
+      "display_name": "Bull Flags",
+      "status": "watchlist_candidate",
+      "official_candidate": true,
+      "book_chapters": [
+        {
+          "chapter": 21,
+          "name": "Flags",
+          "source_page_start": 335,
+          "source_pdf_page_start": 358
+        }
+      ],
+      "golden_fixtures": [
+        {
+          "fixture_id": "bf_valid_up_breakout",
+          "description": "Steep prior advance, short countertrend parallel channel, close above upper trendline.",
+          "expected_match": true,
+          "expected_breakout_direction": "up",
+          "prior_trend": {
+            "direction": "up",
+            "move_pct": 18.0
+          },
+          "pivots": [
+            {"idx": 10, "type": "H", "price": 118.0},
+            {"idx": 14, "type": "L", "price": 111.0},
+            {"idx": 18, "type": "H", "price": 116.0},
+            {"idx": 22, "type": "L", "price": 109.0}
+          ],
+          "post_formation_closes": [
+            {"idx": 24, "close": 116.2},
+            {"idx": 25, "close": 118.0}
+          ]
+        },
+        {
+          "fixture_id": "bf_reject_weak_prior_advance",
+          "description": "Reject a flag-like channel without a steep prior advance.",
+          "expected_match": false,
+          "expected_breakout_direction": null,
+          "prior_trend": {
+            "direction": "up",
+            "move_pct": 4.0
+          },
+          "pivots": [
+            {"idx": 10, "type": "H", "price": 118.0},
+            {"idx": 14, "type": "L", "price": 111.0},
+            {"idx": 18, "type": "H", "price": 116.0},
+            {"idx": 22, "type": "L", "price": 109.0}
+          ],
+          "post_formation_closes": [
+            {"idx": 25, "close": 118.0}
+          ]
+        },
+        {
+          "fixture_id": "bf_reject_no_up_breakout",
+          "description": "Reject a valid flag formation before price closes above the upper trendline.",
+          "expected_match": false,
+          "expected_breakout_direction": null,
+          "prior_trend": {
+            "direction": "up",
+            "move_pct": 18.0
+          },
+          "pivots": [
+            {"idx": 10, "type": "H", "price": 118.0},
+            {"idx": 14, "type": "L", "price": 111.0},
+            {"idx": 18, "type": "H", "price": 116.0},
+            {"idx": 22, "type": "L", "price": 109.0}
+          ],
+          "post_formation_closes": [
+            {"idx": 24, "close": 113.5},
+            {"idx": 25, "close": 114.0}
+          ]
+        }
+      ],
+      "rules": [
+        {
+          "rule_id": "bf.prior_trend.steep_up",
+          "rule_type": "prior_trend",
+          "book_chapter": 21,
+          "source_page": 338,
+          "source_pdf_page": 361,
+          "source_section": "Table 21.1 Identification Characteristics",
+          "evidence_excerpt": "Steep, quick price trend",
+          "interpreted_rule": "Require a steep, quick advance before a Bull Flag formation.",
+          "numeric_threshold": {
+            "operator": "min_change",
+            "value": 10,
+            "unit": "percent_prior_advance"
+          },
+          "confidence": 0.9,
+          "notes_when_ambiguous": "The book gives a qualitative steep/quick rule; the percentage threshold is a scanner calibration parameter."
+        },
+        {
+          "rule_id": "bf.shape.parallel_channel",
+          "rule_type": "trendline_geometry",
+          "book_chapter": 21,
+          "source_page": 338,
+          "source_pdf_page": 361,
+          "source_section": "Table 21.1 Identification Characteristics",
+          "evidence_excerpt": "Price action bounded by two parallel trend lines.",
+          "interpreted_rule": "Require the flag body to fit a short channel bounded by approximately parallel trendlines.",
+          "numeric_threshold": {
+            "operator": "parallel",
+            "value": "two_trendlines",
+            "unit": "trendline_relation"
+          },
+          "confidence": 0.96,
+          "notes_when_ambiguous": "Exact slope tolerance is scanner policy and must be reported in the detector parameters."
+        },
+        {
+          "rule_id": "bf.duration.max_three_weeks",
+          "rule_type": "shape_geometry",
+          "book_chapter": 21,
+          "source_page": 338,
+          "source_pdf_page": 361,
+          "source_section": "Table 21.1 Identification Characteristics",
+          "evidence_excerpt": "Flags are short, from a few days to 3 weeks.",
+          "interpreted_rule": "Reject formations that last longer than three trading weeks.",
+          "numeric_threshold": {
+            "operator": "max",
+            "value": 15,
+            "unit": "trading_days"
+          },
+          "confidence": 0.92,
+          "notes_when_ambiguous": "Three weeks is implemented as approximately 15 trading sessions."
+        },
+        {
+          "rule_id": "bf.countertrend.drift",
+          "rule_type": "shape_geometry",
+          "book_chapter": 21,
+          "source_page": 338,
+          "source_pdf_page": 361,
+          "source_section": "Table 21.1 Identification Characteristics",
+          "evidence_excerpt": "They rise in a down-trend and fall in an uptrend",
+          "interpreted_rule": "For Bull Flags, the flag body should drift sideways to downward against the prior advance.",
+          "numeric_threshold": {
+            "operator": "slope",
+            "value": "flat_to_down",
+            "unit": "channel_direction"
+          },
+          "confidence": 0.86,
+          "notes_when_ambiguous": "The source notes exceptions are common, so this is a strong preference rather than an absolute visual claim."
+        },
+        {
+          "rule_id": "bf.breakout.close_above_trendline",
+          "rule_type": "breakout",
+          "book_chapter": 21,
+          "source_page": 344,
+          "source_pdf_page": 367,
+          "source_section": "Statistics",
+          "evidence_excerpt": "price closes outside the flag trend line",
+          "interpreted_rule": "Confirm a Bull Flag only when price closes above the upper flag trendline.",
+          "numeric_threshold": {
+            "operator": "close_beyond",
+            "value": "upper_flag_trendline",
+            "unit": "price"
+          },
+          "confidence": 0.95,
+          "notes_when_ambiguous": "The source says outside the trend line; upward continuation uses the upper trendline."
+        },
+        {
+          "rule_id": "bf.volume.downward_context",
+          "rule_type": "volume",
+          "book_chapter": 21,
+          "source_page": 338,
+          "source_pdf_page": 361,
+          "source_section": "Table 21.1 Identification Characteristics",
+          "evidence_excerpt": "Volume usually trends downward throughout the formation.",
+          "interpreted_rule": "Record falling volume during the flag as a context feature, but do not make it a hard gate.",
+          "numeric_threshold": {
+            "operator": "optional_context",
+            "value": "downward_volume_trend",
+            "unit": "volume_pattern"
+          },
+          "confidence": 0.84,
+          "notes_when_ambiguous": "The text says volume is usually downward but not inviolate."
+        },
+        {
+          "rule_id": "bf.measure.pole_height_legacy",
+          "rule_type": "measurement",
+          "book_chapter": 21,
+          "source_page": 347,
+          "source_pdf_page": 370,
+          "source_section": "Table 21.8 Trading Tactics",
+          "evidence_excerpt": "Calculate the price difference between the start of the trend and the formation.",
+          "interpreted_rule": "Compute the legacy pole-height measure rule from the start of the prior advance to the flag formation, then keep fractional targets as Vietnam calibration bands.",
+          "numeric_threshold": {
+            "operator": "target_family",
+            "value": [0.46, 0.5, 0.75, 1.0],
+            "unit": "pole_height_multiple"
+          },
+          "confidence": 0.9,
+          "notes_when_ambiguous": "The 1.0x pole-height is retained as a legacy benchmark; 0.46x/0.5x are Bulkowski-adjusted/local calibration bands and must be labeled as such."
+        },
+        {
+          "rule_id": "bf.invalidation.no_strong_advance",
+          "rule_type": "invalidation",
+          "book_chapter": 21,
+          "source_page": 338,
+          "source_pdf_page": 361,
+          "source_section": "Table 21.1 Identification Characteristics",
+          "evidence_excerpt": "If you do not have a strong advance or decline leading to the chart pattern, ignore the flag.",
+          "interpreted_rule": "Invalidate Bull Flag candidates that do not follow a strong advance.",
+          "numeric_threshold": {
+            "operator": "requires",
+            "value": "strong_prior_advance",
+            "unit": "trend_context"
+          },
+          "confidence": 0.94,
+          "notes_when_ambiguous": "This is the explicit inverse of the steep-prior-trend identification rule."
+        }
+      ]
+    },
+    "double_bottoms": {
+      "pattern_key": "double_bottoms",
+      "display_name": "Double Bottoms",
+      "status": "draft_provenance_seed",
+      "official_candidate": false,
+      "book_chapters": [
+        {
+          "chapter": 13,
+          "name": "Double Bottoms, Adam & Adam",
+          "source_page_start": 213,
+          "source_pdf_page_start": 236
+        },
+        {
+          "chapter": 14,
+          "name": "Double Bottoms, Adam & Eve",
+          "source_page_start": 229,
+          "source_pdf_page_start": 252
+        },
+        {
+          "chapter": 15,
+          "name": "Double Bottoms, Eve & Adam",
+          "source_page_start": 244,
+          "source_pdf_page_start": 267
+        },
+        {
+          "chapter": 16,
+          "name": "Double Bottoms, Eve & Eve",
+          "source_page_start": 259,
+          "source_pdf_page_start": 282
+        }
+      ],
+      "golden_fixtures": [],
+      "rules": [
+        {
+          "rule_id": "db.shape.two_bottoms",
+          "rule_type": "pivot_sequence",
+          "book_chapter": 13,
+          "source_page": 213,
+          "source_pdf_page": 236,
+          "source_section": "Results Snapshot",
+          "evidence_excerpt": "Double bottom pattern with narrow or spike bottoms.",
+          "interpreted_rule": "Require two lows that form the double-bottom structure.",
+          "numeric_threshold": {
+            "operator": "count",
+            "value": 2,
+            "unit": "bottom_pivots"
+          },
+          "confidence": 0.8,
+          "notes_when_ambiguous": "Adam/Eve subtype rules need chapter-specific provenance before official activation."
+        },
+        {
+          "rule_id": "db.breakout.up",
+          "rule_type": "breakout",
+          "book_chapter": 13,
+          "source_page": 213,
+          "source_pdf_page": 236,
+          "source_section": "Results Snapshot",
+          "evidence_excerpt": "Breakout is upward.",
+          "interpreted_rule": "The official bullish double-bottom signal requires upward breakout confirmation.",
+          "numeric_threshold": {
+            "operator": "is",
+            "value": "up",
+            "unit": "breakout_direction"
+          },
+          "confidence": 0.92,
+          "notes_when_ambiguous": "Neckline/confirmation threshold requires a dedicated identification-table pass."
+        }
+      ]
+    },
+    "double_tops": {
+      "pattern_key": "double_tops",
+      "display_name": "Double Tops",
+      "status": "draft_provenance_seed",
+      "official_candidate": false,
+      "book_chapters": [
+        {
+          "chapter": 17,
+          "name": "Double Tops, Adam & Adam",
+          "source_page_start": 275,
+          "source_pdf_page_start": 298
+        },
+        {
+          "chapter": 18,
+          "name": "Double Tops, Adam & Eve",
+          "source_page_start": 291,
+          "source_pdf_page_start": 314
+        },
+        {
+          "chapter": 19,
+          "name": "Double Tops, Eve & Adam",
+          "source_page_start": 307,
+          "source_pdf_page_start": 330
+        },
+        {
+          "chapter": 20,
+          "name": "Double Tops, Eve & Eve",
+          "source_page_start": 321,
+          "source_pdf_page_start": 344
+        }
+      ],
+      "golden_fixtures": [],
+      "rules": [
+        {
+          "rule_id": "dt.shape.two_near_peaks",
+          "rule_type": "pivot_sequence",
+          "book_chapter": 17,
+          "source_page": 275,
+          "source_pdf_page": 298,
+          "source_section": "Results Snapshot",
+          "evidence_excerpt": "Two well-defined peaks",
+          "interpreted_rule": "Require two top pivots that define the double-top structure.",
+          "numeric_threshold": {
+            "operator": "count",
+            "value": 2,
+            "unit": "top_pivots"
+          },
+          "confidence": 0.82,
+          "notes_when_ambiguous": "Near-same-price tolerance needs identification-table provenance before official activation."
+        },
+        {
+          "rule_id": "dt.breakout.down",
+          "rule_type": "breakout",
+          "book_chapter": 17,
+          "source_page": 275,
+          "source_pdf_page": 298,
+          "source_section": "Results Snapshot",
+          "evidence_excerpt": "Breakout is downward.",
+          "interpreted_rule": "The official bearish double-top signal requires downward breakout confirmation.",
+          "numeric_threshold": {
+            "operator": "is",
+            "value": "down",
+            "unit": "breakout_direction"
+          },
+          "confidence": 0.92,
+          "notes_when_ambiguous": "Breakout level and pullback handling need a dedicated identification-table pass."
+        }
+      ]
+    },
+    "head_and_shoulders_bottoms": {
+      "pattern_key": "head_and_shoulders_bottoms",
+      "display_name": "Head-and-Shoulders Bottoms",
+      "status": "draft_provenance_seed",
+      "official_candidate": false,
+      "book_chapters": [
+        {
+          "chapter": 24,
+          "name": "Head-and-Shoulders Bottoms",
+          "source_page_start": 374,
+          "source_pdf_page_start": 397
+        }
+      ],
+      "golden_fixtures": [],
+      "rules": [
+        {
+          "rule_id": "hsb.shape.three_valleys",
+          "rule_type": "pivot_sequence",
+          "book_chapter": 24,
+          "source_page": 374,
+          "source_pdf_page": 397,
+          "source_section": "Results Snapshot",
+          "evidence_excerpt": "Three-valley formation",
+          "interpreted_rule": "Require left shoulder, head, and right shoulder valleys.",
+          "numeric_threshold": {
+            "operator": "count",
+            "value": 3,
+            "unit": "valleys"
+          },
+          "confidence": 0.9,
+          "notes_when_ambiguous": "Shoulder symmetry and neckline rules need identification-table provenance."
+        },
+        {
+          "rule_id": "hsb.shape.center_lower",
+          "rule_type": "shape_geometry",
+          "book_chapter": 24,
+          "source_page": 374,
+          "source_pdf_page": 397,
+          "source_section": "Results Snapshot",
+          "evidence_excerpt": "center valley lower than the others",
+          "interpreted_rule": "The head valley must be lower than both shoulder valleys.",
+          "numeric_threshold": {
+            "operator": "less_than",
+            "value": "shoulder_valleys",
+            "unit": "price"
+          },
+          "confidence": 0.95,
+          "notes_when_ambiguous": "Tolerance for nearly equal shoulders is scanner policy until sourced from identification rules."
+        },
+        {
+          "rule_id": "hsb.breakout.up",
+          "rule_type": "breakout",
+          "book_chapter": 24,
+          "source_page": 374,
+          "source_pdf_page": 397,
+          "source_section": "Results Snapshot",
+          "evidence_excerpt": "Upward Breakouts",
+          "interpreted_rule": "The bottom variant is evaluated as an upward breakout pattern.",
+          "numeric_threshold": {
+            "operator": "is",
+            "value": "up",
+            "unit": "breakout_direction"
+          },
+          "confidence": 0.9,
+          "notes_when_ambiguous": "Neckline construction needs explicit rule provenance."
+        }
+      ]
+    },
+    "head_and_shoulders_tops": {
+      "pattern_key": "head_and_shoulders_tops",
+      "display_name": "Head-and-Shoulders Tops",
+      "status": "draft_provenance_seed",
+      "official_candidate": false,
+      "book_chapters": [
+        {
+          "chapter": 26,
+          "name": "Head-and-Shoulders Tops",
+          "source_page_start": 405,
+          "source_pdf_page_start": 428
+        }
+      ],
+      "golden_fixtures": [],
+      "rules": [
+        {
+          "rule_id": "hst.shape.three_peaks",
+          "rule_type": "pivot_sequence",
+          "book_chapter": 26,
+          "source_page": 405,
+          "source_pdf_page": 428,
+          "source_section": "Results Snapshot",
+          "evidence_excerpt": "Three-peak formation",
+          "interpreted_rule": "Require left shoulder, head, and right shoulder peaks.",
+          "numeric_threshold": {
+            "operator": "count",
+            "value": 3,
+            "unit": "peaks"
+          },
+          "confidence": 0.9,
+          "notes_when_ambiguous": "Shoulder symmetry and neckline rules need identification-table provenance."
+        },
+        {
+          "rule_id": "hst.shape.center_taller",
+          "rule_type": "shape_geometry",
+          "book_chapter": 26,
+          "source_page": 405,
+          "source_pdf_page": 428,
+          "source_section": "Results Snapshot",
+          "evidence_excerpt": "center peak taller than the others",
+          "interpreted_rule": "The head peak must be higher than both shoulder peaks.",
+          "numeric_threshold": {
+            "operator": "greater_than",
+            "value": "shoulder_peaks",
+            "unit": "price"
+          },
+          "confidence": 0.95,
+          "notes_when_ambiguous": "Tolerance for nearly equal shoulders is scanner policy until sourced from identification rules."
+        },
+        {
+          "rule_id": "hst.breakout.down",
+          "rule_type": "breakout",
+          "book_chapter": 26,
+          "source_page": 405,
+          "source_pdf_page": 428,
+          "source_section": "Results Snapshot",
+          "evidence_excerpt": "Downward Breakouts",
+          "interpreted_rule": "The top variant is evaluated as a downward breakout pattern.",
+          "numeric_threshold": {
+            "operator": "is",
+            "value": "down",
+            "unit": "breakout_direction"
+          },
+          "confidence": 0.9,
+          "notes_when_ambiguous": "Neckline construction needs explicit rule provenance."
+        }
+      ]
+    },
+    "triangles_ascending": {
+      "pattern_key": "triangles_ascending",
+      "display_name": "Triangles, Ascending",
+      "status": "draft_provenance_seed",
+      "official_candidate": false,
+      "book_chapters": [
+        {
+          "chapter": 47,
+          "name": "Triangles, Ascending",
+          "source_page_start": 711,
+          "source_pdf_page_start": 734
+        }
+      ],
+      "golden_fixtures": [],
+      "rules": [
+        {
+          "rule_id": "ta.shape.horizontal_top",
+          "rule_type": "trendline_geometry",
+          "book_chapter": 47,
+          "source_page": 711,
+          "source_pdf_page": 734,
+          "source_section": "Results Snapshot",
+          "evidence_excerpt": "horizontal top, up-sloping bottom",
+          "interpreted_rule": "Require a near-horizontal upper boundary and rising lower boundary.",
+          "numeric_threshold": {
+            "operator": "shape",
+            "value": "horizontal_top_upsloping_bottom",
+            "unit": "trendline_relation"
+          },
+          "confidence": 0.9,
+          "notes_when_ambiguous": "Numeric flatness tolerance must be sourced or labeled as implementation policy."
+        },
+        {
+          "rule_id": "ta.breakout.up_primary",
+          "rule_type": "breakout",
+          "book_chapter": 47,
+          "source_page": 711,
+          "source_pdf_page": 734,
+          "source_section": "Results Snapshot",
+          "evidence_excerpt": "Breakout is upward.",
+          "interpreted_rule": "The primary ascending-triangle case uses upward breakout confirmation.",
+          "numeric_threshold": {
+            "operator": "is",
+            "value": "up",
+            "unit": "breakout_direction"
+          },
+          "confidence": 0.85,
+          "notes_when_ambiguous": "The same chapter also discusses downward breakouts; V2 needs separate variant handling."
+        }
+      ]
+    },
+    "cup_with_handle": {
+      "pattern_key": "cup_with_handle",
+      "display_name": "Cup with Handle",
+      "status": "draft_provenance_seed",
+      "official_candidate": false,
+      "book_chapters": [
+        {
+          "chapter": 9,
+          "name": "Cup with Handle",
+          "source_page_start": 149,
+          "source_pdf_page_start": 172
+        }
+      ],
+      "golden_fixtures": [],
+      "rules": [
+        {
+          "rule_id": "cwh.shape.cup_handle_right",
+          "rule_type": "shape_geometry",
+          "book_chapter": 9,
+          "source_page": 149,
+          "source_pdf_page": 172,
+          "source_section": "Results Snapshot",
+          "evidence_excerpt": "cup profile with the handle on the right",
+          "interpreted_rule": "Require a rounded cup structure followed by a right-side handle.",
+          "numeric_threshold": {
+            "operator": "shape",
+            "value": "cup_with_right_handle",
+            "unit": "formation_profile"
+          },
+          "confidence": 0.86,
+          "notes_when_ambiguous": "Roundness, handle depth, and lip rules need identification-table provenance."
+        },
+        {
+          "rule_id": "cwh.breakout.up",
+          "rule_type": "breakout",
+          "book_chapter": 9,
+          "source_page": 149,
+          "source_pdf_page": 172,
+          "source_section": "Results Snapshot",
+          "evidence_excerpt": "Upward Breakouts",
+          "interpreted_rule": "The standard cup-with-handle pattern is evaluated on upward breakout.",
+          "numeric_threshold": {
+            "operator": "is",
+            "value": "up",
+            "unit": "breakout_direction"
+          },
+          "confidence": 0.9,
+          "notes_when_ambiguous": "Breakout price and handle constraints need explicit rule provenance."
+        }
+      ]
+    }
+  }
+}

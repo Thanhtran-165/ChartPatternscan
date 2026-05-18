@@ -82,6 +82,12 @@
         "split"
       ],
       "properties": {
+        "pattern_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "symbol": {
           "type": "string"
         },
@@ -115,6 +121,60 @@
             "string",
             "null"
           ]
+        },
+        "outcome": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mfe_pct": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "mae_pct": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "formation_start": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "formation_end": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "breakout_direction": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target_price": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "stop_loss_price": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "pivot_indices": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
         },
         "image_path": {
           "type": [
@@ -192,6 +252,12 @@
             "string",
             "null"
           ]
+        },
+        "language": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     },
@@ -223,7 +289,9 @@
       "additionalProperties": false,
       "required": [
         "phase3_status",
-        "strategy_gate"
+        "strategy_gate",
+        "book_v2_readiness",
+        "readiness_flags"
       ],
       "properties": {
         "phase3_status": {
@@ -237,6 +305,21 @@
             "string",
             "null"
           ]
+        },
+        "book_v2_readiness": {
+          "type": "string",
+          "enum": [
+            "core_research_chapter",
+            "thin_research_chapter",
+            "strategy_appendix",
+            "reference_only"
+          ]
+        },
+        "readiness_flags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },

@@ -4,8 +4,8 @@
 
 `Book v2` is the publication layer for the research engine.
 
-It should replace the old `chapter + AI narrative` flow as the main book path.
-The old book can remain in the repository as legacy tooling, but it should no longer define the project's research model.
+It replaces the old `chapter + AI narrative` flow as the main book path.
+Legacy generated artifacts may remain in local archives for audit only, but the old builder code is no longer part of the active workflow.
 
 The new principle is:
 
@@ -13,7 +13,7 @@ The new principle is:
 
 This makes the book a product of the research engine, not the other way around.
 
-## Why Book V1 Should Become Legacy
+## Why The Previous Book Flow Was Retired
 
 The old book flow was useful as a prototype, but it was structurally misaligned with the project's actual goals.
 
@@ -24,7 +24,7 @@ Problems in the old model:
 - deterministic and AI-generated content were too tightly coupled
 - the book was treated as a primary product before the local research layer was mature
 
-Book v2 should reverse that order:
+Book v2 reverses that order:
 
 1. finalize deterministic research outputs
 2. build readable chapters from those outputs
@@ -139,17 +139,17 @@ The book itself should then be assembled from the market report and pattern mono
 
 ## The 3-Phase Plan
 
-### Phase 1: Freeze Book V1 and Define Book V2 Contracts
+### Phase 1: Retire The Old Book Flow And Define Book V2 Contracts
 
 Goal:
 
-- stop extending the old book as the primary path
+- remove the old book pipeline from the active code path
 - define the data contracts that Book v2 will consume
 
 Required actions:
 
-- mark `scanner/build_book_vi.py` as legacy in documentation and workflow
-- keep old book artifacts only for reference and comparison
+- remove the old narrative-first builder and its validation path from the source tree
+- keep old generated artifacts only as optional local history
 - define stable payload schemas for:
   - market report
   - pattern monograph
@@ -160,7 +160,7 @@ Deliverables:
 
 - Book v2 architecture document
 - data schema definitions
-- legacy status note for Book v1
+- removal note for the old publication path
 
 Exit condition:
 
@@ -361,8 +361,8 @@ Each monograph chapter should follow the same structure.
 
 Keep using:
 
-- [build_vietnam_research_report.py](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/scanner/build_vietnam_research_report.py)
-- [build_symbol_pattern_profiles.py](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/scanner/build_symbol_pattern_profiles.py)
+- [build_vietnam_research_report.py](../../../scanner/build_vietnam_research_report.py)
+- [build_symbol_pattern_profiles.py](../../../scanner/build_symbol_pattern_profiles.py)
 
 as the first deterministic research outputs.
 
@@ -386,7 +386,7 @@ Book v2 should become the main path for:
 - pattern chapters
 - future PDF/book-like outputs
 
-Book v1 should remain only for:
+Legacy generated artifacts should remain only for:
 
 - legacy comparison
 - historical output audit
@@ -404,8 +404,8 @@ Book v2 is successful when:
 
 ## Immediate Next Steps
 
-1. mark Book v1 as legacy in project docs
-2. define a deterministic payload schema for one pattern monograph
-3. implement one pilot chapter family, preferably `broadening_bottoms`
-4. test Book v2 both with and without DeepSeek commentary
-5. only then migrate more families into the new book system
+1. keep Book v2 as the only active publication path
+2. extend deterministic payload coverage before adding new commentary features
+3. implement `scanner/build_current_outlook_reports.py`
+4. keep testing Book v2 both with and without DeepSeek commentary
+5. only promote live/strategy outputs when backed by the research corpus

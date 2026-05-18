@@ -302,6 +302,12 @@ def _render(payload: Dict[str, Any]) -> str:
 
 
 def main() -> None:
+    try:
+        from .legacy_guard import require_legacy_enabled  # type: ignore
+    except Exception:  # pragma: no cover
+        from legacy_guard import require_legacy_enabled  # type: ignore
+
+    require_legacy_enabled("scanner/build_symbol_pattern_profiles.py")
     parser = argparse.ArgumentParser()
     parser.add_argument("--valid-db", required=True)
     parser.add_argument("--calib-db", required=True)

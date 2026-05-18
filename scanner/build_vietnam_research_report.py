@@ -43,6 +43,26 @@ def _fmt(v: Any) -> str:
     return str(v)
 
 
+def _append_table_blocks(
+    lines: List[str],
+    *,
+    header: str,
+    divider: str,
+    rows: List[str],
+    chunk_size: int = 10,
+) -> None:
+    if not rows:
+        lines.append(header)
+        lines.append(divider)
+        lines.append("")
+        return
+    for idx in range(0, len(rows), chunk_size):
+        lines.append(header)
+        lines.append(divider)
+        lines.extend(rows[idx : idx + chunk_size])
+        lines.append("")
+
+
 def _count_evals(*buckets: List[float]) -> int:
     return max((len(bucket) for bucket in buckets), default=0)
 
@@ -368,15 +388,16 @@ def _render(payload: Dict[str, Any], *, language: str) -> str:
 
     lines.append("## Candidate / Watchlist" if not vi else "## Candidate / Watchlist")
     lines.append("")
-    lines.append(
+    header = (
         "| Pattern | Phase 3 | Strategy | Valid evals | Valid move | Target |"
         if not vi
         else "| Pattern | Phase 3 | Strategy | Valid evals | Median move | Target |"
     )
-    lines.append("|---|---|---|---:|---:|---:|")
+    divider = "|---|---|---|---:|---:|---:|"
+    table_rows: List[str] = []
     for row in payload["candidate_and_watchlist"]:
         valid = row["valid"]
-        lines.append(
+        table_rows.append(
             "| "
             + " | ".join(
                 [
@@ -390,19 +411,20 @@ def _render(payload: Dict[str, Any], *, language: str) -> str:
             )
             + " |"
         )
-    lines.append("")
+    _append_table_blocks(lines, header=header, divider=divider, rows=table_rows, chunk_size=8)
 
     lines.append("## Các pattern phổ biến tại Việt Nam (theo valid evals)" if vi else "## Common Patterns In Vietnam (By Valid Evals)")
     lines.append("")
-    lines.append(
+    header = (
         "| Pattern | Valid evals | Symbols | Move | Benchmark |"
         if not vi
         else "| Pattern | Valid evals | Số mã | Median move | Benchmark |"
     )
-    lines.append("|---|---:|---:|---:|---|")
+    divider = "|---|---:|---:|---:|---|"
+    table_rows = []
     for row in payload["top_patterns_by_valid_evals"]:
         valid = row["valid"]
-        lines.append(
+        table_rows.append(
             "| "
             + " | ".join(
                 [
@@ -415,19 +437,20 @@ def _render(payload: Dict[str, Any], *, language: str) -> str:
             )
             + " |"
         )
-    lines.append("")
+    _append_table_blocks(lines, header=header, divider=divider, rows=table_rows, chunk_size=10)
 
     lines.append("## Các pattern phổ biến tại Việt Nam (theo độ phủ mã)" if vi else "## Common Patterns In Vietnam (By Symbol Coverage)")
     lines.append("")
-    lines.append(
+    header = (
         "| Pattern | Symbols | Detections | Valid evals | Move |"
         if not vi
         else "| Pattern | Số mã | Số phát hiện | Valid evals | Median move |"
     )
-    lines.append("|---|---:|---:|---:|---:|")
+    divider = "|---|---:|---:|---:|---:|"
+    table_rows = []
     for row in payload["top_patterns_by_symbol_count"]:
         valid = row["valid"]
-        lines.append(
+        table_rows.append(
             "| "
             + " | ".join(
                 [
@@ -440,19 +463,20 @@ def _render(payload: Dict[str, Any], *, language: str) -> str:
             )
             + " |"
         )
-    lines.append("")
+    _append_table_blocks(lines, header=header, divider=divider, rows=table_rows, chunk_size=10)
 
     lines.append("## Các pattern mạnh hơn khi bỏ gaps" if vi else "## Stronger Patterns Excluding Gaps")
     lines.append("")
-    lines.append(
+    header = (
         "| Pattern | Valid evals | Move | Target | Strategy |"
         if not vi
         else "| Pattern | Valid evals | Median move | Target | Strategy |"
     )
-    lines.append("|---|---:|---:|---:|---|")
+    divider = "|---|---:|---:|---:|---|"
+    table_rows = []
     for row in payload["top_patterns_by_strength_ex_gaps"]:
         valid = row["valid"]
-        lines.append(
+        table_rows.append(
             "| "
             + " | ".join(
                 [
@@ -465,18 +489,19 @@ def _render(payload: Dict[str, Any], *, language: str) -> str:
             )
             + " |"
         )
-    lines.append("")
+    _append_table_blocks(lines, header=header, divider=divider, rows=table_rows, chunk_size=10)
 
     lines.append("## Mức độ phổ biến theo family" if vi else "## Family Prevalence")
     lines.append("")
-    lines.append(
+    header = (
         "| Family | Pattern count | Valid evals | Calib evals |"
         if not vi
         else "| Family | Số pattern | Valid evals | Calib evals |"
     )
-    lines.append("|---|---:|---:|---:|")
+    divider = "|---|---:|---:|---:|"
+    table_rows = []
     for row in payload["family_prevalence"]:
-        lines.append(
+        table_rows.append(
             "| "
             + " | ".join(
                 [
@@ -488,11 +513,17 @@ def _render(payload: Dict[str, Any], *, language: str) -> str:
             )
             + " |"
         )
-    lines.append("")
+    _append_table_blocks(lines, header=header, divider=divider, rows=table_rows, chunk_size=10)
     return "\n".join(lines).strip() + "\n"
 
 
 def main() -> None:
+    try:
+        from .legacy_guard import require_legacy_enabled  # type: ignore
+    except Exception:  # pragma: no cover
+        from legacy_guard import require_legacy_enabled  # type: ignore
+
+    require_legacy_enabled("scanner/build_vietnam_research_report.py")
     parser = argparse.ArgumentParser()
     parser.add_argument("--valid-db", required=True)
     parser.add_argument("--calib-db", required=True)

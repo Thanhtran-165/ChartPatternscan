@@ -1,0 +1,88 @@
+{
+  "version": "scanner_v2_taxonomy_lineage_seed_2026_05_15",
+  "lineage_policy": {
+    "required_chain": [
+      "Bulkowski chapter",
+      "extracted source rule",
+      "normalized rule spec",
+      "scanner pattern key",
+      "result payload",
+      "book v2 chapter"
+    ],
+    "activation_rule": "A pattern cannot become official unless every link is present and validated."
+  },
+  "lineage": {
+    "broadening_bottoms": {
+      "bulkowski_chapters": [1],
+      "source_patterns": ["broadening_bottoms"],
+      "normalized_rule_spec": "scanner/v2/core_patterns.json#/patterns/broadening_bottoms",
+      "scanner_pattern_key": "v2:broadening_bottoms",
+      "result_payload_contract": "schemas/scanner_v2/result_payload.schema.json",
+      "book_v2_chapters": ["broadening_bottoms"],
+      "status": "draft"
+    },
+    "bull_flags": {
+      "bulkowski_chapters": [21],
+      "source_patterns": ["flags_upward_breakout", "bull_flags"],
+      "normalized_rule_spec": "scanner/v2/core_patterns.json#/patterns/bull_flags",
+      "scanner_pattern_key": "v2:bull_flags",
+      "result_payload_contract": "schemas/scanner_v2/result_payload.schema.json",
+      "book_v2_chapters": ["bull_flags"],
+      "status": "watchlist_candidate"
+    },
+    "double_bottoms": {
+      "bulkowski_chapters": [13, 14, 15, 16],
+      "source_patterns": ["double_bottoms_adam_adam", "double_bottoms_adam_eve", "double_bottoms_eve_adam", "double_bottoms_eve_eve"],
+      "normalized_rule_spec": "scanner/v2/core_patterns.json#/patterns/double_bottoms",
+      "scanner_pattern_key": "v2:double_bottoms",
+      "result_payload_contract": "schemas/scanner_v2/result_payload.schema.json",
+      "book_v2_chapters": ["double_bottoms"],
+      "status": "draft"
+    },
+    "double_tops": {
+      "bulkowski_chapters": [17, 18, 19, 20],
+      "source_patterns": ["double_tops_adam_adam", "double_tops_adam_eve", "double_tops_eve_adam", "double_tops_eve_eve"],
+      "normalized_rule_spec": "scanner/v2/core_patterns.json#/patterns/double_tops",
+      "scanner_pattern_key": "v2:double_tops",
+      "result_payload_contract": "schemas/scanner_v2/result_payload.schema.json",
+      "book_v2_chapters": ["double_tops"],
+      "status": "draft"
+    },
+    "head_and_shoulders_bottoms": {
+      "bulkowski_chapters": [24],
+      "source_patterns": ["head_and_shoulders_bottoms"],
+      "normalized_rule_spec": "scanner/v2/core_patterns.json#/patterns/head_and_shoulders_bottoms",
+      "scanner_pattern_key": "v2:head_and_shoulders_bottoms",
+      "result_payload_contract": "schemas/scanner_v2/result_payload.schema.json",
+      "book_v2_chapters": ["head_and_shoulders_bottoms"],
+      "status": "draft"
+    },
+    "head_and_shoulders_tops": {
+      "bulkowski_chapters": [26],
+      "source_patterns": ["head_and_shoulders_tops"],
+      "normalized_rule_spec": "scanner/v2/core_patterns.json#/patterns/head_and_shoulders_tops",
+      "scanner_pattern_key": "v2:head_and_shoulders_tops",
+      "result_payload_contract": "schemas/scanner_v2/result_payload.schema.json",
+      "book_v2_chapters": ["head_and_shoulders_tops"],
+      "status": "draft"
+    },
+    "triangles_ascending": {
+      "bulkowski_chapters": [47],
+      "source_patterns": ["triangles_ascending"],
+      "normalized_rule_spec": "scanner/v2/core_patterns.json#/patterns/triangles_ascending",
+      "scanner_pattern_key": "v2:triangles_ascending",
+      "result_payload_contract": "schemas/scanner_v2/result_payload.schema.json",
+      "book_v2_chapters": ["triangles_ascending"],
+      "status": "draft"
+    },
+    "cup_with_handle": {
+      "bulkowski_chapters": [9],
+      "source_patterns": ["cup_with_handle"],
+      "normalized_rule_spec": "scanner/v2/core_patterns.json#/patterns/cup_with_handle",
+      "scanner_pattern_key": "v2:cup_with_handle",
+      "result_payload_contract": "schemas/scanner_v2/result_payload.schema.json",
+      "book_v2_chapters": ["cup_with_handle"],
+      "status": "draft"
+    }
+  }
+}

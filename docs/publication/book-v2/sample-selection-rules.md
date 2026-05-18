@@ -13,7 +13,7 @@ They should show:
 
 These rules are implemented in:
 
-- [build_pattern_monographs.py](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/scanner/build_pattern_monographs.py)
+- [build_pattern_monographs.py](../../../scanner/build_pattern_monographs.py)
 
 ## Selection Order
 

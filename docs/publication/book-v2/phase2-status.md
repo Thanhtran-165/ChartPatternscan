@@ -10,7 +10,7 @@ The deterministic chapter core for Book v2 now exists as a working build path.
 
 ### 1. Deterministic monograph builder
 
-- [build_pattern_monographs.py](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/scanner/build_pattern_monographs.py)
+- [build_pattern_monographs.py](../../../scanner/build_pattern_monographs.py)
 
 This script builds:
 
@@ -21,7 +21,7 @@ for each pattern.
 
 ### 2. Sample-selection policy
 
-- [sample-selection-rules.md](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/docs/publication/book-v2/sample-selection-rules.md)
+- [sample-selection-rules.md](sample-selection-rules.md)
 
 This freezes deterministic rules for:
 
@@ -34,8 +34,8 @@ This freezes deterministic rules for:
 
 Full output was built to:
 
-- [index.md](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/scan_results/audits/spec-audit-20260308/book-v2-workbench/phase2-core-en/index.md)
-- [index.json](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/scan_results/audits/spec-audit-20260308/book-v2-workbench/phase2-core-en/index.json)
+- [index.md](../../../scan_results/audits/spec-audit-20260308/book-v2-workbench/phase2-core-en/index.md)
+- [index.json](../../../scan_results/audits/spec-audit-20260308/book-v2-workbench/phase2-core-en/index.json)
 
 Pattern count built:
 
@@ -43,8 +43,8 @@ Pattern count built:
 
 Example chapter cores:
 
-- [broadening_bottoms](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/scan_results/audits/spec-audit-20260308/book-v2-workbench/phase2-core-en/broadening_bottoms/chapter_core.md)
-- [double_bottoms_adam_adam](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/scan_results/audits/spec-audit-20260308/book-v2-workbench/phase2-core-en/double_bottoms_adam_adam/chapter_core.md)
+- [broadening_bottoms](../../../scan_results/audits/spec-audit-20260308/book-v2-workbench/phase2-core-en/broadening_bottoms/chapter_core.md)
+- [double_bottoms_adam_adam](../../../scan_results/audits/spec-audit-20260308/book-v2-workbench/phase2-core-en/double_bottoms_adam_adam/chapter_core.md)
 
 ## What Phase 2 Now Guarantees
 

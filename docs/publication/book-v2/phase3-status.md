@@ -53,25 +53,25 @@ The Phase 3 builder validates commentary by:
 
 Phase 3 builder:
 
-- [build_book_v2.py](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/scanner/build_book_v2.py)
+- [build_book_v2.py](../../../scanner/build_book_v2.py)
 
 Style guide:
 
-- [commentary-style-guide.md](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/docs/publication/book-v2/commentary-style-guide.md)
+- [commentary-style-guide.md](commentary-style-guide.md)
 
 ## Verified Outputs
 
 Verified deterministic full build:
 
-- [book_v2.md](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/scan_results/books/book-v2/en-core-full/book_v2.md)
-- [book_v2_meta.json](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/scan_results/books/book-v2/en-core-full/book_v2_meta.json)
-- [book_v2.pdf](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/scan_results/books/book-v2/en-core-full/book_v2.pdf)
-- [book_v2_meta.json](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/scan_results/books/book-v2/en-core-full/book_v2_meta.json)
+- [book_v2.md](../../../scan_results/books/book-v2/en-core-full/book_v2.md)
+- [book_v2_meta.json](../../../scan_results/books/book-v2/en-core-full/book_v2_meta.json)
+- [book_v2.pdf](../../../scan_results/books/book-v2/en-core-full/book_v2.pdf)
+- [book_v2_meta.json](../../../scan_results/books/book-v2/en-core-full/book_v2_meta.json)
 
 Verified AI pilot:
 
-- [chapter_commentary.md](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/scan_results/audits/spec-audit-20260308/book-v2-workbench/phase3-pilot-ai-debug/broadening_bottoms/chapter_commentary.md)
-- [chapter_final.md](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/scan_results/audits/spec-audit-20260308/book-v2-workbench/phase3-pilot-ai-debug/broadening_bottoms/chapter_final.md)
+- [chapter_commentary.md](../../../scan_results/audits/spec-audit-20260308/book-v2-workbench/phase3-pilot-ai-debug/broadening_bottoms/chapter_commentary.md)
+- [chapter_final.md](../../../scan_results/audits/spec-audit-20260308/book-v2-workbench/phase3-pilot-ai-debug/broadening_bottoms/chapter_final.md)
 
 Current verification state:
 

@@ -414,8 +414,9 @@ def detect_all_pivots(df: pd.DataFrame,
 if __name__ == "__main__":
     # Test with sample data
     import sqlite3
+    from pathlib import Path
 
-    db_path = "/Users/bobo/Library/Mobile Documents/com~apple~CloudDocs/main sonet/Nghiên cứu mô hình nến/vietnam_stocks.db"
+    db_path = str(Path(__file__).resolve().parent.parent / "vietnam_stocks.db")
 
     # Load sample stock
     conn = sqlite3.connect(db_path)

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 try:
-    from .build_book_vi import (
+    from .review_plot_helpers import (
         _ensure_dir,
         _load_symbol_ohlcv,
         _plot_candles,
@@ -19,7 +19,7 @@ try:
         _write_text,
     )
 except ImportError:  # pragma: no cover
-    from build_book_vi import (
+    from review_plot_helpers import (
         _ensure_dir,
         _load_symbol_ohlcv,
         _plot_candles,

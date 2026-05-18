@@ -15,7 +15,7 @@ Stage 2 is not another infrastructure-overhaul phase. Its purpose is to:
 
 Reference baseline for Stage 2:
 
-- Stage 1 closure: [stage1-closure-report.md](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/docs/project/stage1-closure-report.md)
+- Stage 1 closure: [stage1-closure-report.md](stage1-closure-report.md)
 - Final snapshot: `scan_results/audits/spec-audit-20260308/snapshots/final-snapshot/final_overhaul_snapshot.md`
 - Final governance: `scan_results/audits/spec-audit-20260308/snapshots/final-snapshot/phase3/phase3_governance_report.md`
 - Final benchmark: `scan_results/audits/spec-audit-20260308/snapshots/final-snapshot/benchmark/benchmark_report.md`

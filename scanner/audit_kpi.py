@@ -114,6 +114,12 @@ def _median(values: List[float]) -> Optional[float]:
 
 
 def main() -> None:
+    try:
+        from .legacy_guard import require_legacy_enabled  # type: ignore
+    except Exception:  # pragma: no cover
+        from legacy_guard import require_legacy_enabled  # type: ignore
+
+    require_legacy_enabled("scanner/audit_kpi.py")
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--results-db",

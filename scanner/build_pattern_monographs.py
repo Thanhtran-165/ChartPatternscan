@@ -10,9 +10,13 @@ from statistics import median
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 try:
+    from .book_v2_readiness import chapter_readiness  # type: ignore
     from .pattern_set_metadata import base_metadata_for_pattern_set  # type: ignore
+    from .review_plot_helpers import _load_symbol_ohlcv, _plot_candles, _slice_window  # type: ignore
 except Exception:  # pragma: no cover
+    from book_v2_readiness import chapter_readiness  # type: ignore
     from pattern_set_metadata import base_metadata_for_pattern_set  # type: ignore
+    from review_plot_helpers import _load_symbol_ohlcv, _plot_candles, _slice_window  # type: ignore
 
 
 def _utc_now_iso() -> str:
@@ -91,6 +95,7 @@ _STRATEGY_GATE_LABELS_VI = {
     "candidate": "ứng viên chiến lược",
     "watchlist": "theo dõi thêm",
     "blocked": "chưa mở cho chiến lược",
+    "retired": "đã loại khỏi chiến lược",
 }
 
 _RESEARCH_LANE_LABELS_VI = {
@@ -98,6 +103,24 @@ _RESEARCH_LANE_LABELS_VI = {
     "active_research": "đang trong lớp nghiên cứu hoạt động",
     "recalibration_backlog": "nằm trong backlog hiệu chỉnh",
     "reference_only": "chỉ giữ làm tham chiếu",
+}
+
+_BOOK_V2_READINESS_LABELS_VI = {
+    "core_research_chapter": "chương nghiên cứu lõi",
+    "thin_research_chapter": "chương nghiên cứu mỏng, cần caveat",
+    "strategy_appendix": "phụ lục chiến lược",
+    "reference_only": "chỉ giữ làm tham chiếu",
+}
+
+_READINESS_FLAG_LABELS_VI = {
+    "no_valid_evals": "không có eval ở valid",
+    "thin_valid_evals": "valid còn mỏng",
+    "no_calib_evals": "không có eval ở calib",
+    "thin_calib_evals": "calib còn mỏng",
+    "sparse_benchmark": "benchmark còn thưa",
+    "materially_weaker_than_reference": "yếu hơn đáng kể so với tham chiếu",
+    "needs_recalibration": "cần hiệu chỉnh lại",
+    "reference_only_governance": "governance chỉ cho phép tham chiếu",
 }
 
 _VARIANT_LABELS_VI = {
@@ -378,9 +401,11 @@ class SplitView:
                 d.breakout_direction,
                 d.breakout_price,
                 d.target_price,
+                d.stop_loss_price,
                 d.confidence_score,
                 d.pattern_height_pct,
                 d.pattern_width_bars,
+                d.pivot_indices_json,
                 d.variant_code,
                 d.variant_confidence,
                 d.variant_evidence_json,
@@ -597,6 +622,7 @@ def _pick_case(
             continue
         used_ids.add(pid)
         return {
+            "pattern_id": str(row["pattern_id"]),
             "symbol": str(row["symbol"]),
             "split": str(row["split"]),
             "breakout_date": row.get("breakout_date"),
@@ -606,6 +632,12 @@ def _pick_case(
             "outcome": _case_outcome(row, language=language),
             "mfe_pct": _safe_float(row.get("max_favorable_excursion_pct")),
             "mae_pct": _safe_float(row.get("max_adverse_excursion_pct")),
+            "formation_start": row.get("formation_start"),
+            "formation_end": row.get("formation_end"),
+            "breakout_direction": row.get("breakout_direction"),
+            "target_price": _safe_float(row.get("target_price")),
+            "stop_loss_price": _safe_float(row.get("stop_loss_price")),
+            "pivot_indices": row.get("pivot_indices") or [],
             "image_path": None,
         }
     return None
@@ -718,6 +750,15 @@ def _rows_as_dicts(rows: Sequence[sqlite3.Row], *, split: str) -> List[Dict[str,
     out: List[Dict[str, Any]] = []
     for row in rows:
         d = dict(row)
+        pivots = d.get("pivot_indices_json")
+        if isinstance(pivots, str) and pivots:
+            try:
+                parsed = json.loads(pivots)
+                d["pivot_indices"] = parsed if isinstance(parsed, list) else []
+            except json.JSONDecodeError:
+                d["pivot_indices"] = []
+        else:
+            d["pivot_indices"] = []
         d["split"] = split
         out.append(d)
     return out
@@ -752,6 +793,75 @@ def _merge_symbol_tendencies(valid_rows: List[Dict[str, Any]], calib_rows: List[
     return out
 
 
+def _render_case_figures(
+    *,
+    price_db: Optional[Path],
+    pattern_dir: Path,
+    bulkowski_name: str,
+    cases: List[Dict[str, Any]],
+    language: str,
+    pre_bars: int = 30,
+    post_bars: int = 30,
+    max_figures: int = 3,
+) -> List[Dict[str, Any]]:
+    if price_db is None or not price_db.exists():
+        return cases
+
+    figures_dir = pattern_dir / "figures"
+    figures_dir.mkdir(parents=True, exist_ok=True)
+    symbol_cache: Dict[str, Any] = {}
+    rendered = 0
+
+    for case in cases:
+        if rendered >= max_figures:
+            break
+        symbol = str(case.get("symbol") or "")
+        formation_start = case.get("formation_start")
+        formation_end = case.get("formation_end")
+        if not symbol or not formation_start or not formation_end:
+            continue
+        try:
+            if symbol not in symbol_cache:
+                symbol_cache[symbol] = _load_symbol_ohlcv(str(price_db), symbol)
+            df = symbol_cache[symbol]
+            if df is None or getattr(df, "empty", True):
+                continue
+            window_df, fs, fe, bd, offset = _slice_window(
+                df,
+                formation_start=str(formation_start),
+                formation_end=str(formation_end),
+                breakout_date=case.get("breakout_date"),
+                pre_bars=int(pre_bars),
+                post_bars=int(post_bars),
+            )
+            if window_df is None or getattr(window_df, "empty", True):
+                continue
+            pivots = [int(i) - int(offset) for i in (case.get("pivot_indices") or []) if isinstance(i, (int, float))]
+            safe_name = (
+                f"{case.get('quality_label')}_{case.get('split')}_{symbol}_{case.get('breakout_date') or 'na'}"
+                .replace("/", "-")
+                .replace(" ", "_")
+            )
+            out_png = figures_dir / f"{safe_name}.png"
+            _plot_candles(
+                window_df,
+                formation_start=fs,
+                formation_end=fe,
+                breakout_date=bd,
+                breakout_direction=case.get("breakout_direction"),
+                target_price=case.get("target_price"),
+                stop_loss_price=case.get("stop_loss_price"),
+                pivot_local_indices=pivots,
+                title=f"{bulkowski_name} | {symbol} | {_display_case_label(case.get('quality_label'), language=language)}",
+                out_png=str(out_png),
+            )
+            case["image_path"] = f"figures/{out_png.name}"
+            rendered += 1
+        except Exception:
+            continue
+    return cases
+
+
 def _render_core(payload: Dict[str, Any], *, language: str) -> str:
     summary = payload["summary"]
     reference = payload["reference"]
@@ -765,6 +875,13 @@ def _render_core(payload: Dict[str, Any], *, language: str) -> str:
     benchmark_label = _map_vi(benchmark["benchmark_status"], _BENCHMARK_STATUS_LABELS_VI) if vi else benchmark["benchmark_status"]
     phase3_label = _map_vi(governance["phase3_status"], _PHASE3_STATUS_LABELS_VI) if vi else governance["phase3_status"]
     strategy_label = _map_vi(governance["strategy_gate"], _STRATEGY_GATE_LABELS_VI) if vi else governance["strategy_gate"]
+    readiness = governance.get("book_v2_readiness") or "reference_only"
+    readiness_label = _map_vi(readiness, _BOOK_V2_READINESS_LABELS_VI) if vi else readiness
+    readiness_flags = [str(flag) for flag in governance.get("readiness_flags") or []]
+    readiness_flag_labels = [
+        _map_vi(flag, _READINESS_FLAG_LABELS_VI) if vi else flag
+        for flag in readiness_flags
+    ]
     family_action = governance.get("family_action")
     family_action_label = _map_vi(family_action, _RESEARCH_LANE_LABELS_VI) if (vi and family_action) else family_action
 
@@ -775,13 +892,13 @@ def _render_core(payload: Dict[str, Any], *, language: str) -> str:
         lines.append(
             f"*Chương `{summary.get('bulkowski_chapter')}`, family `{_human_label(summary['canonical_key'])}`, "
             f"trạng thái nghiên cứu `{phase3_label}`, cửa chiến lược `{strategy_label}`, "
-            f"mức benchmark `{benchmark_label}`.*"
+            f"mức benchmark `{benchmark_label}`, readiness `{readiness_label}`.*"
         )
     else:
         lines.append(
             f"*Chapter `{summary.get('bulkowski_chapter')}`, family `{summary['canonical_key']}`, "
             f"research status `{phase3_label}`, strategy gate `{strategy_label}`, "
-            f"benchmark status `{benchmark_label}`.*"
+            f"benchmark status `{benchmark_label}`, readiness `{readiness_label}`.*"
         )
     lines.append("")
 
@@ -864,6 +981,16 @@ def _render_core(payload: Dict[str, Any], *, language: str) -> str:
     else:
         lines.append("Không tìm thấy mẫu evaluated đại diện trong final snapshot." if vi else "No representative evaluated cases were found in the final snapshot.")
     lines.append("")
+    figure_cases = [row for row in cases if row.get("image_path")]
+    if figure_cases:
+        lines.append("### Hình minh họa" if vi else "### Figures")
+        lines.append("")
+        for row in figure_cases:
+            caption = f"{_display_case_label(row.get('quality_label'), language=language).capitalize()} | {row.get('split')} | {row.get('symbol')} | {row.get('breakout_date') or ''}"
+            lines.append(f"*{caption}*")
+            lines.append("")
+            lines.append(f"![]({row['image_path']})")
+            lines.append("")
 
     lines.append("## Xu hướng theo mã cổ phiếu" if vi else "## Symbol Tendencies")
     lines.append("")
@@ -885,10 +1012,14 @@ def _render_core(payload: Dict[str, Any], *, language: str) -> str:
 
     lines.append("## Trạng thái nghiên cứu hiện tại" if vi else "## Current Research Status")
     lines.append("")
+    lines.append(f"- readiness Book v2: `{readiness_label}`" if vi else f"- book_v2_readiness: `{readiness_label}`")
     lines.append(f"- trạng thái phase 3: `{phase3_label}`" if vi else f"- phase3_status: `{phase3_label}`")
     lines.append(f"- cửa chiến lược: `{strategy_label}`" if vi else f"- strategy_gate: `{strategy_label}`")
     if family_action_label:
         lines.append(f"- lớp nghiên cứu: `{family_action_label}`" if vi else f"- research_lane: `{family_action_label}`")
+    if readiness_flag_labels:
+        flags_text = ", ".join(f"`{flag}`" for flag in readiness_flag_labels)
+        lines.append(f"- cờ caveat: {flags_text}" if vi else f"- readiness_flags: {flags_text}")
     lines.append("")
 
     return "\n".join(lines).strip() + "\n"
@@ -901,6 +1032,7 @@ def build_monographs(
     phase3_matrix: Path,
     benchmark_matrix: Path,
     out_dir: Path,
+    price_db: Optional[Path],
     patterns: Optional[List[str]],
     language: str,
 ) -> Dict[str, Any]:
@@ -922,12 +1054,26 @@ def build_monographs(
             valid_case_rows = _rows_as_dicts(valid_view.pattern_rows(pattern_key), split="valid")
             calib_case_rows = _rows_as_dicts(calib_view.pattern_rows(pattern_key), split="calib")
             cases = _select_cases(valid_case_rows, calib_case_rows, language=language)
+            pattern_dir = out_dir / pattern_key
+            cases = _render_case_figures(
+                price_db=price_db,
+                pattern_dir=pattern_dir,
+                bulkowski_name=str(pattern_meta.get("bulkowski_name") or pattern_key),
+                cases=cases,
+                language=language,
+            )
             symbol_rows = _merge_symbol_tendencies(
                 valid_view.symbol_tendencies(pattern_key),
                 calib_view.symbol_tendencies(pattern_key),
             )[:10]
             phase3_row = phase3.get(pattern_key, {})
             benchmark_row = benchmark.get(pattern_key, {})
+            readiness, readiness_flags = chapter_readiness(
+                valid_metrics=valid_metrics,
+                calib_metrics=calib_metrics,
+                phase3_row=phase3_row,
+                benchmark_row=benchmark_row,
+            )
 
             payload = {
                 "summary": {
@@ -947,6 +1093,8 @@ def build_monographs(
                     "phase3_status": str(phase3_row.get("phase3_status") or "unknown"),
                     "strategy_gate": str(phase3_row.get("strategy_gate") or "blocked"),
                     "family_action": phase3_row.get("research_lane"),
+                    "book_v2_readiness": readiness,
+                    "readiness_flags": readiness_flags,
                 },
                 "benchmark": {
                     "benchmark_status": str(benchmark_row.get("benchmark_status") or "no_benchmark"),
@@ -989,7 +1137,6 @@ def build_monographs(
                 "symbol_tendencies": symbol_rows,
             }
 
-            pattern_dir = out_dir / pattern_key
             _write_json(pattern_dir / "chapter_payload.json", payload)
             _write_text(pattern_dir / "chapter_core.md", _render_core(payload, language=language))
             index_rows.append(
@@ -1000,6 +1147,7 @@ def build_monographs(
                     "bulkowski_chapter": pattern_meta.get("bulkowski_chapter"),
                     "phase3_status": payload["governance"]["phase3_status"],
                     "strategy_gate": payload["governance"]["strategy_gate"],
+                    "book_v2_readiness": payload["governance"]["book_v2_readiness"],
                     "benchmark_status": payload["benchmark"]["benchmark_status"],
                     "payload_path": str((pattern_dir / "chapter_payload.json").resolve()),
                     "chapter_core_path": str((pattern_dir / "chapter_core.md").resolve()),
@@ -1022,15 +1170,15 @@ def build_monographs(
         f"- pattern_count: `{len(index_rows)}`",
         f"- language: `{language}`",
         "",
-        "| Chương | Pattern | Family | Phase 3 | Strategy | Benchmark |"
+        "| Chương | Pattern | Family | Readiness | Phase 3 | Strategy | Benchmark |"
         if _is_vi(language)
-        else "| Chapter | Pattern | Family | Phase 3 | Strategy | Benchmark |",
-        "|---:|---|---|---|---|---|",
+        else "| Chapter | Pattern | Family | Readiness | Phase 3 | Strategy | Benchmark |",
+        "|---:|---|---|---|---|---|---|",
     ]
     for row in index_rows:
         lines.append(
             f"| {row.get('bulkowski_chapter') or ''} | {row['pattern_key']} | {row.get('canonical_key') or ''} | "
-            f"{row['phase3_status']} | {row['strategy_gate']} | {row['benchmark_status']} |"
+            f"{row['book_v2_readiness']} | {row['phase3_status']} | {row['strategy_gate']} | {row['benchmark_status']} |"
         )
     lines.append("")
     _write_text(out_dir / "index.md", "\n".join(lines))
@@ -1038,12 +1186,19 @@ def build_monographs(
 
 
 def main() -> None:
+    try:
+        from .legacy_guard import require_legacy_enabled  # type: ignore
+    except Exception:  # pragma: no cover
+        from legacy_guard import require_legacy_enabled  # type: ignore
+
+    require_legacy_enabled("scanner/build_pattern_monographs.py")
     parser = argparse.ArgumentParser(description="Build deterministic Book v2 monograph payloads and core chapters.")
     parser.add_argument("--valid-db", required=True, help="Final unified valid results DB")
     parser.add_argument("--calib-db", required=True, help="Final unified calib results DB")
     parser.add_argument("--phase3-pattern-matrix", required=True, help="Final phase3 pattern matrix JSON")
     parser.add_argument("--benchmark-pattern-matrix", required=True, help="Final benchmark pattern matrix JSON")
     parser.add_argument("--out-dir", required=True, help="Output directory for deterministic monographs")
+    parser.add_argument("--price-db", help="Optional OHLCV SQLite DB for chapter figure rendering")
     parser.add_argument(
         "--patterns",
         default=None,
@@ -1062,6 +1217,7 @@ def main() -> None:
         phase3_matrix=Path(args.phase3_pattern_matrix),
         benchmark_matrix=Path(args.benchmark_pattern_matrix),
         out_dir=Path(args.out_dir),
+        price_db=Path(args.price_db).resolve() if args.price_db else None,
         patterns=patterns,
         language=str(args.language),
     )

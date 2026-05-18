@@ -256,9 +256,9 @@ def normalize_stock_data(db_path: str, output_path: Optional[str] = None,
 
 if __name__ == "__main__":
     # Test with actual database
-    import sys
+    from pathlib import Path
 
-    db_path = "/Users/bobo/Library/Mobile Documents/com~apple~CloudDocs/main sonet/Nghiên cứu mô hình nến/vietnam_stocks.db"
+    db_path = str(Path(__file__).resolve().parent.parent / "vietnam_stocks.db")
 
     print("Loading sample data...")
     df = OHLCVNormalizer.load_from_db(db_path, symbols=['VCB', 'FPT', 'HCM'], start_date='2020-01-01')

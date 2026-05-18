@@ -27,6 +27,7 @@ import sys
 SCANNER_DIR = os.path.dirname(__file__)
 sys.path.insert(0, SCANNER_DIR)
 
+from legacy_guard import require_legacy_enabled  # noqa: E402
 from pattern_scanner import PatternScanner, ScannerConfig  # noqa: E402
 from post_breakout_analyzer import (  # noqa: E402
     PostBreakoutEvaluator,
@@ -471,6 +472,7 @@ def _compute_run_statistics(conn: sqlite3.Connection, run_id: str) -> Dict[str, 
 
 
 def main() -> None:
+    require_legacy_enabled("scanner/run_full_scan.py")
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--db",
@@ -896,4 +898,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(1)

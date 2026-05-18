@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 try:
     # Package imports (preferred)
+    from .legacy_guard import require_legacy_enabled
     from .pivot_detector import PivotDetector, Pivot, PivotType, PivotConfig
     from .ohlcv_normalizer import OHLCVNormalizer, NormalizationConfig
     from .digitized_pattern_engine import (
@@ -33,6 +34,7 @@ try:
         build_event_ohlcv_scanners,
     )
 except ImportError:  # pragma: no cover - support running as a script from scanner/
+    from legacy_guard import require_legacy_enabled
     from pivot_detector import PivotDetector, Pivot, PivotType, PivotConfig
     from ohlcv_normalizer import OHLCVNormalizer, NormalizationConfig
     from digitized_pattern_engine import (
@@ -497,6 +499,7 @@ class PatternScanner:
     """
 
     def __init__(self, config: Optional[ScannerConfig] = None, *, pattern_set: str = "digitized"):
+        require_legacy_enabled("scanner.pattern_scanner.PatternScanner")
         self.config = config or ScannerConfig()
         self.normalizer = OHLCVNormalizer()
         self.pivot_detector = PivotDetector()
@@ -757,7 +760,9 @@ def create_output_table(db_path: str):
 
 if __name__ == "__main__":
     # Test scanner
-    db_path = "/Users/bobo/Library/Mobile Documents/com~apple~CloudDocs/main sonet/Nghiên cứu mô hình nến/vietnam_stocks.db"
+    from pathlib import Path
+
+    db_path = str(Path(__file__).resolve().parent.parent / "vietnam_stocks.db")
 
     print("Testing Pattern Scanner MVP")
     print("=" * 50)

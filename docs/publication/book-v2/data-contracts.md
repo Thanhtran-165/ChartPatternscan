@@ -22,11 +22,11 @@ Purpose:
 
 Schema:
 
-- [schemas/book_v2/market_report.schema.json](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/schemas/book_v2/market_report.schema.json)
+- [schemas/book_v2/market_report.schema.json](../../../schemas/book_v2/market_report.schema.json)
 
 Current producer:
 
-- [build_vietnam_research_report.py](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/scanner/build_vietnam_research_report.py)
+- [build_vietnam_research_report.py](../../../scanner/build_vietnam_research_report.py)
 
 ### 2. Pattern Monograph
 
@@ -36,11 +36,11 @@ Purpose:
 
 Schema:
 
-- [schemas/book_v2/pattern_monograph.schema.json](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/schemas/book_v2/pattern_monograph.schema.json)
+- [schemas/book_v2/pattern_monograph.schema.json](../../../schemas/book_v2/pattern_monograph.schema.json)
 
 Current producer:
 
-- [build_pattern_monographs.py](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/scanner/build_pattern_monographs.py)
+- [build_pattern_monographs.py](../../../scanner/build_pattern_monographs.py)
 
 ### 3. Symbol Profile
 
@@ -50,11 +50,11 @@ Purpose:
 
 Schema:
 
-- [schemas/book_v2/symbol_profile.schema.json](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/schemas/book_v2/symbol_profile.schema.json)
+- [schemas/book_v2/symbol_profile.schema.json](../../../schemas/book_v2/symbol_profile.schema.json)
 
 Current producer:
 
-- [build_symbol_pattern_profiles.py](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/scanner/build_symbol_pattern_profiles.py)
+- [build_symbol_pattern_profiles.py](../../../scanner/build_symbol_pattern_profiles.py)
 
 ### 4. Current Outlook
 
@@ -64,7 +64,7 @@ Purpose:
 
 Schema:
 
-- [schemas/book_v2/current_outlook.schema.json](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/schemas/book_v2/current_outlook.schema.json)
+- [schemas/book_v2/current_outlook.schema.json](../../../schemas/book_v2/current_outlook.schema.json)
 
 Planned producer:
 
@@ -100,11 +100,11 @@ This allows:
 
 Representative cases for pattern monographs follow deterministic selection rules documented in:
 
-- [sample-selection-rules.md](/Users/bobo/Library/Mobile%20Documents/com~apple~CloudDocs/main%20sonet/Nghie%CC%82n%20cu%CC%9B%CC%81u%20mo%CC%82%20hi%CC%80nh%20ne%CC%82%CC%81n/docs/publication/book-v2/sample-selection-rules.md)
+- [sample-selection-rules.md](sample-selection-rules.md)
 
 ## Current Scope
 
-Phase 1 only defines the contracts and freezes Book v1.
+Phase 1 defines the contracts and removes the old publication builder from the active path.
 
 Phase 2 should implement:
 

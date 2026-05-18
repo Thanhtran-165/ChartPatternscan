@@ -8,13 +8,13 @@ ROOT = Path(__file__).resolve().parent.parent
 SCAN_RESULTS = ROOT / "scan_results"
 
 
-BOOK_V1_DIR_MAP = {
-    "book_vi_all": "books/book-v1/all",
-    "book_vi_debug": "books/book-v1/debug",
-    "book_vi_rerun_20260306": "books/book-v1/rerun-20260306",
-    "book_vi_smoke_20260306_1": "books/book-v1/smoke-20260306-1",
-    "book_vi_smoke_20260306_ai1": "books/book-v1/smoke-20260306-ai1",
-    "book_vi_smoke_20260306_noai": "books/book-v1/smoke-20260306-noai",
+LEGACY_PUBLICATION_DIR_MAP = {
+    "book_vi_all": "books/_archive/legacy-publication/all",
+    "book_vi_debug": "books/_archive/legacy-publication/debug",
+    "book_vi_rerun_20260306": "books/_archive/legacy-publication/rerun-20260306",
+    "book_vi_smoke_20260306_1": "books/_archive/legacy-publication/smoke-20260306-1",
+    "book_vi_smoke_20260306_ai1": "books/_archive/legacy-publication/smoke-20260306-ai1",
+    "book_vi_smoke_20260306_noai": "books/_archive/legacy-publication/smoke-20260306-noai",
 }
 
 AUDIT_DIR_MAP = {
@@ -58,8 +58,8 @@ def _write_local_index() -> None:
         "",
         "Cấu trúc local sau khi dọn:",
         "",
-        "- `books/book-v1/`: output của Book v1 legacy.",
         "- `books/book-v2/`: các bản xuất bản chính của Book v2.",
+        "- `books/_archive/`: lịch sử local của các bản build cũ, nếu cần giữ lại.",
         "- `audits/`: các gói audit, benchmark, snapshot theo mốc thời gian.",
         "- `databases/final/`: các DB baseline/final unified.",
         "- `databases/family/`: các DB chạy riêng theo family/pass.",
@@ -76,7 +76,7 @@ def main() -> None:
     if not SCAN_RESULTS.exists():
         raise SystemExit(f"Missing {SCAN_RESULTS}")
 
-    for name, dest in BOOK_V1_DIR_MAP.items():
+    for name, dest in LEGACY_PUBLICATION_DIR_MAP.items():
         src = SCAN_RESULTS / name
         if src.exists():
             _move(src, dest)
