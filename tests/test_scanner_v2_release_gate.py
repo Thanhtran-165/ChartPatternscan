@@ -11,12 +11,12 @@ from scanner.v2 import ScannerV2Engine, enrich_payload_with_p1_p5_status, evalua
 
 def _base_payload() -> dict:
     registry = load_core_registry()
-    rules = registry["patterns"]["broadening_bottoms"]["rules"]
-    scanner_contract = ScannerV2Engine(registry=registry).compile_pattern("broadening_bottoms", require_official=True).result_metadata()
+    rules = registry["patterns"]["bear_flags"]["rules"]
+    scanner_contract = ScannerV2Engine(registry=registry).compile_pattern("bear_flags", require_official=True).result_metadata()
     return {
         "generated_at": "2026-05-16T00:00:00+00:00",
-        "pattern_key": "broadening_bottoms",
-        "display_name": "Broadening Bottoms",
+        "pattern_key": "bear_flags",
+        "display_name": "Bear Flags",
         "source_alignment": {"aligned": True, "errors": []},
         "scanner_contract": scanner_contract,
         "rules": rules,

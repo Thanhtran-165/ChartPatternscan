@@ -11,8 +11,7 @@ from .contracts import (
     validate_official_pattern,
     validate_pattern_provenance,
 )
-from .broadening_bottoms import BroadeningBottomsV2Detector, run_broadening_bottoms_fixture
-from .bull_flags import BullFlagV2Detector, run_bull_flags_fixture
+from .bull_flags import BearFlagV2Detector, BullFlagV2Detector, run_bear_flags_fixture, run_bull_flags_fixture
 from .source_alignment import audit_source_alignment, verify_pattern_source_alignment
 from .release_gate import enrich_payload_with_p1_p5_status, evaluate_release_gate
 from .matrix import (
@@ -21,13 +20,14 @@ from .matrix import (
     PatternScannerDefinition,
     ScannerMatrixRegistry,
     build_bull_flag_matrix_artifacts,
+    build_flag_family_matrix_artifacts,
     default_scanner_matrix,
     normalize_bull_flag_events,
     validate_matrix_events,
 )
 
 __all__ = [
-    "BroadeningBottomsV2Detector",
+    "BearFlagV2Detector",
     "BullFlagV2Detector",
     "CORE_PATTERN_KEYS",
     "ContractError",
@@ -38,6 +38,7 @@ __all__ = [
     "ScannerMatrixRegistry",
     "build_rule_coverage",
     "build_bull_flag_matrix_artifacts",
+    "build_flag_family_matrix_artifacts",
     "canonical_spec_hash",
     "default_scanner_matrix",
     "load_core_registry",
@@ -48,7 +49,7 @@ __all__ = [
     "enrich_payload_with_p1_p5_status",
     "evaluate_release_gate",
     "normalize_bull_flag_events",
-    "run_broadening_bottoms_fixture",
+    "run_bear_flags_fixture",
     "run_bull_flags_fixture",
     "validate_matrix_events",
     "verify_pattern_source_alignment",

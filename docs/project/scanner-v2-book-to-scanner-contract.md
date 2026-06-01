@@ -7,9 +7,10 @@ chain that turns source-book knowledge into scanner logic.
 
 ## Scope
 
-The first V2 cohort is deliberately small:
+The first V2 cohort is deliberately small and now starts with Flag Family:
 
-- Broadening Bottoms
+- Bull Flags
+- Bear Flags
 - Double Bottoms
 - Double Tops
 - Head-and-Shoulders Bottoms
@@ -65,9 +66,10 @@ A pattern is not official until all gates pass:
 6. Golden fixtures exist and pass.
 7. `official_candidate` is explicitly set to `true`.
 
-`broadening_bottoms` is the first official V2 candidate. The remaining core
-patterns intentionally fail the official gate until their golden fixtures are
-created.
+`bull_flags` is the reference official V2 pattern. `bear_flags` is the next
+Flag Family pattern and is classified as an informational or defensive
+candidate for Vietnam cash equities. The remaining core patterns intentionally
+fail the official gate until their golden fixtures are created.
 
 ## Commands
 
@@ -80,7 +82,8 @@ Run the contract audit:
 Run the source-alignment audit:
 
 ```bash
-.venv/bin/python scanner/audit_scanner_v2_source_alignment.py --pattern broadening_bottoms --out artifacts/scanner_v2/source_alignment_broadening_bottoms.json
+.venv/bin/python scanner/audit_scanner_v2_source_alignment.py --pattern bull_flags --out artifacts/scanner_v2/source_alignment_bull_flags.json
+.venv/bin/python scanner/audit_scanner_v2_source_alignment.py --pattern bear_flags --out artifacts/scanner_v2/source_alignment_bear_flags.json
 ```
 
 Run the V2 tests:
@@ -97,13 +100,14 @@ Run all tests:
 
 ## Next Step
 
-Promote one pattern at a time. `broadening_bottoms` is now the reference pattern:
+Promote one pattern at a time. Flag Family is now the reference lane:
 
-1. Use its provenance fields as the minimum rule standard.
-2. Use its fixture set as the minimum pass/fail standard.
+1. Use Bull Flag provenance fields as the minimum rule standard.
+2. Use Bull Flag fixture and matrix outputs as the minimum pass/fail standard.
 3. Only set `official_candidate` after a pattern can compile with `require_official=True`.
 
-The next promotion target should be either `double_bottoms` or `double_tops`.
+The next promotion target is `bear_flags`, so the family can support both
+upward and downward flag breakouts before moving to another pattern family.
 
 For the PDF/chapter outcome, follow
 [`v2-pdf-monograph-task-list.md`](v2-pdf-monograph-task-list.md). That list is

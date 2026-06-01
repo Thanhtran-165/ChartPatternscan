@@ -16,8 +16,7 @@ This note converts the latest GPT 5.5 research response into implementation deci
 
 | Pattern family | Base target | Additional bands | Legacy benchmark |
 |---|---:|---|---:|
-| Broadening Bottoms | `0.65x` pattern height | `0.75x` | `1.0x` |
-| Flags / Bull Flag | `0.46x` pole height | `0.5x`, `0.75x` | `1.0x` |
+| Flag Family | `0.46x` pole height | `0.5x`, `0.75x` | `1.0x` |
 
 The base target is not a tuned profit objective. It is the first empirical-calibration benchmark for the chapter. Selection must be validated by target-first-before-adverse, failure containment, Wilson confidence intervals, and holdout/regime robustness before being promoted.
 
@@ -37,12 +36,11 @@ A chapter cannot move above descriptive-reference until these are disclosed or p
 
 | Pattern | Current lane | Reason |
 |---|---|---|
-| Broadening Bottoms | descriptive-reference | N is strong, but MFE and MAE are close and target rule likely needs local calibration. |
 | Bull Flag | watchlist-reference candidate | Best current asymmetry; should be promoted from experiment only after provenance and data gates are added. |
 | Bear Flag | informational/defensive-reference | Weak path statistics and limited downside executability in Vietnam cash equities. |
 
 ## Immediate Engineering Changes
 
 - Research support analysis now uses pattern-specific target families.
-- The next official Scanner V2 promotion candidate should be Bull Flag, not the whole Flags experiment.
+- The next official Scanner V2 promotion candidate should be Bear Flag within the Flag Family lane, not a new unrelated pattern family.
 - Ranking must wait until target families and data gates are encoded.

@@ -263,18 +263,19 @@ GROUP BY chapter_id
 HAVING COUNT(DISTINCT failure_definition_id) > 1;
 ```
 
-## Trạng Thái Hiện Tại Của Broadening Bottoms
+## Trạng Thái Hiện Tại Của Flag Family
 
-Theo chuẩn chốt này, `broadening_bottoms` hiện là `research-only` hoặc
-`watchlist-reference draft`, chưa phải `investment-reference`.
+Theo chuẩn chốt này, `bull_flags` hiện là `watchlist-reference` đến
+`investment-reference` trong phạm vi dữ liệu sẵn có, còn `bear_flags` là
+`informational/defensive-reference` candidate. Các mẫu non-Flag dùng logic V2
+cũ đã được đưa ra khỏi lane hoạt động cho đến khi được xây lại theo chuẩn
+matrix mới.
 
 Lý do:
 
-- chưa có PTI universe đầy đủ gồm delisted/halted
-- chưa có corporate-action audit point-in-time
+- chưa có PTI universe đầy đủ gồm delisted/halted, nên kết luận dùng phạm vi
+  active series hiện có
+- chưa có corporate-action factor log chính thức, chỉ có proxy audit
 - chưa có event-level JSON/CSV tái lập đầy đủ bảng PDF
-- chưa có post-breakout OHLC path chuẩn cho tb/pb, KM, retrace, censoring
-- chưa có Wilson/bootstrap CI và adjusted p khi có so sánh/ranking
-- chưa có seeded stratified chart example protocol
+- Bear Flag chưa có real-data chapter runner hoàn chỉnh
 - chưa có release gate status/reviewer sign-off
-

@@ -1,8 +1,8 @@
-"""Scanner matrix contracts and Bull Flag reference adapter.
+"""Scanner matrix contracts and Flag Family reference adapters.
 
 The matrix layer keeps pattern detection independent while forcing every
-scanner to emit the same event contract. Bull Flag is the reference scanner:
-other patterns should match this output shape, not reuse Bull Flag geometry.
+scanner to emit the same event contract. Flag Family is the reference family:
+other patterns should match this output shape, not reuse flag geometry.
 """
 
 from __future__ import annotations
@@ -26,6 +26,8 @@ MATRIX_EVENT_COLUMNS: tuple[str, ...] = (
     "pattern_name",
     "scanner_pattern_key",
     "scanner_version",
+    "scanner_branch_id",
+    "scanner_branch_lane",
     "spec_hash",
     "source_chapters",
     "symbol",
@@ -126,6 +128,12 @@ def default_scanner_matrix(engine: Optional[ScannerV2Engine] = None) -> ScannerM
     # Matrix builds should not require PDF source extraction at runtime. The
     # official source-alignment gate is enforced separately by contract tests.
     bull_flag = engine.compile_pattern("bull_flags", require_official=False)
+    bear_flag = engine.compile_pattern("bear_flags", require_official=False)
+    ascending_triangle = engine.compile_pattern("triangles_ascending", require_official=False)
+    descending_triangle = engine.compile_pattern("triangles_descending", require_official=False)
+    symmetrical_triangle = engine.compile_pattern("triangles_symmetrical", require_official=False)
+    falling_wedge = engine.compile_pattern("wedges_falling", require_official=False)
+    rising_wedge = engine.compile_pattern("wedges_rising", require_official=False)
     return ScannerMatrixRegistry(
         [
             PatternScannerDefinition(
@@ -135,7 +143,55 @@ def default_scanner_matrix(engine: Optional[ScannerV2Engine] = None) -> ScannerM
                 module="scanner.v2.bull_flags",
                 role="reference_scanner",
                 status="active",
-            )
+            ),
+            PatternScannerDefinition(
+                pattern_id="bear_flags",
+                pattern_name="Cờ giảm",
+                scanner_pattern_key=bear_flag.scanner_pattern_key,
+                module="scanner.v2.bear_flags_monograph",
+                role="reference_scanner",
+                status="active",
+            ),
+            PatternScannerDefinition(
+                pattern_id="triangles_ascending",
+                pattern_name="Tam giác tăng",
+                scanner_pattern_key=ascending_triangle.scanner_pattern_key,
+                module="scanner.v2.ascending_triangles",
+                role="chapter_scanner",
+                status="active",
+            ),
+            PatternScannerDefinition(
+                pattern_id="triangles_descending",
+                pattern_name="Tam giác giảm",
+                scanner_pattern_key=descending_triangle.scanner_pattern_key,
+                module="scanner.v2.descending_triangles",
+                role="chapter_scanner",
+                status="active",
+            ),
+            PatternScannerDefinition(
+                pattern_id="triangles_symmetrical",
+                pattern_name="Tam giác cân",
+                scanner_pattern_key=symmetrical_triangle.scanner_pattern_key,
+                module="scanner.v2.symmetrical_triangles",
+                role="chapter_scanner",
+                status="active",
+            ),
+            PatternScannerDefinition(
+                pattern_id="wedges_falling",
+                pattern_name="Nêm giảm",
+                scanner_pattern_key=falling_wedge.scanner_pattern_key,
+                module="scanner.v2.falling_wedges",
+                role="chapter_scanner",
+                status="active",
+            ),
+            PatternScannerDefinition(
+                pattern_id="wedges_rising",
+                pattern_name="Nêm tăng",
+                scanner_pattern_key=rising_wedge.scanner_pattern_key,
+                module="scanner.v2.rising_wedges",
+                role="chapter_scanner",
+                status="active",
+            ),
         ]
     )
 
@@ -210,7 +266,7 @@ def _quality_tier(setup: float, confirmation: float, followthrough: float, data_
     return "weak"
 
 
-def _bull_flag_target_family() -> str:
+def _flag_target_family() -> str:
     return json.dumps(
         {
             "base": 0.46,
@@ -232,13 +288,15 @@ def normalize_bull_flag_events(
     events: pd.DataFrame,
     *,
     engine: Optional[ScannerV2Engine] = None,
+    pattern_id: str = "bull_flags",
+    pattern_name: str = "Cờ tăng",
 ) -> pd.DataFrame:
-    """Normalize Bull Flag detector output into the scanner matrix event schema."""
+    """Normalize Flag Family detector output into the scanner matrix event schema."""
 
     engine = engine or ScannerV2Engine()
-    compiled = engine.compile_pattern("bull_flags", require_official=False)
+    compiled = engine.compile_pattern(pattern_id, require_official=False)
     rows: list[dict[str, Any]] = []
-    target_family = _bull_flag_target_family()
+    target_family = _flag_target_family()
     source_chapters = _source_chapters(compiled)
 
     for _, row in events.iterrows():
@@ -257,11 +315,13 @@ def normalize_bull_flag_events(
 
         rows.append(
             {
-                "event_id": str(raw.get("detection_id") or f"bull_flags:{raw.get('symbol')}:{raw.get('breakout_date')}"),
-                "pattern_id": "bull_flags",
-                "pattern_name": "Cờ tăng",
+                "event_id": str(raw.get("detection_id") or f"{pattern_id}:{raw.get('symbol')}:{raw.get('breakout_date')}"),
+                "pattern_id": pattern_id,
+                "pattern_name": pattern_name,
                 "scanner_pattern_key": compiled.scanner_pattern_key,
                 "scanner_version": "scanner_matrix_v1",
+                "scanner_branch_id": _clean(raw.get("bear_branch_id")) or _clean(raw.get("scanner_branch_id")),
+                "scanner_branch_lane": _clean(raw.get("bear_branch_lane")) or _clean(raw.get("scanner_branch_lane")),
                 "spec_hash": compiled.spec_hash,
                 "source_chapters": source_chapters,
                 "symbol": str(raw.get("symbol")),
@@ -342,6 +402,39 @@ def build_bull_flag_matrix_artifacts(
     registry = default_scanner_matrix(engine)
     events = pd.read_csv(events_path)
     normalized = normalize_bull_flag_events(events, engine=engine)
+    errors = validate_matrix_events(normalized, registry)
+    if errors:
+        raise ContractError("; ".join(errors))
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    events_out = out_dir / "scanner_matrix_events.csv"
+    manifest_out = out_dir / "scanner_matrix_manifest.json"
+    normalized.to_csv(events_out, index=False)
+    manifest_out.write_text(json.dumps(registry.manifest(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return {"events": events_out, "manifest": manifest_out}
+
+
+def build_flag_family_matrix_artifacts(
+    event_sources: Mapping[str, Path],
+    out_dir: Path,
+    *,
+    engine: Optional[ScannerV2Engine] = None,
+) -> Dict[str, Path]:
+    engine = engine or ScannerV2Engine()
+    registry = default_scanner_matrix(engine)
+    frames: list[pd.DataFrame] = []
+    names = {"bull_flags": "Cờ tăng", "bear_flags": "Cờ giảm"}
+    for pattern_id, events_path in event_sources.items():
+        events = pd.read_csv(events_path)
+        frames.append(
+            normalize_bull_flag_events(
+                events,
+                engine=engine,
+                pattern_id=pattern_id,
+                pattern_name=names.get(pattern_id, pattern_id),
+            )
+        )
+    normalized = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=MATRIX_EVENT_COLUMNS)
     errors = validate_matrix_events(normalized, registry)
     if errors:
         raise ContractError("; ".join(errors))

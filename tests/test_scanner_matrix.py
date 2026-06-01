@@ -11,6 +11,7 @@ from scanner.v2.matrix import (
     MATRIX_EVENT_COLUMNS,
     ContractError,
     build_bull_flag_matrix_artifacts,
+    build_flag_family_matrix_artifacts,
     default_scanner_matrix,
     normalize_bull_flag_events,
     validate_matrix_events,
@@ -86,8 +87,23 @@ def test_default_scanner_matrix_registers_bull_flag_as_reference_scanner() -> No
     manifest = registry.manifest()
 
     assert manifest["event_contract_version"] == "scanner_matrix_event_v1"
-    assert manifest["scanners"][0]["pattern_id"] == "bull_flags"
-    assert manifest["scanners"][0]["role"] == "reference_scanner"
+    assert [scanner["pattern_id"] for scanner in manifest["scanners"]] == [
+        "bull_flags",
+        "bear_flags",
+        "triangles_ascending",
+        "triangles_descending",
+        "triangles_symmetrical",
+        "wedges_falling",
+        "wedges_rising",
+    ]
+    roles = {scanner["pattern_id"]: scanner["role"] for scanner in manifest["scanners"]}
+    assert roles["bull_flags"] == "reference_scanner"
+    assert roles["bear_flags"] == "reference_scanner"
+    assert roles["triangles_ascending"] == "chapter_scanner"
+    assert roles["triangles_descending"] == "chapter_scanner"
+    assert roles["triangles_symmetrical"] == "chapter_scanner"
+    assert roles["wedges_falling"] == "chapter_scanner"
+    assert roles["wedges_rising"] == "chapter_scanner"
     assert manifest["columns"] == list(MATRIX_EVENT_COLUMNS)
 
 
@@ -139,3 +155,33 @@ def test_matrix_artifact_writer_blocks_invalid_contract(tmp_path: Path) -> None:
 
     with pytest.raises(ContractError, match="confirmation_price"):
         build_bull_flag_matrix_artifacts(events_path, tmp_path / "matrix")
+
+
+def test_flag_family_matrix_artifact_writer_accepts_bull_and_bear_flags(tmp_path: Path) -> None:
+    bull_path = tmp_path / "bull_events.csv"
+    bear_path = tmp_path / "bear_events.csv"
+    bull = _bull_flag_fixture()
+    bear = _bull_flag_fixture()
+    bear["detection_id"] = bear["detection_id"].str.replace("bf_", "brf_", regex=False)
+    bear["breakout_direction"] = "down"
+    bull.to_csv(bull_path, index=False)
+    bear.to_csv(bear_path, index=False)
+
+    paths = build_flag_family_matrix_artifacts(
+        {"bull_flags": bull_path, "bear_flags": bear_path},
+        tmp_path / "family_matrix",
+    )
+
+    events = pd.read_csv(paths["events"])
+    manifest = json.loads(paths["manifest"].read_text(encoding="utf-8"))
+    assert set(events["pattern_id"]) == {"bull_flags", "bear_flags"}
+    assert set(events["direction"]) == {"up", "down"}
+    assert [scanner["pattern_id"] for scanner in manifest["scanners"]] == [
+        "bull_flags",
+        "bear_flags",
+        "triangles_ascending",
+        "triangles_descending",
+        "triangles_symmetrical",
+        "wedges_falling",
+        "wedges_rising",
+    ]

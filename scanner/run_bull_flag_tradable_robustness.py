@@ -29,8 +29,8 @@ from scanner.v2.bull_flag_tradable_setup import (  # noqa: E402
     summarize_trades,
     score_tradable_setup,
 )
-from scanner.v2.broadening_bottoms_monograph import DEFAULT_SOURCE_DIR  # noqa: E402
 from scanner.v2.bull_flag_localization import _apply_three_layer_scores  # noqa: E402
+from scanner.v2.source_data import DEFAULT_SOURCE_DIR  # noqa: E402
 
 
 DEFAULT_OUT_DIR = Path("artifacts/scanner_v2/bull_flags_tradable_robustness")

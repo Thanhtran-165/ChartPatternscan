@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.backends.backend_pdf import PdfPages
 
-from .broadening_bottoms_monograph import DEFAULT_SOURCE_DIR
+from .source_data import DEFAULT_SOURCE_DIR
 from .flags_experiment import (
     DEFAULT_INDEX_DB,
     DEFAULT_INDEX_SYMBOL,
@@ -412,6 +412,8 @@ def _bulkowski_equivalent_metrics_for_event(series: pd.DataFrame, row: Mapping[s
     formation_end_idx = _bar_index_on_or_after(working, row.get("formation_end_date"))
     if breakout_idx is None:
         return {}
+    direction = str(row.get("breakout_direction") or "up")
+    is_down = direction == "down"
 
     breakout = working.iloc[breakout_idx]
     prev = working.iloc[breakout_idx - 1] if breakout_idx > 0 else None
@@ -419,6 +421,18 @@ def _bulkowski_equivalent_metrics_for_event(series: pd.DataFrame, row: Mapping[s
     breakout_open = float(breakout["open"])
     breakout_high = float(breakout["high"])
     breakout_low = float(breakout["low"])
+    if not np.isfinite(breakout_close) or breakout_close <= 0:
+        return {
+            "breakout_gap_pct": None,
+            "breakout_volume_ratio_20": None,
+            "volume_trend_slope_pct_per_bar": None,
+            "volume_trend_direction": "unknown",
+            "yearly_range_position_pct": None,
+            "throwback_exact_30d": None,
+            "days_to_throwback_exact": None,
+            "busted_pattern_flag": None,
+            "days_to_bust": None,
+        }
     breakout_range = max(1e-9, breakout_high - breakout_low)
     prior_20 = working.iloc[max(0, breakout_idx - 20) : breakout_idx].copy()
     future = working.iloc[breakout_idx + 1 : min(len(working), breakout_idx + 1 + horizon_days)].copy().reset_index(drop=True)
@@ -459,7 +473,10 @@ def _bulkowski_equivalent_metrics_for_event(series: pd.DataFrame, row: Mapping[s
     lower_breakout = _line_value(row, side="lower", idx=breakout_idx)
     first_lift_bar: Optional[int] = None
     if not future_60.empty:
-        lift = future_60[(future_60["high"] / breakout_close - 1.0) * 100.0 >= 2.0]
+        if is_down:
+            lift = future_60[(breakout_close / future_60["low"].replace(0, np.nan) - 1.0) * 100.0 >= 2.0]
+        else:
+            lift = future_60[(future_60["high"] / breakout_close - 1.0) * 100.0 >= 2.0]
         if not lift.empty:
             first_lift_bar = int(lift.index[0])
     throwback_exact = False
@@ -470,13 +487,15 @@ def _bulkowski_equivalent_metrics_for_event(series: pd.DataFrame, row: Mapping[s
         check = future_60.iloc[first_lift_bar + 1 : 30].copy()
         for rel_idx, frow in check.iterrows():
             absolute_idx = breakout_idx + 1 + int(rel_idx)
-            upper_value = _line_value(row, side="upper", idx=absolute_idx)
-            if upper_value is not None and float(frow["low"]) <= upper_value * 1.005:
+            boundary_value = _line_value(row, side="lower" if is_down else "upper", idx=absolute_idx)
+            if boundary_value is not None and (
+                float(frow["high"]) >= boundary_value * 0.995 if is_down else float(frow["low"]) <= boundary_value * 1.005
+            ):
                 throwback_exact = True
                 days_to_throwback_exact = int(rel_idx) + 1
                 break
         for rel_idx, frow in check.iterrows():
-            if float(frow["low"]) <= breakout_close * 1.005:
+            if float(frow["high"]) >= breakout_close * 0.995 if is_down else float(frow["low"]) <= breakout_close * 1.005:
                 throwback_to_breakout = True
                 days_to_throwback_to_breakout = int(rel_idx) + 1
                 break
@@ -485,20 +504,36 @@ def _bulkowski_equivalent_metrics_for_event(series: pd.DataFrame, row: Mapping[s
     post_flag_trend_move_pct = None
     trend_end_censored = True
     if not future.empty:
-        running_high = -np.inf
-        high_day = 0
-        reversal_day: Optional[int] = None
-        for idx, frow in future.iterrows():
-            high = float(frow["high"])
-            close = float(frow["close"])
-            if high > running_high:
-                running_high = high
-                high_day = int(idx) + 1
-            if running_high > 0 and close <= running_high * 0.80:
-                reversal_day = int(idx) + 1
-                break
-        days_to_trend_end = high_day
-        post_flag_trend_move_pct = (running_high / breakout_close - 1.0) * 100.0 if running_high > 0 else None
+        if is_down:
+            running_low = np.inf
+            low_day = 0
+            reversal_day = None
+            for idx, frow in future.iterrows():
+                low = float(frow["low"])
+                close = float(frow["close"])
+                if low < running_low:
+                    running_low = low
+                    low_day = int(idx) + 1
+                if running_low > 0 and close >= running_low * 1.20:
+                    reversal_day = int(idx) + 1
+                    break
+            days_to_trend_end = low_day
+            post_flag_trend_move_pct = (breakout_close / running_low - 1.0) * 100.0 if running_low > 0 and np.isfinite(running_low) else None
+        else:
+            running_high = -np.inf
+            high_day = 0
+            reversal_day = None
+            for idx, frow in future.iterrows():
+                high = float(frow["high"])
+                close = float(frow["close"])
+                if high > running_high:
+                    running_high = high
+                    high_day = int(idx) + 1
+                if running_high > 0 and close <= running_high * 0.80:
+                    reversal_day = int(idx) + 1
+                    break
+            days_to_trend_end = high_day
+            post_flag_trend_move_pct = (running_high / breakout_close - 1.0) * 100.0 if running_high > 0 else None
         trend_end_censored = reversal_day is None
 
     busted = False
@@ -506,17 +541,23 @@ def _bulkowski_equivalent_metrics_for_event(series: pd.DataFrame, row: Mapping[s
     if not future_60.empty:
         max_fav_before = 0.0
         flag_low = None
+        flag_high = None
         if formation_start_idx is not None and formation_end_idx is not None:
             flag_low = float(working.iloc[formation_start_idx : formation_end_idx + 1]["low"].min())
+            flag_high = float(working.iloc[formation_start_idx : formation_end_idx + 1]["high"].max())
         for idx, frow in future_60.iterrows():
             high = float(frow["high"])
             low = float(frow["low"])
             close = float(frow["close"])
-            max_fav_before = max(max_fav_before, (high / breakout_close - 1.0) * 100.0)
+            if is_down:
+                max_fav_before = max(max_fav_before, (breakout_close / max(low, 1e-9) - 1.0) * 100.0)
+            else:
+                max_fav_before = max(max_fav_before, (high / breakout_close - 1.0) * 100.0)
             absolute_idx = breakout_idx + 1 + int(idx)
-            lower_value = _line_value(row, side="lower", idx=absolute_idx)
-            busted_level = lower_value if lower_value is not None else flag_low
-            if busted_level is not None and max_fav_before < 10.0 and (close < busted_level or low < busted_level):
+            boundary_value = _line_value(row, side="upper" if is_down else "lower", idx=absolute_idx)
+            busted_level = boundary_value if boundary_value is not None else (flag_high if is_down else flag_low)
+            busted_now = (close > busted_level or high > busted_level) if is_down else (close < busted_level or low < busted_level)
+            if busted_level is not None and max_fav_before < 10.0 and busted_now:
                 busted = True
                 days_to_bust = int(idx) + 1
                 break
@@ -526,7 +567,10 @@ def _bulkowski_equivalent_metrics_for_event(series: pd.DataFrame, row: Mapping[s
         hit = False
         hit_day = None
         if not future_60.empty:
-            mask = future_60["low"] <= breakout_close * (1.0 - stop / 100.0)
+            if is_down:
+                mask = future_60["high"] >= breakout_close * (1.0 + stop / 100.0)
+            else:
+                mask = future_60["low"] <= breakout_close * (1.0 - stop / 100.0)
             hit = bool(mask.any())
             if hit:
                 hit_day = int(mask[mask].index[0]) + 1
@@ -1238,7 +1282,7 @@ def _render_pdf(path: Path, stats: Mapping[str, Any]) -> None:
             fig,
             0.08,
             y,
-            "Next: áp dụng cùng framework cho Broadening Bottoms, sau đó mới mở rộng ranking nhiều pattern. Với bearish patterns trên cash equities Việt Nam, default vẫn nên là informational/defensive-reference.",
+            "Next: mở rộng cùng framework sang Bear Flag để hoàn thiện Flag Family trước khi chuyển sang họ mẫu hình khác. Với bearish patterns trên cash equities Việt Nam, default vẫn nên là informational/defensive-reference.",
             width=105,
             fontsize=9.2,
         )

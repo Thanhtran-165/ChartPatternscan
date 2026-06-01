@@ -16,7 +16,6 @@ import numpy as np
 import pandas as pd
 
 from ..research_support_analysis import PatternArtifacts, target_sensitivity, wilson_ci
-from .broadening_bottoms_monograph import _load_market_stats_symbol, _symbol_from_path
 from .bull_flags_monograph import DEFAULT_MARKET_STATS_JSON, PATTERN_KEY
 from .bull_flags_monograph import DEFAULT_OUT_DIR as DEFAULT_BULL_FLAGS_DIR
 from .bull_flags_monograph import (
@@ -29,6 +28,8 @@ from .bull_flags_monograph import (
 )
 from .flags_experiment import DEFAULT_INDEX_DB, DEFAULT_INDEX_SYMBOL, _path_rows, scan_market_stats
 from .flags_experiment import FlagDetectorConfig
+from .source_data import load_market_stats_symbol as _load_market_stats_symbol
+from .source_data import symbol_from_path as _symbol_from_path
 
 
 DEFAULT_OUT_DIR = Path("artifacts/scanner_v2/bull_flags_localization")

@@ -78,7 +78,7 @@ Use:
 
 - [x] Stop referencing legacy scan commands in the top-level README.
 - [x] Quarantine legacy report/readiness entrypoints behind the same env guard.
-- [ ] Build the V2 data runner for `broadening_bottoms`.
+- [ ] Build the V2 data runner for `bear_flags` through the Flag Family matrix.
 - [ ] Replace report builders with V2 monograph payload builders.
 - [ ] Move legacy-only scripts into an archive folder after V2 has replacement commands.
 - [ ] Delete legacy-only code only after no active V2 task imports it.

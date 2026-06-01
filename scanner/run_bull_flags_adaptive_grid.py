@@ -10,10 +10,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scanner.v2.broadening_bottoms_monograph import DEFAULT_SOURCE_DIR
 from scanner.v2.bull_flag_localization import DEFAULT_ADAPTIVE_GRID_OUT_DIR, run_adaptive_detector_grid
 from scanner.v2.bull_flags_monograph import DEFAULT_MARKET_STATS_JSON
 from scanner.v2.flags_experiment import DEFAULT_INDEX_DB, DEFAULT_INDEX_SYMBOL
+from scanner.v2.source_data import DEFAULT_SOURCE_DIR
 
 
 def main() -> None:

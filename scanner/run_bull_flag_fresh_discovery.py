@@ -195,7 +195,7 @@ def export_sqlite_to_stock_series(db_path: Path, out_root: Path, *, min_history_
         ]
         metadata = {
             "schema_version": "market-stats-compatible-sqlite-export-v1",
-            "generated_at": pd.Timestamp.utcnow().replace(microsecond=0).isoformat(),
+            "generated_at": pd.Timestamp.now("UTC").replace(microsecond=0).isoformat(),
             "source_db": str(db_path),
             "data_basis": {
                 "price": "sqlite_stock_price_history",

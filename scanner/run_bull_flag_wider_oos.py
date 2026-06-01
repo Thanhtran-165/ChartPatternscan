@@ -26,7 +26,6 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scanner.run_bull_flag_tradable_robustness import normalize_profile_schema  # noqa: E402
-from scanner.v2.broadening_bottoms_monograph import DEFAULT_SOURCE_DIR  # noqa: E402
 from scanner.v2.bull_flag_localization import (  # noqa: E402
     BULL_FLAG_V2_SPLIT_STABLE_PROFILE_ID,
     _apply_post_score_filter,
@@ -37,6 +36,7 @@ from scanner.v2.bull_flag_localization import (  # noqa: E402
 )
 from scanner.v2.bull_flags_monograph import DEFAULT_MARKET_STATS_JSON  # noqa: E402
 from scanner.v2.flags_experiment import DEFAULT_INDEX_DB, DEFAULT_INDEX_SYMBOL  # noqa: E402
+from scanner.v2.source_data import DEFAULT_SOURCE_DIR  # noqa: E402
 from scanner.v2.bull_flag_tradable_setup import (  # noqa: E402
     DEFAULT_STRATEGY_GRID,
     FROZEN_STRATEGY_ID,

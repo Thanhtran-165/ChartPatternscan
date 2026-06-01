@@ -19,8 +19,8 @@ Activation policy:
 
 Current official V2 patterns:
 
-- `broadening_bottoms`
 - `bull_flags` (available-series watchlist-reference candidate; active Market Stats universe gate passes, but no full point-in-time universe claim)
+- `bear_flags` (defensive/informational candidate in the same Flag Family; not a cash-equity short recommendation)
 
 Remaining core patterns are still draft and should not be used as official research scanners until
 their provenance and fixtures pass the same gate.
@@ -35,7 +35,7 @@ The scanner matrix is the standard expansion path for multiple chart patterns:
 Independent pattern scanner -> scanner matrix event contract -> common metrics/charts/PDF/watchlist
 ```
 
-Bull Flag is the reference implementation. It remains an independent scanner, but its output is normalized by
+Flag Family is the reference implementation. Bull Flag remains the first completed public chapter, and Bear Flag is the next family branch. Their output is normalized by
 `scanner.v2.matrix.normalize_bull_flag_events` into the shared event schema:
 
 - `pattern_id`, `scanner_pattern_key`, `spec_hash`, `source_chapters`
@@ -47,7 +47,42 @@ The rule for scaling is strict:
 
 - scanner logic is pattern-specific;
 - event output is common;
-- Bull Flag is the template for matrix output, not the geometry template for other patterns.
+- Flag Family is the template for matrix output, not the geometry template for unrelated pattern families.
+
+## Family-Based Architecture Principle
+
+The project uses shared infrastructure only at the statistical/output layer.
+Pattern logic is not shared across unrelated pattern families.
+
+Shared across the whole project:
+
+- OHLCV/path loading conventions.
+- Scanner matrix event schema.
+- Post-breakout statistics: target hit, failure, target-first-before-adverse, MFE, MAE, quantiles, Wilson intervals, and robustness tables.
+- Thin PDF/table/chart rendering primitives.
+
+Owned by each family:
+
+- Geometry language and reader-facing terms.
+- Target unit and target-family interpretation.
+- Chapter structure details that depend on the family.
+- Example-selection rules when the family requires different context.
+
+Owned by each pattern:
+
+- Scanner thresholds and branch logic.
+- Setup-quality, confirmation, and follow-through scoring.
+- Local calibration and optimization.
+
+Current publication boundary:
+
+- `scanner.pattern_publication_core`: thin statistical/publication core. It must stay pattern-agnostic.
+- `scanner.flag_family_public_chapter_factory`: Flag Family publication factory.
+- `scanner.triangle_family_public_chapter_factory`: Triangle Family publication factory.
+
+The lesson from Bull/Bear Flag is now a hard rule: each pattern may require
+its own optimization. A family can share language and structure only when the
+patterns in that family genuinely share geometry and target semantics.
 
 Build the current matrix artifacts with:
 

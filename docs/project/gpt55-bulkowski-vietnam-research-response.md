@@ -41,9 +41,9 @@ Nguyên nhân kỹ thuật là target sensitivity đang đọc path 120 phiên, 
    - Không gọi đây là nới lỏng target; gọi là local calibration theo empirical target attainment.
 
 4. **Pattern tiering**
-   - Broadening Bottoms: descriptive reference.
-   - Bull Flag: chapter candidate có triển vọng, nhưng chưa P1-P5 official vì thiếu provenance đầy đủ.
-   - Bear Flag: informational/defensive reference, không nên xếp cùng investment-reference bullish pattern.
+   - Bull Flag: chapter candidate có triển vọng nhất và là mẫu chuẩn hiện tại của Flag Family.
+   - Bear Flag: informational/defensive reference, không nên xếp cùng investment-reference bullish pattern nếu chưa có lớp thực thi downside.
+   - Các mẫu non-Flag dùng logic V2 cũ: đã đưa ra khỏi lane hoạt động cho đến khi được xây lại theo chuẩn matrix mới.
 
 ## Quy tắc vận hành
 
@@ -55,4 +55,3 @@ Không ranking pattern chính thức trước khi các gate sau pass:
 - metric consistency gate;
 - liquidity gate;
 - overlap gate.
-

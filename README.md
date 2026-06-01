@@ -30,6 +30,11 @@ The legacy scanner path is quarantined and must not be used as the source of
 truth for new research or PDF monograph facts. New work should use `scanner/v2/`
 and the task list in `docs/project/v2-pdf-monograph-task-list.md`.
 
+For final investor-facing chapters, the active working standard is
+`docs/project/canonical-chapter-working-standard.md`. A chapter is not final
+unless it passes the canonical publication flow in
+`docs/project/canonical-publication-flow.md`.
+
 Historical comparison only:
 
 ```bash
@@ -49,6 +54,16 @@ CHARTPATTERNSCAN_ALLOW_LEGACY_SCANNER=1 python3 scanner/run_full_scan.py ...
   - Book v2 deterministic chapters: `scanner/build_pattern_monographs.py`
   - Book v2 readiness/governance audit: `scanner/audit_book_v2_readiness.py`
   - Book v2 assembly/commentary/PDF: `scanner/build_book_v2.py`
+
+- Legacy publication builders quarantined outside the active scanner flow:
+  - `scanner/_legacy_quarantine/build_bull_flag_public_chapter.py`
+  - `scanner/_legacy_quarantine/build_bull_flag_investor_chapter.py`
+
+- Canonical public chapter publication:
+  - `scanner/canonical_publication_chapter_factory.py`: only allowed final chapter factory.
+  - `scanner/canonical_chapter_content.py`: only allowed public editorial section adapter.
+  - `scanner/canonical_editorial_layer.py`: gate for AI/human editorial sections.
+  - `scanner/pattern_publication_core.py`: low-level renderer only; not enough by itself to declare final.
 
 - `scanner/ohlcv_normalizer.py`: làm sạch OHLCV (NULL, high/low đảo, clamp open/close, loại bỏ giá <=0), tạo cột dẫn xuất (ATR, volume_ma, volume_ratio…)
 - `scanner/pivot_detector.py`: phát hiện pivot highs/lows + lọc spacing để giảm nhiễu

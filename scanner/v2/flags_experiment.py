@@ -1,8 +1,8 @@
 """Experimental Scanner V2 flag detector.
 
-This is deliberately not an official P1-P5 pattern. It is a diagnostic
-experiment to compare a common Vietnam-market continuation pattern against the
-Broadening Bottoms V2 baseline using the same Market Stats V1 data style.
+This began as a diagnostic experiment and is now the shared data runner for
+the Flag Family lane. Official Bull/Bear Flag promotion still happens through
+the contract and release-gate modules.
 """
 
 from __future__ import annotations
@@ -22,14 +22,12 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 from ..ohlcv_normalizer import OHLCVNormalizer
 from ..pivot_detector import Pivot, PivotDetector, PivotType
-from .broadening_bottoms_monograph import (
-    DEFAULT_SOURCE_DIR,
-    _attach_current_market_groups,
-    _classify_market_regimes,
-    _load_market_stats_symbol,
-    _symbol_concentration,
-    _symbol_from_path,
-)
+from .source_data import DEFAULT_SOURCE_DIR
+from .source_data import attach_current_market_groups as _attach_current_market_groups
+from .source_data import classify_market_regimes as _classify_market_regimes
+from .source_data import load_market_stats_symbol as _load_market_stats_symbol
+from .source_data import symbol_concentration as _symbol_concentration
+from .source_data import symbol_from_path as _symbol_from_path
 
 
 PATTERN_KEY = "flags_experiment"
@@ -612,16 +610,13 @@ def _path_rows(scan: Mapping[str, Any], *, source_dir: Path, horizon_bars: int =
     return out
 
 
-def _render_pdf(path: Path, stats: Mapping[str, Any], *, broadening_stats_path: Optional[Path] = None) -> None:
-    broadening: Optional[Mapping[str, Any]] = None
-    if broadening_stats_path and broadening_stats_path.exists():
-        broadening = json.loads(broadening_stats_path.read_text(encoding="utf-8"))
+def _render_pdf(path: Path, stats: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with PdfPages(path) as pdf:
         fig = plt.figure(figsize=(8.27, 11.69))
         fig.patch.set_facecolor("#fffdf8")
         fig.text(0.5, 0.91, "Flags Experiment", ha="center", va="top", fontsize=22, weight="bold")
-        fig.text(0.5, 0.875, "Đối chứng dữ liệu với Broadening Bottoms", ha="center", va="top", fontsize=11)
+        fig.text(0.5, 0.875, "Đối chứng dữ liệu trong Flag Family", ha="center", va="top", fontsize=11)
         rows = [
             ("Số mã quét", stats.get("symbols_scanned")),
             ("Số mẫu Flag", stats.get("detection_count")),
@@ -634,14 +629,6 @@ def _render_pdf(path: Path, stats: Mapping[str, Any], *, broadening_stats_path: 
             ("Fail 5%", f"{stats.get('failure_5pct_rate')}%"),
             ("Target-first trước adverse 5%", f"{stats.get('target_first_before_adverse_5pct_rate')}%"),
         ]
-        if broadening:
-            rows.extend(
-                [
-                    ("Broadening target hit", f"{broadening.get('target_hit_rate')}%"),
-                    ("Broadening fail 5%", f"{broadening.get('failure_5pct_rate')}%"),
-                    ("Broadening MFE/MAE", f"{broadening.get('median_mfe_pct')}% / {broadening.get('median_mae_pct')}%"),
-                ]
-            )
         y = 0.80
         for label, value in rows:
             fig.text(0.18, y, str(label), fontsize=10, weight="bold", ha="left", va="top")
@@ -651,7 +638,7 @@ def _render_pdf(path: Path, stats: Mapping[str, Any], *, broadening_stats_path: 
             0.14,
             0.18,
             "Ghi chú: đây là experiment chưa có provenance P1-P5 cho chương Flag. "
-            "Mục tiêu là kiểm tra nhanh liệu một mẫu phổ biến hơn tại Việt Nam có tạo thống kê hậu phá vỡ tốt hơn Broadening Bottoms hay không.",
+            "Mục tiêu là kiểm tra nhanh liệu nhánh Flag nào có thống kê hậu phá vỡ đủ ổn định để nâng lên chapter chính.",
             fontsize=9,
             ha="left",
             va="top",
@@ -701,5 +688,5 @@ def run_experiment(
             "signed_low_excursion_pct",
         ],
     )
-    _render_pdf(paths["pdf"], stats, broadening_stats_path=Path("artifacts/scanner_v2/broadening_bottoms/statistics.json"))
+    _render_pdf(paths["pdf"], stats)
     return paths

@@ -94,13 +94,10 @@ def test_target_sensitivity_respects_horizon_days() -> None:
 
 
 def test_target_family_uses_pattern_specific_bulkowski_adjusted_bands() -> None:
-    broadening = target_family_for_label("broadening_bottoms")
     official_bull_flag = target_family_for_label("bull_flags")
     bull_flag = target_family_for_label("flags_experiment:bull_flag")
     fallback = target_family_for_label("unknown_pattern")
 
-    assert [row["multiple"] for row in broadening] == [0.65, 0.75, 1.0]
-    assert broadening[0]["role"] == "bulkowski_adjusted_base"
     assert [row["multiple"] for row in official_bull_flag] == [0.46, 0.5, 0.75, 1.0]
     assert [row["multiple"] for row in bull_flag] == [0.46, 0.5, 0.75, 1.0]
     assert bull_flag[-1]["role"] == "legacy_full_pole"

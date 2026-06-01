@@ -74,6 +74,17 @@ class ExecutionConfig:
     max_breakout_date: Optional[str] = None
     allowed_liquidity_buckets: Optional[tuple[str, ...]] = None
     allowed_market_regimes: Optional[tuple[str, ...]] = None
+    allowed_publication_quality_tiers: Optional[tuple[str, ...]] = None
+    min_pole_move_pct: Optional[float] = None
+    max_pennant_to_pole_pct: Optional[float] = None
+    max_compression_ratio: Optional[float] = None
+    min_breakout_volume_ratio: Optional[float] = None
+    require_volume_confirmed: bool = False
+    allowed_pre_breakout_regime_branches: Optional[tuple[str, ...]] = None
+    excluded_pole_exhaustion_branches: Optional[tuple[str, ...]] = None
+    max_prior_pennant_cluster_count_10d: Optional[int] = None
+    max_pre_breakout_volatility_20d_pct: Optional[float] = None
+    cooldown_days: Optional[int] = None
     exclude_bear_high_liquidity_setup_score_min: Optional[float] = None
     low_liquidity_extra_slippage_bps: float = 0.0
     mid_liquidity_extra_slippage_bps: float = 0.0
@@ -335,6 +346,17 @@ def frozen_rule_contract(config: ExecutionConfig, *, profile_id: str = DEFAULT_P
             "max_breakout_date": config.max_breakout_date,
             "allowed_liquidity_buckets": config.allowed_liquidity_buckets,
             "allowed_market_regimes": config.allowed_market_regimes,
+            "allowed_publication_quality_tiers": config.allowed_publication_quality_tiers,
+            "min_pole_move_pct": config.min_pole_move_pct,
+            "max_pennant_to_pole_pct": config.max_pennant_to_pole_pct,
+            "max_compression_ratio": config.max_compression_ratio,
+            "min_breakout_volume_ratio": config.min_breakout_volume_ratio,
+            "require_volume_confirmed": config.require_volume_confirmed,
+            "allowed_pre_breakout_regime_branches": config.allowed_pre_breakout_regime_branches,
+            "excluded_pole_exhaustion_branches": config.excluded_pole_exhaustion_branches,
+            "max_prior_pennant_cluster_count_10d": config.max_prior_pennant_cluster_count_10d,
+            "max_pre_breakout_volatility_20d_pct": config.max_pre_breakout_volatility_20d_pct,
+            "cooldown_days": config.cooldown_days,
             "exclude_bear_high_liquidity_setup_score_min": config.exclude_bear_high_liquidity_setup_score_min,
         },
         "cost_model": {
@@ -640,6 +662,29 @@ def _apply_execution_filters(events: pd.DataFrame, config: ExecutionConfig) -> p
     if config.allowed_market_regimes:
         allowed = {str(item) for item in config.allowed_market_regimes}
         mask &= series("market_regime").astype(str).isin(allowed)
+    if config.allowed_publication_quality_tiers and "publication_quality_tier" in filtered.columns:
+        allowed = {str(item) for item in config.allowed_publication_quality_tiers}
+        mask &= series("publication_quality_tier").astype(str).isin(allowed)
+    if config.min_pole_move_pct is not None and "pole_move_pct" in filtered.columns:
+        mask &= pd.to_numeric(series("pole_move_pct"), errors="coerce").fillna(-np.inf) >= float(config.min_pole_move_pct)
+    if config.max_pennant_to_pole_pct is not None and "pennant_to_pole_pct" in filtered.columns:
+        mask &= pd.to_numeric(series("pennant_to_pole_pct"), errors="coerce").fillna(np.inf) <= float(config.max_pennant_to_pole_pct)
+    if config.max_compression_ratio is not None and "compression_ratio" in filtered.columns:
+        mask &= pd.to_numeric(series("compression_ratio"), errors="coerce").fillna(np.inf) <= float(config.max_compression_ratio)
+    if config.min_breakout_volume_ratio is not None and "breakout_volume_ratio" in filtered.columns:
+        mask &= pd.to_numeric(series("breakout_volume_ratio"), errors="coerce").fillna(-np.inf) >= float(config.min_breakout_volume_ratio)
+    if config.require_volume_confirmed and "volume_confirmed" in filtered.columns:
+        mask &= series("volume_confirmed").map(lambda value: bool(value) if isinstance(value, bool) else str(value).strip().lower() in {"true", "1", "yes", "y"})
+    if config.allowed_pre_breakout_regime_branches and "pre_breakout_regime_branch" in filtered.columns:
+        allowed = {str(item) for item in config.allowed_pre_breakout_regime_branches}
+        mask &= series("pre_breakout_regime_branch").astype(str).isin(allowed)
+    if config.excluded_pole_exhaustion_branches and "pole_exhaustion_branch" in filtered.columns:
+        excluded = {str(item) for item in config.excluded_pole_exhaustion_branches}
+        mask &= ~series("pole_exhaustion_branch").astype(str).isin(excluded)
+    if config.max_prior_pennant_cluster_count_10d is not None and "prior_pennant_cluster_count_10d" in filtered.columns:
+        mask &= pd.to_numeric(series("prior_pennant_cluster_count_10d"), errors="coerce").fillna(np.inf) <= int(config.max_prior_pennant_cluster_count_10d)
+    if config.max_pre_breakout_volatility_20d_pct is not None and "pre_breakout_volatility_20d_pct" in filtered.columns:
+        mask &= pd.to_numeric(series("pre_breakout_volatility_20d_pct"), errors="coerce").fillna(np.inf) <= float(config.max_pre_breakout_volatility_20d_pct)
     if config.exclude_bear_high_liquidity_setup_score_min is not None:
         overextended_bear_high_liquidity = (
             (series("market_regime").astype(str) == "bear")
@@ -664,6 +709,20 @@ def apply_event_scope(events: pd.DataFrame, path: pd.DataFrame, config: Executio
         if config.max_breakout_date is not None:
             mask &= dates <= pd.Timestamp(config.max_breakout_date)
     scoped = scoped[mask].copy()
+    if config.cooldown_days is not None and not scoped.empty and {"symbol", "breakout_date"}.issubset(scoped.columns):
+        ordered = scoped.copy()
+        ordered["_breakout_ts"] = pd.to_datetime(ordered["breakout_date"], errors="coerce")
+        ordered = ordered.dropna(subset=["_breakout_ts"]).sort_values(["symbol", "_breakout_ts"]).copy()
+        keep: List[Any] = []
+        last_by_symbol: Dict[str, pd.Timestamp] = {}
+        for idx, row in ordered.iterrows():
+            symbol = str(row.get("symbol") or "")
+            ts = row["_breakout_ts"]
+            last = last_by_symbol.get(symbol)
+            if last is None or (ts - last).days >= int(config.cooldown_days):
+                keep.append(idx)
+                last_by_symbol[symbol] = ts
+        scoped = ordered.loc[keep].drop(columns=["_breakout_ts"], errors="ignore").sort_values(["breakout_date", "symbol"]).copy()
     if path.empty or scoped.empty or "event_id" not in scoped.columns or "event_id" not in path.columns:
         return scoped, path.copy()
     event_ids = set(scoped["event_id"].astype(str))
@@ -695,6 +754,11 @@ def build_signal_trades(events: pd.DataFrame, path: pd.DataFrame, config: Execut
                     "adtv20_value": event.get("adtv20_value"),
                     "market_regime": event.get("market_regime"),
                     "market_group": event.get("market_group"),
+                    "pre_breakout_regime_branch": event.get("pre_breakout_regime_branch"),
+                    "pole_exhaustion_branch": event.get("pole_exhaustion_branch"),
+                    "cluster_noise_branch": event.get("cluster_noise_branch"),
+                    "prior_pennant_cluster_count_10d": event.get("prior_pennant_cluster_count_10d"),
+                    "pre_breakout_volatility_20d_pct": event.get("pre_breakout_volatility_20d_pct"),
                 }
             )
             trades.append(trade)

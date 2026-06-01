@@ -68,5 +68,4 @@ Nên chuyển từ thử nghiệm sang pipeline có kiểm soát:
 2. Thêm guard sửa/loại thuật ngữ tiếng Anh trong body, nhưng cho phép trong tên field kỹ thuật.
 3. Thêm kiểm tra caption arithmetic: mọi caption có giá, mục tiêu, biên thuận lợi/bất lợi phải khớp event data.
 4. Dùng critic output như checklist sửa, không dùng self-score làm quyết định cuối.
-5. Sau khi guard sạch, mới đưa section được duyệt vào `build_bull_flag_public_chapter.py`.
-
+5. Sau khi guard sạch, đưa section được duyệt vào canonical content layer; `build_bull_flag_public_chapter.py` đã được chuyển vào `_legacy_quarantine` và không còn là luồng xuất bản.

@@ -18,7 +18,7 @@ def main() -> None:
     parser.add_argument("--out", default=None, help="Optional JSON output path")
     args = parser.parse_args()
 
-    result = audit_source_alignment(tuple(args.pattern) if args.pattern else ("broadening_bottoms",))
+    result = audit_source_alignment(tuple(args.pattern) if args.pattern else ("bull_flags", "bear_flags"))
     text = json.dumps(result, indent=2, sort_keys=True)
     if args.out:
         path = Path(args.out)

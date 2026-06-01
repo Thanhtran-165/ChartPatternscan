@@ -48,7 +48,7 @@ python3 scanner/run_deepseek_blocked_bull_flag_editorial.py
 Lệnh build PDF trial:
 
 ```bash
-python3 scanner/build_bull_flag_public_chapter.py \
+CHARTPATTERNSCAN_ALLOW_LEGACY_PUBLICATION_BUILDER=1 python3 scanner/_legacy_quarantine/build_bull_flag_public_chapter.py \
   --ai-sections artifacts/scanner_v2/bull_flags_ai_writing_blocked_v4_flash/approved_ai_sections.json \
   --out-dir artifacts/scanner_v2/bull_flags_public_chapter_trial_ai_blocks
 ```
@@ -71,4 +71,3 @@ Một output AI chỉ được đưa vào PDF khi:
 - Block cuối không gọi DeepSeek nữa. Tổng hợp cuối là deterministic code để tránh lỗi JSON dài/cắt output.
 - Critic output là checklist, không phải quyết định cuối. Quyết định cuối nằm ở local guard và PDF QA.
 - Field kỹ thuật có thể chứa tên field như `median_mfe_pct`, nhưng body/caption public không được chứa thuật ngữ đó.
-

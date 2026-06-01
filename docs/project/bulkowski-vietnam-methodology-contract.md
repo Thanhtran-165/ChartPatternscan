@@ -204,21 +204,24 @@ Cách đọc điểm:
 - 70-84: research draft hữu ích nhưng thiếu ít nhất một trụ cột lớn
 - dưới 70: chỉ nên xem là bản nháp nội bộ
 
-## Áp dụng hiện tại cho Broadening Bottoms
+## Áp dụng hiện tại cho Flag Family
 
-Chương Broadening Bottoms V2 hiện đã vượt qua ngưỡng template sớm:
+Flag Family là lane hoạt động hiện tại của Scanner V2. Bull Flag đã vượt qua
+ngưỡng template sớm và Bear Flag đang được dùng để mở rộng cùng framework sang
+breakout xuống:
 
 - đã có rule provenance từ nguồn
 - đã có rule coverage chính thức trong Scanner V2
 - đã chạy trên OHLCV Việt Nam thật
-- target rule có nguồn
+- target family có nguồn và có local calibration
 - đã có split theo VNINDEX regime
 - ví dụ gồm cả case đạt tốt và case yếu/thất bại
 - AI commentary bị khóa bởi payload deterministic
 - đã có PDF output
 
-Tuy nhiên, chương này vẫn phải được xem là research-reference draft, chưa phải
-hệ thống giao dịch trưởng thành.
+Tuy nhiên, Flag Family vẫn phải được xem là research-reference draft, chưa phải
+hệ thống giao dịch trưởng thành. Riêng Bear Flag phải giữ ngôn ngữ
+informational/defensive cho đến khi có lớp thực thi downside riêng.
 
 Các khoảng trống trước khi claim đầy đủ mức 85-90%:
 

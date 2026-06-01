@@ -27,20 +27,10 @@ import pandas as pd
 
 
 DEFAULT_OUT_DIR = Path("artifacts/scanner_v2/research_support")
-DEFAULT_BROADENING_DIR = Path("artifacts/scanner_v2/broadening_bottoms")
 DEFAULT_FLAGS_DIR = Path("artifacts/scanner_v2/flags_experiment")
 DEFAULT_BULL_FLAGS_DIR = Path("artifacts/scanner_v2/bull_flags")
 FALLBACK_TARGET_MULTIPLES = (0.5, 0.75, 1.0, 1.25)
 TARGET_FAMILIES: Dict[str, Sequence[Dict[str, Any]]] = {
-    "broadening_bottoms": (
-        {
-            "multiple": 0.65,
-            "role": "bulkowski_adjusted_base",
-            "note": "Broadening Bottoms adjusted benchmark from empirical target attainment, not full height.",
-        },
-        {"multiple": 0.75, "role": "local_stretch", "note": "Intermediate local calibration band."},
-        {"multiple": 1.0, "role": "legacy_full_measure", "note": "Full geometric measure rule kept for comparison only."},
-    ),
     "flags_experiment": (
         {
             "multiple": 0.46,
@@ -60,6 +50,21 @@ TARGET_FAMILIES: Dict[str, Sequence[Dict[str, Any]]] = {
         {"multiple": 0.5, "role": "rounded_local_base", "note": "Rounded local base target for Vietnam calibration."},
         {"multiple": 0.75, "role": "local_stretch", "note": "Stretch target below full pole-height."},
         {"multiple": 1.0, "role": "legacy_full_pole", "note": "Full pole-height target kept as legacy benchmark."},
+    ),
+    "bear_flags": (
+        {
+            "multiple": 0.46,
+            "role": "bulkowski_adjusted_base",
+            "note": "Bear Flag adjusted benchmark based on fractional pole-height target.",
+        },
+        {"multiple": 0.5, "role": "rounded_local_base", "note": "Rounded local base target for Vietnam defensive calibration."},
+        {"multiple": 0.75, "role": "local_stretch", "note": "Stretch target below full pole-height."},
+        {"multiple": 1.0, "role": "legacy_full_pole", "note": "Full pole-height target kept as legacy benchmark."},
+    ),
+    "triangles_ascending": (
+        {"multiple": 0.5, "role": "local_base", "note": "Local base target at half triangle height for Vietnam calibration."},
+        {"multiple": 0.75, "role": "local_stretch", "note": "Stretch target below full triangle height."},
+        {"multiple": 1.0, "role": "legacy_full_height", "note": "Full triangle-height target kept as legacy benchmark."},
     ),
 }
 DEFAULT_ANALYSIS_HORIZON_DAYS = 60
@@ -316,41 +321,45 @@ def _bool_mask(series: pd.Series) -> pd.Series:
 
 
 def _bull_flag_subgroups(events: pd.DataFrame) -> List[tuple[str, pd.DataFrame]]:
+    return _flag_subgroups(events, "bull_flags")
+
+
+def _flag_subgroups(events: pd.DataFrame, pattern_key: str) -> List[tuple[str, pd.DataFrame]]:
     if events.empty:
         return []
-    groups: List[tuple[str, pd.DataFrame]] = [("bull_flags", events.copy())]
+    groups: List[tuple[str, pd.DataFrame]] = [(pattern_key, events.copy())]
     if "liquidity_bucket" in events.columns:
         for bucket in ("high", "mid", "low"):
             subset = events[events["liquidity_bucket"].astype(str) == bucket].copy()
             if not subset.empty:
-                groups.append((f"bull_flags:liquidity={bucket}", subset))
+                groups.append((f"{pattern_key}:liquidity={bucket}", subset))
     if "is_primary_event_60d" in events.columns:
         primary = _bool_mask(events["is_primary_event_60d"])
-        groups.append(("bull_flags:primary_60d=true", events[primary].copy()))
-        groups.append(("bull_flags:primary_60d=false", events[~primary].copy()))
+        groups.append((f"{pattern_key}:primary_60d=true", events[primary].copy()))
+        groups.append((f"{pattern_key}:primary_60d=false", events[~primary].copy()))
     if "halted_delisted_proxy_flag" in events.columns:
         flagged = _bool_mask(events["halted_delisted_proxy_flag"])
-        groups.append(("bull_flags:path_proxy_clean", events[~flagged].copy()))
-        groups.append(("bull_flags:path_proxy_flagged", events[flagged].copy()))
+        groups.append((f"{pattern_key}:path_proxy_clean", events[~flagged].copy()))
+        groups.append((f"{pattern_key}:path_proxy_flagged", events[flagged].copy()))
     if "path_quality_bucket" in events.columns:
         for bucket in ("clean", "stale_close", "zero_and_stale", "zero_volume", "short_path", "mixed_flag"):
             subset = events[events["path_quality_bucket"].astype(str) == bucket].copy()
             if not subset.empty:
-                groups.append((f"bull_flags:path_quality={bucket}", subset))
+                groups.append((f"{pattern_key}:path_quality={bucket}", subset))
     if "market_regime" in events.columns:
         for regime in ("bull", "bear", "unknown"):
             subset = events[events["market_regime"].astype(str) == regime].copy()
             if not subset.empty:
-                groups.append((f"bull_flags:regime={regime}", subset))
+                groups.append((f"{pattern_key}:regime={regime}", subset))
     if "time_split" in events.columns:
         for split in ("train_60", "validation_20", "holdout_20", "unknown"):
             subset = events[events["time_split"].astype(str) == split].copy()
             if not subset.empty:
-                groups.append((f"bull_flags:time={split}", subset))
+                groups.append((f"{pattern_key}:time={split}", subset))
     if "corp_action_proxy_flag" in events.columns:
         flagged = _bool_mask(events["corp_action_proxy_flag"])
-        groups.append(("bull_flags:corp_proxy_clean", events[~flagged].copy()))
-        groups.append(("bull_flags:corp_proxy_flagged", events[flagged].copy()))
+        groups.append((f"{pattern_key}:corp_proxy_clean", events[~flagged].copy()))
+        groups.append((f"{pattern_key}:corp_proxy_flagged", events[flagged].copy()))
     return [(label, group) for label, group in groups if not group.empty]
 
 
@@ -760,7 +769,7 @@ def build_comparison(patterns: Sequence[PatternArtifacts], *, horizon_days: int 
             "Wilson CI is used for binary rates.",
             "Median MFE/MAE intervals use symbol-cluster bootstrap to reduce single-symbol dominance.",
             f"Target sensitivity recalculates target hit over {int(horizon_days)} trading sessions using pattern-specific target families.",
-            "Pattern-specific target families are used where research has a Bulkowski-adjusted benchmark: Broadening Bottoms uses 0.65x/0.75x/1.0x, Flags use 0.46x/0.5x/0.75x/1.0x.",
+            "Pattern-specific target families are used where research has a Bulkowski-adjusted benchmark: Flags use 0.46x/0.5x/0.75x/1.0x.",
             "Base-target selection is rule-based: preserve target-family order and pass minimum N, hit-rate Wilson lower bound, target-first-before-adverse, and failure containment.",
             "This packet is descriptive research support, not a trading-system validation.",
         ],
@@ -889,7 +898,7 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         [
             "## Notes For GPT 5.5 Pro Research",
             "",
-            "- Broadening Bottoms and Flags were run on Market Stats V1 stock series; Bull Flags are now filtered to the active/current Market Stats universe.",
+            "- Flags were run on Market Stats V1 stock series; Bull Flags are now filtered to the active/current Market Stats universe.",
             "- Bull Flags have Scanner V2 provenance, golden fixtures, and active-universe data gates; remaining work is calibration/regime/liquidity robustness, not legacy PTI membership.",
             "- The combined Flags experiment remains diagnostic-only for bear/downside comparison.",
             "- The current target calibration view is: full 1.0x remains a legacy benchmark, while Bulkowski-adjusted fractional targets are the candidate base targets.",
@@ -995,7 +1004,6 @@ def write_report(report: Mapping[str, Any], out_dir: Path, *, render_pdf_artifac
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--broadening-dir", default=str(DEFAULT_BROADENING_DIR))
     parser.add_argument("--flags-dir", default=str(DEFAULT_FLAGS_DIR))
     parser.add_argument("--bull-flags-dir", default=str(DEFAULT_BULL_FLAGS_DIR))
     parser.add_argument("--out-dir", default=str(DEFAULT_OUT_DIR))
@@ -1004,7 +1012,6 @@ def main() -> None:
     args = parser.parse_args()
 
     patterns = [
-        load_pattern_artifacts("broadening_bottoms", Path(args.broadening_dir)),
         load_pattern_artifacts("bull_flags", Path(args.bull_flags_dir)),
         load_pattern_artifacts("flags_experiment", Path(args.flags_dir)),
     ]

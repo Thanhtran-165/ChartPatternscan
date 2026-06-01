@@ -21,13 +21,17 @@ CORE_REGISTRY_PATH = PACKAGE_DIR / "core_patterns.json"
 TAXONOMY_LINEAGE_PATH = PACKAGE_DIR / "taxonomy_lineage.json"
 
 CORE_PATTERN_KEYS: Tuple[str, ...] = (
-    "broadening_bottoms",
     "bull_flags",
+    "bear_flags",
     "double_bottoms",
     "double_tops",
     "head_and_shoulders_bottoms",
     "head_and_shoulders_tops",
     "triangles_ascending",
+    "triangles_descending",
+    "triangles_symmetrical",
+    "wedges_falling",
+    "wedges_rising",
     "cup_with_handle",
 )
 
@@ -44,12 +48,25 @@ REQUIRED_RULE_FIELDS: Tuple[str, ...] = (
 
 SUPPORTED_RULE_TYPES: Dict[str, str] = {
     "prior_trend": "trend",
+    "trend_context": "trend",
     "pivot_sequence": "pattern_structure",
     "trendline_geometry": "pattern_structure",
     "shape_geometry": "pattern_structure",
+    "shape": "pattern_structure",
+    "touch_count": "pattern_structure",
+    "path_quality": "pattern_structure",
+    "time_geometry": "pattern_structure",
+    "position_context": "pattern_context",
+    "duration": "pattern_context",
+    "height": "pattern_geometry",
     "breakout": "breakout",
     "measurement": "post_breakout_measurement",
+    "target": "post_breakout_measurement",
+    "target_measure_rule": "post_breakout_measurement",
+    "post_breakout_behavior": "post_breakout_measurement",
     "volume": "volume",
+    "volume_context": "volume",
+    "variant_shape": "variant_geometry",
     "invalidation": "invalidation",
 }
 
@@ -224,14 +241,14 @@ def _coverage_errors(pattern_key: str, coverage: Sequence[RuleCoverageRow]) -> L
 
 
 def _detector_rule_errors(pattern_key: str, pattern: Mapping[str, Any]) -> List[str]:
-    if pattern_key == "broadening_bottoms":
-        from .broadening_bottoms import BROADENING_BOTTOMS_SUPPORTED_RULE_IDS
-
-        supported = BROADENING_BOTTOMS_SUPPORTED_RULE_IDS
-    elif pattern_key == "bull_flags":
+    if pattern_key == "bull_flags":
         from .bull_flags import BULL_FLAGS_SUPPORTED_RULE_IDS
 
         supported = BULL_FLAGS_SUPPORTED_RULE_IDS
+    elif pattern_key == "bear_flags":
+        from .bull_flags import BEAR_FLAGS_SUPPORTED_RULE_IDS
+
+        supported = BEAR_FLAGS_SUPPORTED_RULE_IDS
     else:
         return []
 
@@ -249,14 +266,14 @@ def _fixture_errors(pattern_key: str, pattern: Mapping[str, Any]) -> List[str]:
     fixtures = pattern.get("golden_fixtures")
     if not isinstance(fixtures, list):
         return [f"{pattern_key}: golden_fixtures must be a list"]
-    if pattern_key == "broadening_bottoms":
-        from .broadening_bottoms import run_broadening_bottoms_fixture
-
-        runner = run_broadening_bottoms_fixture
-    elif pattern_key == "bull_flags":
+    if pattern_key == "bull_flags":
         from .bull_flags import run_bull_flags_fixture
 
         runner = run_bull_flags_fixture
+    elif pattern_key == "bear_flags":
+        from .bull_flags import run_bear_flags_fixture
+
+        runner = run_bear_flags_fixture
     else:
         return []
 

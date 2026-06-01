@@ -111,7 +111,9 @@ Example outputs:
 
 - `double_bottoms.md`
 - `triangles.md`
-- `broadening_bottoms.md`
+- `flag_family.md`
+- `bull_flags.md`
+- `bear_flags.md`
 
 ### C. Symbol Dossier
 
