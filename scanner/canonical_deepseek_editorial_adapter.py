@@ -550,20 +550,67 @@ def _geometry_terms_for_payload(prepared_payload: Mapping[str, Any]) -> list[str
         ).lower()
     identity_text = " ".join([pattern_id, pattern_name, rule_text])
     family_terms: list[str]
-    if "pipe" in identity_text:
+    if "head_and_shoulders" in pattern_id or "head_shoulders" in pattern_id or "head and shoulders" in pattern_name or "vai đầu vai" in pattern_name:
+        family_terms = ["vai", "đầu", "đường cổ", "vai trái", "vai phải", "xác nhận"]
+    elif "double_bottoms" in pattern_id:
+        family_terms = ["hai đáy", "đáy thứ nhất", "đáy thứ hai", "adam", "eve", "đỉnh", "xác nhận", "phá vỡ"]
+    elif "double_tops" in pattern_id:
+        family_terms = ["hai đỉnh", "đỉnh thứ nhất", "đỉnh thứ hai", "adam", "eve", "đáy", "xác nhận", "phá vỡ"]
+    elif "double" in pattern_id:
+        family_terms = ["hai đáy", "hai đỉnh", "adam", "eve", "xác nhận", "phá vỡ"]
+    elif "triple_bottoms" in pattern_id:
+        family_terms = ["ba đáy", "vùng hỗ trợ", "đường xác nhận", "đỉnh tạm thời", "đóng cửa", "phá vỡ"]
+    elif "triple_tops" in pattern_id:
+        family_terms = ["ba đỉnh", "vùng kháng cự", "đường xác nhận", "đáy tạm thời", "đóng cửa", "phá vỡ"]
+    elif "triple" in pattern_id:
+        family_terms = ["ba đỉnh", "ba đáy", "vùng xác nhận", "kháng cự", "hỗ trợ", "đóng cửa"]
+    elif "three_falling_peaks" in pattern_id or "three_rising_valleys" in pattern_id:
+        family_terms = ["ba đỉnh", "ba đáy", "thấp dần", "cao dần", "đỉnh sau", "đáy sau", "đỉnh xen giữa", "đáy xen giữa", "vùng xác nhận", "đóng cửa"]
+    elif "triangle" in pattern_id or "triangles" in pattern_id or "triangle" in pattern_name or "tam giác" in pattern_name:
+        family_terms = ["tam giác", "đường xu hướng", "đỉnh", "đáy", "hội tụ", "kháng cự", "hỗ trợ", "phá vỡ"]
+    elif "wedge" in pattern_id or "wedges" in pattern_id or "wedge" in pattern_name or "nêm" in pattern_name:
+        family_terms = ["nêm", "đường xu hướng", "hội tụ", "dốc", "đỉnh", "đáy", "phá vỡ"]
+    elif "flag" in pattern_id or "flags" in pattern_id or "pennant" in pattern_id or "flag" in pattern_name or "cờ" in pattern_name or "pennant" in pattern_name:
+        family_terms = ["cột cờ", "thân cờ", "phá vỡ", "kênh", "song song", "ngắn", "hẹp"]
+    elif "cup" in pattern_id or "cup" in pattern_name or "cốc" in pattern_name:
+        family_terms = ["cốc", "tay cầm", "môi", "đáy", "chữ u", "phá vỡ", "tròn"]
+    elif "rectangle" in pattern_id or "rectangle" in pattern_name or "chữ nhật" in pattern_name:
+        family_terms = ["chữ nhật", "hai đường", "trần", "sàn", "biên ngang", "đóng cửa", "phá vỡ"]
+    elif "measured_move_down" in pattern_id:
+        family_terms = ["a", "b", "c", "nhịp giảm đầu", "pha hồi", "đóng cửa dưới", "0.5x"]
+    elif "measured_move_up" in pattern_id:
+        family_terms = ["a", "b", "c", "nhịp tăng đầu", "pha điều chỉnh", "đóng cửa trên", "0.5x"]
+    elif "measured_move" in pattern_id or "measured" in pattern_id or "measured" in pattern_name:
+        family_terms = ["nhịp đầu", "pha điều chỉnh", "nhịp thứ hai", "hồi", "lùi", "xác nhận"]
+    elif "scallop" in pattern_id and "inverted" in pattern_id:
+        family_terms = ["scallop", "ô", "môi trái", "môi phải", "đỉnh", "tròn", "cong", "phá vỡ"]
+    elif "scallop" in pattern_id or "scallop" in pattern_name:
+        family_terms = ["scallop", "chữ j", "lòng chảo", "đỉnh trái", "đỉnh phải", "môi", "cong", "phá vỡ"]
+    elif "broadening" in pattern_id or "broadening" in pattern_name or "mở rộng" in pattern_name:
+        family_terms = ["mở rộng", "đỉnh cao hơn", "đáy thấp hơn", "đường xu hướng", "phá vỡ"]
+    elif "rounding" in pattern_id or "rounding" in pattern_name or "dạng bát" in pattern_name or "bát úp" in pattern_name:
+        if "rounding_top" in pattern_id or "rounding top" in pattern_name or "bát úp" in pattern_name:
+            family_terms = ["dạng bát úp", "biểu đồ tuần", "mép phải", "đỉnh", "đóng cửa", "xác nhận"]
+        else:
+            family_terms = ["dạng bát", "biểu đồ tuần", "mép phải", "đáy", "đóng cửa", "xác nhận"]
+    elif "rising_three_methods" in pattern_id:
+        family_terms = ["nến trắng dài", "ba nến", "nến thứ năm", "biên độ nến đầu", "đóng cửa", "xu hướng tăng"]
+    elif "falling_three_methods" in pattern_id:
+        family_terms = ["nến đen dài", "ba nến", "nến thứ năm", "biên độ nến đầu", "đóng cửa", "xu hướng giảm"]
+    elif "pipe" in identity_text:
         family_terms = ["tuần", "cú xuyên", "chồng lấn", "liền", "đóng cửa", "xác nhận", "đỉnh", "đáy", "nổi bật", "khối lượng"]
     elif "horn" in identity_text:
         family_terms = ["tuần", "cú xuyên", "cách nhau", "tuần giữa", "mẫu 3 tuần", "đóng cửa", "xác nhận", "đỉnh", "đáy", "nổi bật"]
     elif "diamond" in identity_text or "kim cương" in identity_text:
         family_terms = ["diamond", "kim cương", "mở rộng", "thu hẹp", "đỉnh cao hơn", "đáy thấp hơn", "đỉnh thấp hơn", "đáy cao hơn", "đóng cửa", "xác nhận"]
+    elif "bump_and_run_reversal_tops" in pattern_id or "bump-and-run reversal top" in identity_text:
+        family_terms = ["nhịp dẫn", "bump", "run", "đường xu hướng", "đóng cửa dưới", "đỉnh bump", "kéo ngược"]
+    elif "bump_and_run_reversal_bottoms" in pattern_id or "bump-and-run reversal bottom" in identity_text:
+        family_terms = ["nhịp dẫn", "bump", "run", "đường xu hướng", "đóng cửa trên", "đáy bump", "kéo ngược"]
     elif "bump-and-run" in identity_text or "bump_and_run" in identity_text:
         family_terms = ["nhịp dẫn", "cú bump", "pha run", "đường xu hướng dẫn", "vượt lại", "rơi xuống dưới", "xác nhận"]
-    elif "flag" in identity_text or "cờ" in identity_text or "pennant" in identity_text:
-        family_terms = ["cột cờ", "thân cờ", "phá vỡ", "kênh", "song song", "ngắn", "hẹp"]
     elif "triangle" in identity_text or "tam giác" in identity_text:
         family_terms = ["tam giác", "đường xu hướng", "đỉnh", "đáy", "hội tụ", "kháng cự", "hỗ trợ", "phá vỡ"]
-    elif "wedge" in identity_text or "nêm" in identity_text:
-        family_terms = ["nêm", "đường xu hướng", "hội tụ", "dốc", "đỉnh", "đáy", "phá vỡ"]
     elif "ttop." in identity_text or "tfp." in identity_text or "triple_tops" in identity_text or "ba đỉnh ngang" in identity_text:
         family_terms = ["ba đỉnh", "vùng kháng cự", "vùng xác nhận", "đáy trung gian", "đóng cửa"]
     elif "ttb." in identity_text or "triple_bottoms" in identity_text or "ba đáy ngang" in identity_text:
@@ -577,8 +624,10 @@ def _geometry_terms_for_payload(prepared_payload: Mapping[str, Any]) -> list[str
             family_terms = ["dạng bát úp", "biểu đồ tuần", "mép phải", "đỉnh", "đóng cửa", "xác nhận"]
         else:
             family_terms = ["dạng bát", "biểu đồ tuần", "mép phải", "đáy", "đóng cửa", "xác nhận"]
-    elif "double" in identity_text or "hai đáy" in identity_text or "hai đỉnh" in identity_text:
-        family_terms = ["hai đáy", "hai đỉnh", "adam", "eve", "đường xác nhận", "đỉnh giữa", "đáy giữa"]
+    elif "hai đáy" in identity_text:
+        family_terms = ["hai đáy", "đáy thứ nhất", "đáy thứ hai", "adam", "eve", "đỉnh", "xác nhận", "phá vỡ"]
+    elif "double" in identity_text or "hai đỉnh" in identity_text:
+        family_terms = ["hai đỉnh", "đỉnh thứ nhất", "đỉnh thứ hai", "adam", "eve", "đáy", "xác nhận", "phá vỡ"]
     elif "dead-cat" in identity_text or "dead_cat_bounce" in identity_text or "dead cat" in identity_text:
         if "inverted" in identity_text:
             family_terms = ["cú tăng", "sự kiện", "ngày thứ hai", "trả lại", "thành quả", "close-to-close", "gap", "khối lượng"]
@@ -599,13 +648,15 @@ def _geometry_terms_for_payload(prepared_payload: Mapping[str, Any]) -> list[str
     ):
         family_terms = ["vai", "đầu", "đường cổ", "vai trái", "vai phải", "xác nhận"]
     elif "cup" in identity_text or "cốc" in identity_text:
-        family_terms = ["cốc", "tay cầm", "miệng cốc", "đáy cốc", "phá vỡ", "bo tròn"]
+        family_terms = ["cốc", "tay cầm", "môi", "đáy", "chữ u", "phá vỡ", "tròn"]
     elif "rectangle" in identity_text or "chữ nhật" in identity_text:
         family_terms = ["hình chữ nhật", "kháng cự", "hỗ trợ", "biên trên", "biên dưới", "phá vỡ"]
     elif "measured" in identity_text or "measured move" in identity_text:
         family_terms = ["nhịp đầu", "pha điều chỉnh", "nhịp thứ hai", "hồi", "lùi", "xác nhận"]
+    elif "scallop" in identity_text and "inverted" in identity_text:
+        family_terms = ["scallop", "ô", "môi trái", "môi phải", "đỉnh", "tròn", "cong", "phá vỡ"]
     elif "scallop" in identity_text:
-        family_terms = ["vỏ sò", "đáy tròn", "đỉnh tròn", "đường cong", "phá vỡ"]
+        family_terms = ["scallop", "chữ j", "lòng chảo", "đỉnh trái", "đỉnh phải", "môi", "cong", "phá vỡ"]
     elif "broadening" in identity_text or "mở rộng" in identity_text:
         family_terms = ["mở rộng", "đỉnh cao hơn", "đáy thấp hơn", "đường xu hướng", "phá vỡ"]
     else:

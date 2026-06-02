@@ -67,6 +67,8 @@ from scanner.validate_final_chapters_manifest import DEFAULT_MANIFEST  # noqa: E
 DEFAULT_OUT_ROOT = Path("artifacts/scanner_v2/source_guided_refinement_final_v1")
 DEFAULT_SOURCE_PDF = Path("references/encyclopedia-of-chart-patterns-2nbsped-9786468600-3175723993-9780471668268-0471668265_compress.pdf")
 CORE_PATTERNS = Path("scanner/v2/core_patterns.json")
+LIGHTWEIGHT_SECTION_REPAIR_ID = "edition11_lightweight_ai_section_repair_v1"
+LIGHTWEIGHT_SECTION_REPAIR_ATTEMPTS = 3
 
 EVENT_SOURCES: dict[str, tuple[Path, dict[str, str]]] = {
     "bull_flags": (Path("artifacts/scanner_v2/bull_flags_db_source_parity/db_active/events.csv"), {}),
@@ -150,9 +152,173 @@ def _read_json(path: Path) -> Mapping[str, Any]:
     return payload if isinstance(payload, Mapping) else {}
 
 
+def _mapping(value: Any) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
+
+
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str) + "\n", encoding="utf-8")
+
+
+def _failed_editorial_sections_from_error(message: str) -> list[str]:
+    return [section for section in REQUIRED_EDITORIAL_SECTIONS if f"'section': '{section}'" in message]
+
+
+def _coerce_section_repair(parsed: Any, failed_sections: list[str]) -> dict[str, list[str]]:
+    if not isinstance(parsed, Mapping):
+        raise RuntimeError("section repair returned non-object JSON")
+    candidate = parsed.get("editorial_sections")
+    if candidate is None:
+        candidate = parsed.get("sections")
+    if not isinstance(candidate, Mapping):
+        direct = {section: parsed.get(section) for section in failed_sections if section in parsed}
+        candidate = direct if direct else None
+    if not isinstance(candidate, Mapping):
+        raise RuntimeError("section repair returned no editorial_sections object")
+
+    unexpected = sorted(str(key) for key in candidate if str(key) not in set(failed_sections))
+    if unexpected:
+        raise RuntimeError("section repair returned unexpected sections: " + ", ".join(unexpected))
+
+    repaired: dict[str, list[str]] = {}
+    for section in failed_sections:
+        value = candidate.get(section)
+        if isinstance(value, list):
+            clean_value = [str(item).strip() for item in value if str(item).strip()]
+        elif value is not None:
+            clean_value = [str(value).strip()]
+        else:
+            clean_value = []
+        if not clean_value:
+            raise RuntimeError(f"section repair returned empty section {section}")
+        repaired[section] = clean_value
+    return repaired
+
+
+def _repair_lightweight_sections(
+    *,
+    payload: Mapping[str, Any],
+    approved_path: Path,
+    failed_sections: list[str],
+    gate_failure: str,
+    chapter_meta: Mapping[str, Any],
+    model: str,
+    temperature: float,
+    timeout_s: int,
+    max_tokens: int,
+    api_key: str,
+) -> dict[str, Any]:
+    """Ask AI to repair only failing public sections.
+
+    This is intentionally not a fallback generator: it can only rewrite the
+    sections that the canonical gate rejected, and the artifact must pass the
+    same gate before rendering continues.
+    """
+
+    approved = _read_json(approved_path)
+    sections = approved.get("editorial_sections") if isinstance(approved.get("editorial_sections"), Mapping) else {}
+    if not sections:
+        raise RuntimeError(f"Approved artifact has no editorial_sections: {approved_path}")
+    out_dir = approved_path.parent
+    prompt = {
+        "task": "Repair only failing Vietnamese public editorial sections for Edition 1.1.",
+        "repair_id": LIGHTWEIGHT_SECTION_REPAIR_ID,
+        "chapter_meta": dict(chapter_meta),
+        "schema_contract": {
+            "only_valid_shape": {
+                "editorial_sections": {section: ["paragraph 1", "paragraph 2", "paragraph 3"] for section in failed_sections}
+            },
+            "allowed_section_ids": failed_sections,
+        },
+        "failed_sections": failed_sections,
+        "gate_failure": gate_failure,
+        "hard_rules": [
+            "Output valid JSON only.",
+            "Return only key `editorial_sections` with exactly the failed section ids.",
+            "Do not invent numbers, dates, tickers, examples, or outcomes.",
+            "Use only locked payload facts and the current approved artifact.",
+            "Make each repaired section reader-facing: chart behavior -> statistic if needed -> implication -> caution.",
+            "Do not write buy/sell/short advice.",
+            "Do not use internal terms: scanner, pipeline, proxy, setup, target-hit, target-first, validation, holdout, backtest, profit factor.",
+        ],
+        "locked_payload_facts": {
+            "pattern_id": payload.get("pattern_id"),
+            "pattern_name": payload.get("pattern_name"),
+            "chapter_reference": payload.get("chapter_reference"),
+            "target_calibration": payload.get("target_calibration"),
+            "classification": payload.get("classification"),
+            "publication_spec": payload.get("publication_spec"),
+            "example_events": payload.get("example_events"),
+        },
+        "current_failed_sections": {section: sections.get(section) for section in failed_sections},
+        "other_sections_for_style_only": {
+            section: sections.get(section)
+            for section in REQUIRED_EDITORIAL_SECTIONS
+            if section not in failed_sections
+        },
+    }
+    prompt_path = out_dir / "lightweight_section_repair_prompt.json"
+    _write_json(prompt_path, prompt)
+    schema_errors: list[str] = []
+    result: Mapping[str, Any] | None = None
+    repaired_sections: dict[str, list[str]] | None = None
+    for attempt in range(1, LIGHTWEIGHT_SECTION_REPAIR_ATTEMPTS + 1):
+        attempt_prompt = dict(prompt)
+        attempt_prompt["attempt"] = attempt
+        if schema_errors:
+            attempt_prompt["previous_schema_errors"] = schema_errors
+            attempt_prompt["repair_instruction"] = "Return exactly the schema_contract.only_valid_shape form and nothing else."
+        result = _call_deepseek_json(
+            api_key=api_key,
+            base_url=DEFAULT_DEEPSEEK_BASE_URL,
+            model=model,
+            prompt=json.dumps(attempt_prompt, ensure_ascii=False, indent=2, default=str),
+            temperature=min(float(temperature), 0.2),
+            max_tokens=max_tokens,
+            timeout_s=timeout_s,
+        )
+        (out_dir / f"lightweight_section_repair_attempt_{attempt}_raw.json").write_text(
+            str(result.get("raw") or ""),
+            encoding="utf-8",
+        )
+        (out_dir / f"lightweight_section_repair_attempt_{attempt}_parsed.json").write_text(
+            json.dumps(result.get("parsed"), ensure_ascii=False, indent=2, default=str) + "\n",
+            encoding="utf-8",
+        )
+        try:
+            repaired_sections = _coerce_section_repair(result.get("parsed"), failed_sections)
+            break
+        except RuntimeError as exc:
+            schema_errors.append(str(exc))
+    if result is None or repaired_sections is None:
+        raise RuntimeError(f"AI section repair failed schema for {chapter_meta}: {schema_errors}")
+
+    merged_sections = dict(sections)
+    for section, value in repaired_sections.items():
+        merged_sections[section] = value
+    repaired_artifact = dict(approved)
+    repaired_artifact["editorial_sections"] = merged_sections
+    repairs = list(repaired_artifact.get("edition11_section_repairs") or [])
+    repairs.append(
+        {
+            "repair_id": LIGHTWEIGHT_SECTION_REPAIR_ID,
+            "failed_sections": failed_sections,
+            "gate_failure": gate_failure,
+            "prompt_path": str(prompt_path),
+            "schema_attempts": len(schema_errors) + 1,
+            "schema_errors": schema_errors,
+            "usage": result.get("usage"),
+        }
+    )
+    repaired_artifact["edition11_section_repairs"] = repairs
+    _write_json(approved_path, repaired_artifact)
+    return {
+        "repair_id": LIGHTWEIGHT_SECTION_REPAIR_ID,
+        "failed_sections": failed_sections,
+        "usage": result.get("usage"),
+        "schema_attempts": len(schema_errors) + 1,
+    }
 
 
 def _slug_from_entry(entry: Mapping[str, Any]) -> str:
@@ -200,6 +366,7 @@ def build_source_style_dossier(
     publication_spec: Mapping[str, Any],
     out_dir: Path,
     source_pdf: Path = DEFAULT_SOURCE_PDF,
+    edition11_context: Mapping[str, Any] | None = None,
 ) -> dict[str, Path | None]:
     out_dir.mkdir(parents=True, exist_ok=True)
     pattern_id = str(entry.get("pattern_id"))
@@ -264,6 +431,46 @@ def build_source_style_dossier(
             "",
         ]
     )
+    context = edition11_context if isinstance(edition11_context, Mapping) else {}
+    if context:
+        role = context.get("edition11_role")
+        role_guidance = context.get("role_guidance")
+        after_buy = context.get("after_buy_coverage") if isinstance(context.get("after_buy_coverage"), Mapping) else {}
+        metric_snapshot = context.get("metric_snapshot") if isinstance(context.get("metric_snapshot"), Mapping) else {}
+        lines.extend(
+            [
+                "## Edition 1.1 role và After-the-Buy context",
+                "",
+                f"- Vai trò chương trong Edition 1.1: `{role or 'n/a'}`",
+                f"- Hướng diễn giải vai trò: {role_guidance or 'Không có hướng dẫn vai trò riêng.'}",
+                "- Dùng After-the-Buy để làm rõ đường đi sau xác nhận, bẫy thất bại và cách đọc thận trọng; không dùng nó để tự thêm số Việt Nam.",
+                "",
+                "### Metric snapshot khóa nhanh",
+                "",
+            ]
+        )
+        for key in (
+            "events",
+            "median_mfe_pct",
+            "median_mae_pct",
+            "failure_5pct_rate",
+            "target_hit_rate",
+            "target_first_before_adverse_5pct_rate",
+            "selected_base_target_multiple",
+            "preflight_status",
+            "preflight_score",
+            "tradable_status",
+            "tradable_score",
+            "tradable_blockers",
+        ):
+            if metric_snapshot.get(key) not in (None, "", []):
+                lines.append(f"- `{key}`: {metric_snapshot.get(key)}")
+        if after_buy:
+            lines.extend(["", "### After-the-Buy coverage", ""])
+            for key, value in list(after_buy.items())[:12]:
+                if value not in (None, "", []):
+                    lines.append(f"- `{key}`: {value}")
+        lines.append("")
     if source_excerpt:
         lines.extend(
             [
@@ -567,7 +774,27 @@ def _run_lightweight_refinement(
     }
     parsed_path.write_text(json.dumps(parsed, ensure_ascii=False, indent=2, default=str) + "\n", encoding="utf-8")
     approved.write_text(json.dumps(refined, ensure_ascii=False, indent=2, default=str) + "\n", encoding="utf-8")
-    prepared = prepare_canonical_chapter_content(payload, approved_sections_path=approved)
+    section_repair: dict[str, Any] | None = None
+    try:
+        prepared = prepare_canonical_chapter_content(payload, approved_sections_path=approved)
+    except ValueError as exc:
+        failure_message = str(exc)
+        failed_sections = _failed_editorial_sections_from_error(failure_message)
+        if not failed_sections:
+            raise
+        section_repair = _repair_lightweight_sections(
+            payload=payload,
+            approved_path=approved,
+            failed_sections=failed_sections,
+            gate_failure=failure_message,
+            chapter_meta=chapter_meta,
+            model=model,
+            temperature=temperature,
+            timeout_s=timeout_s,
+            max_tokens=max_tokens,
+            api_key=api_key,
+        )
+        prepared = prepare_canonical_chapter_content(payload, approved_sections_path=approved)
     editorial_report = validate_canonical_editorial_sections(prepared)
     spirit = _spirit_score(prepared, editorial_report)
     guard = {
@@ -579,6 +806,7 @@ def _run_lightweight_refinement(
         "temperature": temperature,
         "usage": result.get("usage"),
         "json_repaired": bool(result.get("json_repaired")),
+        "section_repair": section_repair,
     }
     _write_json(guard_path, guard)
     _write_json(
@@ -609,6 +837,9 @@ def rebuild_one(
     timeout_s: int,
     max_tokens: int,
     force_ai: bool,
+    edition11_context_by_pattern: Mapping[str, Mapping[str, Any]] | None = None,
+    edition11_style_guide: Mapping[str, Any] | None = None,
+    edition11_lightweight_from_current: bool = False,
 ) -> Path:
     pattern_id = str(entry.get("pattern_id"))
     family = str(entry.get("family") or "uncategorized")
@@ -629,26 +860,48 @@ def rebuild_one(
         source_notes=source_notes,
         publication_spec=spec,
         out_dir=style_dir,
+        edition11_context={
+            **dict((edition11_context_by_pattern or {}).get(pattern_id, {})),
+            "role_guidance": (
+                (edition11_style_guide or {})
+                .get("role_guidance", {})
+                .get(str((edition11_context_by_pattern or {}).get(pattern_id, {}).get("edition11_role") or ""), "")
+                if isinstance((edition11_style_guide or {}).get("role_guidance"), Mapping)
+                else ""
+            ),
+        }
+        if edition11_context_by_pattern is not None
+        else None,
     )
     style_dossier = Path(style_paths["source_style_dossier"])  # type: ignore[arg-type]
     chapter_meta = {
         "pattern_id": pattern_id,
         "title": spec.get("title") or pattern_id,
         "family": family,
+        "edition11_role": (edition11_context_by_pattern or {}).get(pattern_id, {}).get("edition11_role")
+        if edition11_context_by_pattern
+        else None,
     }
-    source_guided = _run_ai_stage(
-        payload_path=payload_path,
-        source_notes_path=source_notes_path,
-        out_dir=ai_dir / "source_guided",
-        chapter_meta=chapter_meta,
-        style_dossier=style_dossier,
-        previous_candidate=None,
-        model=model,
-        temperature=temperature,
-        timeout_s=timeout_s,
-        max_tokens=max_tokens,
-        force=force_ai,
-    )
+    if edition11_lightweight_from_current:
+        current_refined_value = _mapping(entry.get("chapter_writing_stages")).get("refined_ai_sections")
+        current_refined = Path(str(current_refined_value or payload.get("editorial_source_path") or ""))
+        if not current_refined.exists():
+            raise FileNotFoundError(f"Missing current refined AI sections for {pattern_id}: {current_refined}")
+        source_guided = current_refined
+    else:
+        source_guided = _run_ai_stage(
+            payload_path=payload_path,
+            source_notes_path=source_notes_path,
+            out_dir=ai_dir / "source_guided",
+            chapter_meta=chapter_meta,
+            style_dossier=style_dossier,
+            previous_candidate=None,
+            model=model,
+            temperature=temperature,
+            timeout_s=timeout_s,
+            max_tokens=max_tokens,
+            force=force_ai,
+        )
     refined = _run_ai_stage(
         payload_path=payload_path,
         source_notes_path=source_notes_path,
@@ -730,6 +983,13 @@ def rebuild_one(
                 "không sao chép/không dịch sát tài liệu gốc; sinh source-guided AI candidate, "
                 "refinement pass, rồi render qua canonical publication factory."
             ),
+            "edition11_editorial_pack_id": (edition11_style_guide or {}).get("style_guide_id")
+            if edition11_style_guide
+            else None,
+            "edition11_role": (edition11_context_by_pattern or {}).get(pattern_id, {}).get("edition11_role")
+            if edition11_context_by_pattern
+            else None,
+            "edition11_lightweight_from_current": bool(edition11_lightweight_from_current),
         }
     )
     entry_path = chapter_dir / f"{pattern_id}_final_manifest_entry.json"
@@ -763,6 +1023,16 @@ def main() -> None:
     parser.add_argument("--timeout-s", type=int, default=900)
     parser.add_argument("--force-ai", action="store_true")
     parser.add_argument("--promote", action="store_true")
+    parser.add_argument(
+        "--edition11-pack-dir",
+        default="",
+        help="Optional directory produced by scanner.build_edition11_editorial_pack.",
+    )
+    parser.add_argument(
+        "--edition11-lightweight-from-current",
+        action="store_true",
+        help="Use the current approved/refined AI sections as the baseline and run only the Edition 1.1 refinement pass.",
+    )
     args = parser.parse_args()
 
     manifest_path = Path(args.manifest)
@@ -770,6 +1040,21 @@ def main() -> None:
     entries = _select_entries(manifest, list(args.pattern), bool(args.all_missing_policy))
     if not entries:
         raise SystemExit("No chapters selected.")
+
+    edition11_context_by_pattern: dict[str, Mapping[str, Any]] | None = None
+    edition11_style_guide: Mapping[str, Any] | None = None
+    if args.edition11_pack_dir:
+        pack_dir = Path(args.edition11_pack_dir)
+        inventory = _read_json(pack_dir / "editorial_inventory.json")
+        edition11_style_guide = _read_json(pack_dir / "edition_1_1_style_guide.json")
+        edition11_context_by_pattern = {
+            str(row.get("pattern_id")): row
+            for row in inventory.get("chapters", [])
+            if isinstance(row, Mapping) and row.get("pattern_id")
+        }
+        missing_context = [str(entry.get("pattern_id")) for entry in entries if str(entry.get("pattern_id")) not in edition11_context_by_pattern]
+        if missing_context:
+            raise RuntimeError(f"Edition 1.1 inventory missing patterns: {missing_context}")
 
     entry_paths: list[Path] = []
     for index, entry in enumerate(entries, start=1):
@@ -784,6 +1069,9 @@ def main() -> None:
                 timeout_s=int(args.timeout_s),
                 max_tokens=int(args.max_tokens),
                 force_ai=bool(args.force_ai),
+                edition11_context_by_pattern=edition11_context_by_pattern,
+                edition11_style_guide=edition11_style_guide,
+                edition11_lightweight_from_current=bool(args.edition11_lightweight_from_current),
             )
         )
     report: dict[str, Any] = {

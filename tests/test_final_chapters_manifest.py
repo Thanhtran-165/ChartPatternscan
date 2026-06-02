@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pandas as pd
 from pypdf import PdfReader
 from reportlab.pdfgen import canvas
+import scanner.canonical_publication_chapter_factory as canonical_factory
 from scanner.audit_canonical_publication_flow import audit_manifest
 from scanner.canonical_chapter_content import (
     CANONICAL_CONTENT_GENERATOR_ID,
@@ -474,7 +476,7 @@ def test_canonical_factory_refuses_to_render_thin_editorial_payload() -> None:
             )
         )
     except ValueError as exc:
-        assert "canonical editorial gate failed" in str(exc)
+        assert "editorial gate failed" in str(exc)
     else:
         raise AssertionError("canonical factory accepted thin editorial payload")
 
@@ -669,13 +671,64 @@ def test_canonical_content_generator_maps_approved_ai_sections(tmp_path) -> None
     loaded = load_approved_editorial_sections(approved)
     payload = prepare_canonical_chapter_content({"status": "PASS"}, approved_sections_path=approved)
 
-    assert loaded["sections"]["summary"][: len(_rich_editorial_sections()["summary"])] == _rich_editorial_sections()["summary"]
-    assert len(loaded["sections"]["summary"]) > len(_rich_editorial_sections()["summary"])
-    assert loaded["sections"]["checklist"][: len(_rich_editorial_sections()["checklist"])] == _rich_editorial_sections()["checklist"]
+    assert loaded["sections"]["summary"] == _rich_editorial_sections()["summary"]
+    assert loaded["sections"]["checklist"] == _rich_editorial_sections()["checklist"]
     assert payload["canonical_content_generator_id"] == CANONICAL_CONTENT_GENERATOR_ID
     assert payload["canonical_content_source_kind"] == "approved_ai_sections"
     assert payload["editorial_source_path"] == str(approved)
     assert payload["example_captions"]["schematic"] == "Caption mẫu"
+    assert payload["canonical_content_generation_report"]["editorial_gate_report"]["status"] == "PASS"
+
+
+def test_canonical_factory_prefers_editorial_source_path_over_stale_payload_sections(tmp_path, monkeypatch) -> None:
+    approved_sections = _rich_editorial_sections()
+    stale_sections = _rich_editorial_sections()
+    stale_sections["summary"] = [
+        "STALE INLINE SECTION. " + paragraph
+        for paragraph in stale_sections["summary"]
+    ]
+    approved = tmp_path / "approved_ai_sections.json"
+    approved.write_text(
+        json.dumps({"editorial_sections": approved_sections}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    payload = {
+        "pattern_id": "factory_priority_test",
+        "pattern_name": "Factory Priority Test",
+        "canonical_content_generator_id": CANONICAL_CONTENT_GENERATOR_ID,
+        "editorial_source_path": str(approved),
+        "editorial_sections": stale_sections,
+    }
+    captured: dict[str, dict] = {}
+
+    def fake_build_pattern_public_chapter(**kwargs):
+        captured["payload"] = kwargs["payload"]
+        return {
+            "pdf": tmp_path / "chapter.pdf",
+            "payload": tmp_path / "payload.json",
+            "manuscript": tmp_path / "manuscript.md",
+            "notes": tmp_path / "notes.md",
+        }
+
+    monkeypatch.setattr(canonical_factory, "build_pattern_public_chapter", fake_build_pattern_public_chapter)
+
+    canonical_factory.build_canonical_publication_chapter(
+        payload=payload,
+        source_notes={},
+        events=pd.DataFrame(),
+        path_df=pd.DataFrame(),
+        charts={},
+        spec={},
+        out_dir=tmp_path,
+        pdf_filename="chapter.pdf",
+        payload_filename="payload.json",
+        manuscript_filename="manuscript.md",
+        notes_filename="notes.md",
+        family_id="test_family",
+    )
+
+    assert captured["payload"]["editorial_sections"]["summary"] == approved_sections["summary"]
+    assert not captured["payload"]["editorial_sections"]["summary"][0].startswith("STALE INLINE SECTION")
 
 
 def test_publication_contract_has_no_canonical_opt_out_for_final_chapters(tmp_path) -> None:

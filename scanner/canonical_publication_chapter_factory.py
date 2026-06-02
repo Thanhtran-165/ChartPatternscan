@@ -27,6 +27,7 @@ from scanner.canonical_editorial_layer import (
 from scanner.pattern_publication_core import PUBLICATION_CORE_ID, build_pattern_public_chapter
 
 
+ROOT = Path(__file__).resolve().parents[1]
 CANONICAL_PUBLICATION_FACTORY_ID = "canonical_publication_chapter_factory_v1"
 CANONICAL_READER_EXPERIENCE_GATE_ID = "canonical_reader_experience_gate_v1"
 CANONICAL_PUBLICATION_STYLE_VERSION = "canonical_publication_style_v3"
@@ -101,6 +102,16 @@ def canonicalize_publication_spec(spec: Mapping[str, Any], *, family_id: str | N
     return out
 
 
+def _resolve_editorial_source_path(payload: Mapping[str, Any]) -> Path | None:
+    value = payload.get("editorial_source_path")
+    if not value:
+        return None
+    path = Path(str(value))
+    if not path.is_absolute():
+        path = ROOT / path
+    return path if path.exists() and path.is_file() else None
+
+
 def build_canonical_publication_chapter(
     *,
     payload: Mapping[str, Any],
@@ -127,13 +138,13 @@ def build_canonical_publication_chapter(
             approved_sections_path=approved_sections_path,
             editorial_sections=editorial_sections,
         )
-    elif payload.get("canonical_content_generator_id") == CANONICAL_CONTENT_GENERATOR_ID:
-        prepared_payload = payload
-    elif payload.get("editorial_source_path") and Path(str(payload.get("editorial_source_path"))).exists():
+    elif (resolved_editorial_source_path := _resolve_editorial_source_path(payload)) is not None:
         prepared_payload = prepare_canonical_chapter_content(
             payload,
-            approved_sections_path=Path(str(payload.get("editorial_source_path"))),
+            approved_sections_path=resolved_editorial_source_path,
         )
+    elif payload.get("canonical_content_generator_id") == CANONICAL_CONTENT_GENERATOR_ID:
+        prepared_payload = payload
     else:
         prepared_payload = payload
     canonical_payload = canonicalize_publication_payload(prepared_payload, family_factory_id=source_family_factory_id)
