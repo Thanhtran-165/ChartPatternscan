@@ -40,11 +40,14 @@ dùng logic legacy hoặc gọi nhầm builder lịch sử.
    cốc tay cầm, broadening hoặc các case thất bại hiếm, phải dùng queue review
    bằng mắt/whitelist nếu ví dụ tự động chỉ đạt `usable`.
 
-7. **Hai thang điểm bắt buộc**  
+7. **Hai thang điểm bắt buộc và nhãn sử dụng phải đúng vai**
    Mỗi chapter phải có publication/preflight score và tradable score nếu pattern
-   có ý nghĩa thực thi long-cash. Pattern defensive/downside được phép mang nhãn
-   defensive/informational, nhưng phải nói rõ đó là nhãn sử dụng, không phải lỗi
-   thống kê mặc định.
+   có ý nghĩa thực thi long-cash. Pattern bearish/top/downside không được bị hạ
+   xuống một nhãn “phòng thủ/thông tin” chung chung nếu dữ liệu cho phép đo bẫy
+   giảm. Với các chapter này, cách đọc mặc định là: kiểm tra độ sạch của phá vỡ
+   giảm, quan sát giá quay lại vùng phá vỡ trong 5/10/20 phiên, và dùng kết quả
+   như lớp kỷ luật cắt lỗ/thoát vị thế, không phải tín hiệu mua hoặc bán khống
+   tự động.
 
 8. **Chỉ báo cáo khi đạt mốc hoặc gặp blocker thật**  
    Không gọi draft là final. Không promote khi audit còn cảnh báo nghiêm trọng.
@@ -68,6 +71,15 @@ dùng logic legacy hoặc gọi nhầm builder lịch sử.
    ```
 
 10. Đọc PDF bằng mắt hoặc contact sheet trước khi promote.
+11. Nếu chapter thuộc nhóm bearish/top/downside có trong scope
+    `bear_trap_stoploss_caution_layer_v1`, chạy thêm:
+
+   ```bash
+   PYTHONPATH=. ./.venv/bin/python -m scanner.build_bear_trap_stoploss_caution_layer
+   PYTHONPATH=. ./.venv/bin/python -m scanner.apply_bear_trap_publication_reframe
+   PYTHONPATH=. ./.venv/bin/python -m scanner.rerender_final_chapters_render_only --pattern <pattern_id> --promote
+   PYTHONPATH=. ./.venv/bin/python -m pytest tests/test_bear_trap_publication_reframe.py tests/test_bear_trap_final_pdf_text.py
+   ```
 
 ## Cấm
 
@@ -77,6 +89,10 @@ dùng logic legacy hoặc gọi nhầm builder lịch sử.
   thành...”.
 - Dùng fallback để che lỗi thiếu AI/editorial section.
 - Chọn ví dụ chỉ vì VN30/VN100 nếu hình thái kém.
+- In marker kỹ thuật như `bear_trap_stoploss_publication_reframe_v1` ra PDF
+  public.
+- Để chữ public dùng lại cụm “defensive/informational” cho chapter bearish đã
+  có lớp bẫy giảm/cắt lỗ thận trọng.
 - Xóa/move file user tạo hoặc dữ liệu nghiên cứu nếu không phục vụ trực tiếp
   cho việc quarantine/cleanup.
 

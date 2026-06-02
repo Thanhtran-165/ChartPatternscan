@@ -23,5 +23,38 @@ def test_realtime_watchlist_uses_available_event_artifacts() -> None:
     plan = build_realtime_scan_plan(patterns=["bull_flags"])
     watchlist = build_watchlist_from_artifacts(plan, lookback_days=30)
 
-    assert set(watchlist.columns).issuperset({"pattern_id", "symbol", "event_date", "quality_tier"})
+    assert set(watchlist.columns).issuperset(
+        {
+            "pattern_id",
+            "symbol",
+            "event_date",
+            "quality_tier",
+            "after_buy_role",
+            "after_buy_action",
+            "after_buy_trade_mode",
+            "after_buy_risk_context",
+        }
+    )
     assert Path(plan["jobs"][0]["event_source"]).exists()
+    if not watchlist.empty:
+        assert set(watchlist["after_buy_action"]) == {"actionable_long_cash_candidate_after_buy_confirmed"}
+
+
+def test_realtime_watchlist_marks_defensive_patterns_as_risk_context() -> None:
+    plan = build_realtime_scan_plan(patterns=["bear_flags"])
+    watchlist = build_watchlist_from_artifacts(plan, lookback_days=3650)
+
+    assert set(watchlist.columns).issuperset(
+        {
+            "after_buy_action",
+            "after_buy_risk_context",
+            "stoploss_caution_role",
+            "stoploss_caution_action",
+            "stoploss_caution_is_buy_signal",
+        }
+    )
+    if not watchlist.empty:
+        assert set(watchlist["after_buy_action"]) == {"avoid_buy_or_exit_warning"}
+        assert set(watchlist["after_buy_risk_context"]) == {True}
+        assert set(watchlist["stoploss_caution_role"]) == {"failed_breakdown_reclaim_watch"}
+        assert set(watchlist["stoploss_caution_is_buy_signal"]) == {False}

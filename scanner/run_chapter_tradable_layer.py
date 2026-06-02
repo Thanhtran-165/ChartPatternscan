@@ -270,6 +270,12 @@ CHAPTER_SPECS: dict[str, ChapterSpec] = {
         Path("artifacts/scanner_v2/head_shoulders_family/head_and_shoulders_bottoms_complex/db_active/post_breakout_path.csv"),
         "long_cash_candidate",
     ),
+    "head_and_shoulders_bottoms": ChapterSpec(
+        "head_and_shoulders_bottoms",
+        Path("artifacts/scanner_v2/head_shoulders_family/head_and_shoulders_bottoms/db_active/events.csv"),
+        Path("artifacts/scanner_v2/head_shoulders_family/head_and_shoulders_bottoms/db_active/post_breakout_path.csv"),
+        "long_cash_candidate",
+    ),
     "head_and_shoulders_tops_complex": ChapterSpec(
         "head_and_shoulders_tops_complex",
         Path("artifacts/scanner_v2/head_shoulders_family/head_and_shoulders_tops_complex/db_active/events.csv"),
@@ -609,6 +615,17 @@ def _filter_pattern_tradable_scope(events: pd.DataFrame, spec: ChapterSpec) -> p
         candidate = scoped[mask].copy()
         if len(candidate) >= 80:
             return candidate.reset_index(drop=True)
+        return scoped.reset_index(drop=True)
+    if spec.pattern_id == "rectangle_bottoms":
+        # After-the-Buy treats bullish rectangle work as direction-specific:
+        # either a confirmed upward breakout, or a failed downside breakout
+        # that reclaims the rectangle top.  The available event table does not
+        # yet encode the latter as a separate branch, so the executable layer
+        # removes outright down-breakout rows before testing long-cash behavior.
+        if "breakout_direction" in scoped.columns:
+            candidate = scoped[scoped["breakout_direction"].astype(str).eq("up")].copy()
+            if len(candidate) >= 80:
+                return candidate.reset_index(drop=True)
         return scoped.reset_index(drop=True)
     if spec.pattern_id != "measured_move_up":
         return events.copy()

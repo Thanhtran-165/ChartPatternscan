@@ -30,6 +30,13 @@ from scanner.run_bear_flag_db_source_parity_audit import DEFAULT_DB  # noqa: E40
 
 WORKFLOW_ID = "realtime_scan_watchlist_v1"
 DEFAULT_OUT_DIR = Path("artifacts/realtime_scan/latest")
+DEFAULT_AFTER_BUY_CONFIG = Path("artifacts/scanner_v2/after_buy_vietnam_v2/after_buy_scanner_stat_trade_config.json")
+STOPLOSS_CAUTION_PATTERNS = {
+    "bear_flags",
+    "triangles_descending",
+    "head_and_shoulders_tops",
+    "head_and_shoulders_tops_complex",
+}
 
 
 @dataclass(frozen=True)
@@ -177,7 +184,71 @@ def _normalize_watchlist_row(pattern_id: str, family: str, row: Mapping[str, Any
     }
 
 
-def build_watchlist_from_artifacts(plan: Mapping[str, Any], *, lookback_days: int = 7) -> pd.DataFrame:
+def _load_after_buy_runtime_config(path: Path = DEFAULT_AFTER_BUY_CONFIG) -> dict[str, Mapping[str, Any]]:
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    rows = data.get("patterns") if isinstance(data.get("patterns"), list) else []
+    return {str(row.get("pattern_id")): row for row in rows if isinstance(row, Mapping) and row.get("pattern_id")}
+
+
+def _after_buy_watchlist_fields(pattern_id: str, config: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+    row = config.get(pattern_id)
+    if not row:
+        return {
+            "after_buy_role": "unmapped_reference",
+            "after_buy_action": "review_with_base_chapter_only",
+            "after_buy_trade_mode": "not_after_buy_mapped",
+            "after_buy_risk_context": False,
+            "after_buy_no_overfit_blocked": False,
+        }
+    buy_allowed = bool(row.get("buy_layer_allowed"))
+    trade_mode = str(row.get("trade_layer_mode") or "")
+    no_overfit_gate = row.get("no_overfit_gate") if isinstance(row.get("no_overfit_gate"), Mapping) else {}
+    if not buy_allowed:
+        action = "avoid_buy_or_exit_warning"
+        risk_context = True
+    elif trade_mode == "preserve_tradable_final":
+        action = "actionable_long_cash_candidate_after_buy_confirmed"
+        risk_context = False
+    elif no_overfit_gate.get("currently_blocked"):
+        action = "watchlist_only_do_not_promote_until_fold_improves"
+        risk_context = False
+    else:
+        action = "source_guided_long_cash_review"
+        risk_context = False
+    return {
+        "after_buy_role": row.get("local_role"),
+        "after_buy_action": action,
+        "after_buy_trade_mode": trade_mode,
+        "after_buy_risk_context": risk_context,
+        "after_buy_no_overfit_blocked": bool(no_overfit_gate.get("currently_blocked")),
+    }
+
+
+def _stoploss_caution_watchlist_fields(pattern_id: str) -> dict[str, Any]:
+    if pattern_id not in STOPLOSS_CAUTION_PATTERNS:
+        return {
+            "stoploss_caution_role": "none",
+            "stoploss_caution_action": "not_applicable",
+            "stoploss_caution_window_bars": None,
+            "stoploss_caution_is_buy_signal": False,
+        }
+    return {
+        "stoploss_caution_role": "failed_breakdown_reclaim_watch",
+        "stoploss_caution_action": "watch_5_10_20d_reclaim_before_treating_breakdown_as_clean",
+        "stoploss_caution_window_bars": 20,
+        "stoploss_caution_is_buy_signal": False,
+    }
+
+
+def build_watchlist_from_artifacts(
+    plan: Mapping[str, Any],
+    *,
+    lookback_days: int = 7,
+    after_buy_config_path: Path | None = DEFAULT_AFTER_BUY_CONFIG,
+) -> pd.DataFrame:
+    after_buy_config = _load_after_buy_runtime_config(after_buy_config_path) if after_buy_config_path else {}
     frames: list[pd.DataFrame] = []
     for job in plan.get("jobs", []):
         if not isinstance(job, Mapping):
@@ -195,7 +266,13 @@ def build_watchlist_from_artifacts(plan: Mapping[str, Any], *, lookback_days: in
         if dates.notna().any():
             cutoff = dates.max() - pd.Timedelta(days=int(lookback_days))
             df = df.loc[dates >= cutoff].copy()
-        rows = [_normalize_watchlist_row(str(job["pattern_id"]), str(job["family"]), row) for row in df.to_dict("records")]
+        pattern_id = str(job["pattern_id"])
+        after_buy_fields = _after_buy_watchlist_fields(pattern_id, after_buy_config)
+        stoploss_caution_fields = _stoploss_caution_watchlist_fields(pattern_id)
+        rows = [
+            {**_normalize_watchlist_row(pattern_id, str(job["family"]), row), **after_buy_fields, **stoploss_caution_fields}
+            for row in df.to_dict("records")
+        ]
         if rows:
             frames.append(pd.DataFrame(rows))
     if not frames:
@@ -216,6 +293,15 @@ def build_watchlist_from_artifacts(plan: Mapping[str, Any], *, lookback_days: in
                 "failure_5pct",
                 "target_first_before_adverse_5pct",
                 "source_event_id",
+                "after_buy_role",
+                "after_buy_action",
+                "after_buy_trade_mode",
+                "after_buy_risk_context",
+                "after_buy_no_overfit_blocked",
+                "stoploss_caution_role",
+                "stoploss_caution_action",
+                "stoploss_caution_window_bars",
+                "stoploss_caution_is_buy_signal",
             ]
         )
     out = pd.concat(frames, ignore_index=True)
@@ -238,7 +324,7 @@ def write_realtime_outputs(plan: Mapping[str, Any], watchlist: pd.DataFrame, out
         f"Workflow: `{WORKFLOW_ID}`",
         f"Candidate count: `{len(watchlist)}`",
         "",
-        "| Date | Pattern | Symbol | Direction | Tier | Group | Regime |",
+        "| Date | Pattern | Symbol | Direction | Tier | After-Buy action | Regime |",
         "|---|---|---|---|---|---|---|",
     ]
     for row in watchlist.head(80).to_dict("records"):
@@ -247,7 +333,7 @@ def write_realtime_outputs(plan: Mapping[str, Any], watchlist: pd.DataFrame, out
             event_date = event_date.date().isoformat()
         lines.append(
             f"| {event_date} | {row.get('pattern_id')} | {row.get('symbol')} | {row.get('direction')} | "
-            f"{row.get('quality_tier')} | {row.get('market_group')} | {row.get('market_regime')} |"
+            f"{row.get('quality_tier')} | {row.get('after_buy_action')} | {row.get('market_regime')} |"
         )
     report_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return {"plan": str(plan_path), "watchlist_csv": str(watchlist_csv), "watchlist_json": str(watchlist_json), "report_md": str(report_md)}
@@ -259,10 +345,11 @@ def main() -> None:
     parser.add_argument("--out-dir", default=str(DEFAULT_OUT_DIR))
     parser.add_argument("--lookback-days", type=int, default=7)
     parser.add_argument("--pattern", action="append", default=[])
+    parser.add_argument("--after-buy-config", default=str(DEFAULT_AFTER_BUY_CONFIG))
     args = parser.parse_args()
     out_dir = Path(args.out_dir)
     plan = build_realtime_scan_plan(db_path=Path(args.db), out_root=out_dir, patterns=list(args.pattern) or None)
-    watchlist = build_watchlist_from_artifacts(plan, lookback_days=int(args.lookback_days))
+    watchlist = build_watchlist_from_artifacts(plan, lookback_days=int(args.lookback_days), after_buy_config_path=Path(args.after_buy_config))
     paths = write_realtime_outputs(plan, watchlist, out_dir)
     print(json.dumps({"workflow_id": WORKFLOW_ID, "status": "PASS", "counts": {"jobs": len(plan["jobs"]), "watchlist": len(watchlist)}, "paths": paths}, ensure_ascii=False, indent=2))
 

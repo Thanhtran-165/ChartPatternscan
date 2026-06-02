@@ -383,6 +383,17 @@ def _load_publication_spec(entry: Mapping[str, Any], payload: Mapping[str, Any])
         or target_family.get("legacy_full_pole")
         or 1.0
     )
+    payload_spec = payload.get("publication_spec") if isinstance(payload.get("publication_spec"), Mapping) else {}
+
+    def apply_payload_overrides(spec: dict[str, Any]) -> dict[str, Any]:
+        for key, value in payload_spec.items():
+            spec[key] = value
+        for key in ("role_note", "reader_question_rows"):
+            value = payload.get(key)
+            if value not in (None, "", []):
+                spec[key] = value
+        return spec
+
     if spec_path and spec_path.exists() and spec_path.is_file():
         spec = dict(_read_json(spec_path))
         if not str(spec.get("title") or "").strip():
@@ -393,8 +404,8 @@ def _load_publication_spec(entry: Mapping[str, Any], payload: Mapping[str, Any])
             spec["target_unit_label"] = default_target_unit
         spec.setdefault("base_target_multiple", base_target_multiple)
         spec.setdefault("legacy_target_multiple", legacy_target_multiple)
-        return spec
-    return {
+        return apply_payload_overrides(spec)
+    return apply_payload_overrides({
         "title": title.replace("_", " ").title(),
         "subtitle": "Chương mẫu hình theo logic xuất bản chuẩn",
         "labels": {"favorable_move": "mức đi thuận lợi tốt nhất", "adverse_move": "mức kéo ngược sâu nhất"},
@@ -408,7 +419,7 @@ def _load_publication_spec(entry: Mapping[str, Any], payload: Mapping[str, Any])
         "failure_bullets": ["Thất bại là một phần của phân phối thật.", "Không dùng một ví dụ đẹp để thay thế thống kê toàn mẫu.", "Đọc mục tiêu cùng mức kéo ngược và thời gian đạt mục tiêu."],
         "example_intro": ["Các ví dụ được giữ như case study đọc biểu đồ: một trường hợp tốt, một trường hợp trung vị và một trường hợp thất bại."],
         "conclusion_bullets": ["Chương nên được dùng như tài liệu tham khảo mẫu hình trong phạm vi dữ liệu hiện có.", "Không diễn giải kết quả như khuyến nghị giao dịch tự động."],
-    }
+    })
 
 
 def _run_ai_stage(
