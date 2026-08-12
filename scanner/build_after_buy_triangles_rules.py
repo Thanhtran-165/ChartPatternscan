@@ -26,7 +26,7 @@ from scanner.after_buy_source_grounding import (  # noqa: E402
 RULESET_ID = "after_buy_triangles_rules_v1"
 DEFAULT_SOURCE_MAP = DEFAULT_AFTER_BUY_OUT_DIR / "after_buy_source_map.json"
 DEFAULT_OUT_DIR = DEFAULT_AFTER_BUY_OUT_DIR / "triangles"
-DEFAULT_GOVERNANCE_MATRIX = Path("artifacts/final_chapters/governance/chapter_governance_matrix.json")
+DEFAULT_GOVERNANCE_MATRIX = Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json")
 
 SOURCE_NOTES = {
     "triangles_ascending": Path("artifacts/scanner_v2/triangle_family_public_chapters/ascending_triangle/ascending_triangle_source_notes.json"),

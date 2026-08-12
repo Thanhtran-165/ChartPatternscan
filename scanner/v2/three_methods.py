@@ -26,6 +26,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+from scanner.v2.measurement_registry import lookahead_bars as _registry_lookahead
 
 from scanner.ohlcv_normalizer import OHLCVNormalizer  # noqa: E402
 from scanner.research_support_analysis import PatternArtifacts, build_target_calibration_decisions, target_sensitivity  # noqa: E402
@@ -386,7 +387,7 @@ def scan_symbol(
     rows = ThreeMethodsDetector(pattern_key, config).scan(df)
     out: list[dict[str, Any]] = []
     for row in rows:
-        out.append({**row, **_evaluate_detection(df, row, lookahead=20)})
+        out.append({**row, **_evaluate_detection(df, row, lookahead=_registry_lookahead(row.get("pattern_key") or "rising_three_methods"))})
     return out, {"rows": int(len(df)), "normalizer": norm_stats, "detector_config": config.to_dict()}
 
 
@@ -529,7 +530,7 @@ EVENT_FIELDS = [
     "mfe_pct",
     "mae_pct",
     "target_hit",
-    "failure_5pct",
+    "failure_5pct", "weak_move_5pct", "failure_busted", "days_to_bust",
     "target_first_before_adverse_5pct",
     "days_to_target",
     "throwback_pullback_30d",
@@ -617,7 +618,7 @@ def scan_three_methods_db(
     }
     _enrich_events_from_series(scan, series_by_symbol, corporate_db=index_db)
     _assign_publication_quality_tiers(scan["detections"])
-    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=20)
+    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=_registry_lookahead(scan["pattern_key"]))
     stats = summarize(scan, pattern_key)
     stats["source"] = scan["source"]
     stats["db_source_meta"] = _db_meta(db_path)

@@ -41,6 +41,7 @@ CANONICAL_CONTENT_CONTRACT = {
 
 
 SECTION_ALIASES: dict[str, tuple[str, ...]] = {
+    "quick_read": ("quick_read", "doc_nhanh_chuong_nay", "doc-nhanh-chuong-nay", "quick-read", "fast_read"),
     "summary": ("summary", "intro", "tom-tat", "overview"),
     "tour": ("tour", "how_it_works", "mau-hinh-hoat-dong"),
     "failure": ("failure", "that-bai"),
@@ -52,6 +53,10 @@ SECTION_ALIASES: dict[str, tuple[str, ...]] = {
 }
 
 PUBLIC_TEXT_REPLACEMENTS = {
+    "được chuyển thành câu chuyện thị giác": "được diễn giải bằng ngôn ngữ biểu đồ",
+    "được chuyển thành": "được diễn giải thành",
+    "chúng tôi kỳ vọng bạn": "người đọc nên",
+    "chúng tôi": "chương này",
     "tổng mẫu quét lịch sử": "tổng mẫu lịch sử",
     "Tổng mẫu quét lịch sử": "Tổng mẫu lịch sử",
     "mẫu quét lịch sử": "mẫu lịch sử",
@@ -111,6 +116,8 @@ PUBLIC_TEXT_REPLACEMENTS = {
     "short cấu hình": "hồ sơ bán khống",
     "long-watchlist": "hồ sơ theo dõi hướng tăng",
     "long-theo dõi": "hồ sơ theo dõi hướng tăng",
+    "watchlist-reference": "tham khảo theo dõi",
+    "watchlist": "theo dõi",
     "vào lệnh": "xem xét tín hiệu",
     "dừng lỗ": "ngưỡng rủi ro",
 }

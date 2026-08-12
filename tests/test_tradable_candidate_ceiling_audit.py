@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 def test_tradable_candidate_ceiling_audit_stops_all_current_candidates() -> None:
-    payload = json.loads(Path("artifacts/final_chapters/governance/tradable_candidate_ceiling_audit.json").read_text(encoding="utf-8"))
+    payload = json.loads(Path("artifacts/governance/final_chapters/governance/tradable_candidate_ceiling_audit.json").read_text(encoding="utf-8"))
 
     assert payload["audit_id"] == "tradable_candidate_ceiling_audit_v1"
     assert payload["counts"] == {
@@ -35,7 +35,7 @@ def test_tradable_candidate_ceiling_audit_stops_all_current_candidates() -> None
 
 
 def test_tradable_candidate_ceiling_identifies_the_three_near_90_plus_cases() -> None:
-    payload = json.loads(Path("artifacts/final_chapters/governance/tradable_candidate_ceiling_audit.json").read_text(encoding="utf-8"))
+    payload = json.loads(Path("artifacts/governance/final_chapters/governance/tradable_candidate_ceiling_audit.json").read_text(encoding="utf-8"))
     rows = {row["pattern_id"]: row for row in payload["rows"]}
 
     assert rows["bull_pennants"]["best_known_score"] == 93.8
@@ -49,7 +49,7 @@ def test_tradable_candidate_ceiling_identifies_the_three_near_90_plus_cases() ->
 
 
 def test_tradable_candidate_ceiling_keeps_walk_forward_blockers_explicit() -> None:
-    payload = json.loads(Path("artifacts/final_chapters/governance/tradable_candidate_ceiling_audit.json").read_text(encoding="utf-8"))
+    payload = json.loads(Path("artifacts/governance/final_chapters/governance/tradable_candidate_ceiling_audit.json").read_text(encoding="utf-8"))
     rows = {row["pattern_id"]: row for row in payload["rows"]}
 
     for pattern_id in ["bull_pennants", "wedges_falling", "triangles_ascending"]:

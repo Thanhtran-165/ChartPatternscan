@@ -31,7 +31,7 @@ from scanner.rebuild_source_guided_final_chapters import _load_charts, _load_pub
 from scanner.validate_final_chapters_manifest import DEFAULT_MANIFEST  # noqa: E402
 
 
-OUT_DIR = ROOT / "artifacts/final_chapters/governance/deep_pdf_review"
+OUT_DIR = ROOT / "artifacts/governance/final_chapters/governance/deep_pdf_review"
 TMP_DIR = ROOT / "tmp/pdfs/deep_pdf_review"
 PUBLIC_TOKEN_RE = re.compile(r"\b(n/a|nan|none|null|todo|placeholder|debug)\b", re.IGNORECASE)
 PUBLIC_PLACEHOLDER_PHRASES = [
@@ -45,12 +45,12 @@ PUBLIC_PLACEHOLDER_PHRASES = [
     "không dùng suy diễn tự động",
 ]
 REQUIRED_SECTIONS = [
-    "Kết quả quan trọng",
+    "Đọc nhanh chương này",
     "Mẫu hình hoạt động ra sao",
     "Cách nhận diện",
     "Ví dụ minh họa",
     "Tập trung vào thất bại",
-    "Cách đọc kết quả quan trọng",
+    "Cách đọc các con số",
     "Khi mẫu đáng chú ý hơn",
     "Cách sử dụng thực tế",
     "Phụ lục kỹ thuật",

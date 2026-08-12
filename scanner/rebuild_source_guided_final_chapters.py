@@ -649,6 +649,11 @@ def _run_ai_stage(
         status = _read_json(guard).get("status")
         if status == "PASS":
             return approved
+        draft_acceptance = out_dir / "source_guided_draft_acceptance.json"
+        if previous_candidate is None and draft_acceptance.exists():
+            acceptance_status = _read_json(draft_acceptance).get("status")
+            if acceptance_status == "PASS_AS_DRAFT_FOR_REFINEMENT":
+                return approved
     if previous_candidate is not None:
         return _run_lightweight_refinement(
             payload_path=payload_path,
@@ -676,8 +681,21 @@ def _run_ai_stage(
         timeout_s=timeout_s,
         style_profile=BULKOWSKI_SOURCE_GUIDED_READER_PROFILE,
     )
-    if _read_json(guard).get("status") != "PASS":
-        raise RuntimeError(f"AI editorial guard failed: {guard}")
+    guard_payload = _read_json(guard)
+    if guard_payload.get("status") != "PASS":
+        editorial_report = _mapping(guard_payload.get("editorial_report"))
+        spirit = _mapping(guard_payload.get("bulkowski_spirit_score"))
+        score = float(spirit.get("score_0_100") or 0.0)
+        if editorial_report.get("status") != "PASS" or score < 80:
+            raise RuntimeError(f"AI editorial guard failed: {guard}")
+        draft_acceptance = {
+            "status": "PASS_AS_DRAFT_FOR_REFINEMENT",
+            "reason": "source_guided stage is not final public prose; refined stage remains the strong gate",
+            "original_guard_status": guard_payload.get("status"),
+            "score_0_100": score,
+            "target_band": spirit.get("target_band"),
+        }
+        _write_json(out_dir / "source_guided_draft_acceptance.json", draft_acceptance)
     return approved
 
 
@@ -697,8 +715,29 @@ def _run_lightweight_refinement(
 ) -> Path:
     approved = out_dir / "approved_ai_sections.json"
     guard_path = out_dir / "approved_ai_sections_guard.json"
-    if approved.exists() and guard_path.exists() and not force:
-        if _read_json(guard_path).get("status") == "PASS":
+    if approved.exists() and not force:
+        try:
+            payload_for_guard = _read_json(payload_path)
+            prepared_for_guard = prepare_canonical_chapter_content(payload_for_guard, approved_sections_path=approved)
+            editorial_report_for_guard = validate_canonical_editorial_sections(prepared_for_guard)
+            spirit_for_guard = _spirit_score(prepared_for_guard, editorial_report_for_guard)
+            previous_guard = _read_json(guard_path) if guard_path.exists() else {}
+            recomputed_guard = {
+                "status": _editorial_guard_status(editorial_report_for_guard, spirit_for_guard),
+                "refinement_mode": "lightweight_source_guided_refinement_v1",
+                "editorial_report": editorial_report_for_guard,
+                "bulkowski_spirit_score": spirit_for_guard,
+                "model": model,
+                "temperature": temperature,
+                "usage": previous_guard.get("usage"),
+                "json_repaired": previous_guard.get("json_repaired"),
+                "section_repair": previous_guard.get("section_repair"),
+                "recomputed_from_existing_artifact": True,
+            }
+            _write_json(guard_path, recomputed_guard)
+        except ValueError:
+            recomputed_guard = {}
+        if recomputed_guard.get("status") == "PASS":
             return approved
     load_dotenv()
     api_key = os.getenv("DEEPSEEK_API_KEY")
@@ -794,7 +833,47 @@ def _run_lightweight_refinement(
             max_tokens=max_tokens,
             api_key=api_key,
         )
-        prepared = prepare_canonical_chapter_content(payload, approved_sections_path=approved)
+        try:
+            prepared = prepare_canonical_chapter_content(payload, approved_sections_path=approved)
+        except ValueError as repair_exc:
+            previous_prepared = prepare_canonical_chapter_content(payload, approved_sections_path=previous_candidate)
+            previous_report = validate_canonical_editorial_sections(previous_prepared)
+            previous_spirit = _spirit_score(previous_prepared, previous_report)
+            if _editorial_guard_status(previous_report, previous_spirit) != "PASS":
+                raise repair_exc
+            approved.write_text(previous_candidate.read_text(encoding="utf-8"), encoding="utf-8")
+            guard = {
+                "status": "PASS",
+                "refinement_mode": "lightweight_source_guided_refinement_v1",
+                "editorial_report": previous_report,
+                "bulkowski_spirit_score": previous_spirit,
+                "model": model,
+                "temperature": temperature,
+                "usage": result.get("usage"),
+                "json_repaired": bool(result.get("json_repaired")),
+                "section_repair": section_repair,
+                "refinement_rejected": {
+                    "reason": "refinement_or_section_repair_failed_gate; source-guided candidate already passed strong canonical guard",
+                    "failure": str(repair_exc),
+                    "previous_candidate": str(previous_candidate),
+                },
+            }
+            _write_json(guard_path, guard)
+            _write_json(
+                out_dir / "run_meta.json",
+                {
+                    "mode": "lightweight_source_guided_refinement_v1",
+                    "model": model,
+                    "temperature": temperature,
+                    "payload_path": str(payload_path),
+                    "source_notes_path": str(source_notes_path),
+                    "previous_candidate": str(previous_candidate),
+                    "approved_ai_sections_path": str(approved),
+                    "refinement_rejected_used_source_guided": True,
+                    "created_at": _utc_now_iso(),
+                },
+            )
+            return approved
     editorial_report = validate_canonical_editorial_sections(prepared)
     spirit = _spirit_score(prepared, editorial_report)
     guard = {

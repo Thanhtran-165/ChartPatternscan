@@ -29,8 +29,8 @@ DEFAULT_MANIFEST = Path("artifacts/final_chapters/final_chapters_manifest.json")
 DEFAULT_TARGET_CALIBRATION_SUMMARY = Path(
     "artifacts/scanner_v2/final_chapters_target_calibration_audit/chapter_target_calibration_summary.json"
 )
-DEFAULT_CHAPTER_GOVERNANCE_MATRIX = Path("artifacts/final_chapters/governance/chapter_governance_matrix.json")
-DEFAULT_TRADABLE_PREFLIGHT_MATRIX = Path("artifacts/final_chapters/governance/chapter_tradable_preflight_matrix.json")
+DEFAULT_CHAPTER_GOVERNANCE_MATRIX = Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json")
+DEFAULT_TRADABLE_PREFLIGHT_MATRIX = Path("artifacts/governance/final_chapters/governance/chapter_tradable_preflight_matrix.json")
 TARGET_CALIBRATION_AUDIT_ID = "final_chapters_target_calibration_audit_v1"
 DUAL_AXIS_CHAPTER_SCORING_ID = "dual_axis_chapter_scoring_v1"
 TRADABLE_PREFLIGHT_MATRIX_ID = "tradable_preflight_matrix_v1"

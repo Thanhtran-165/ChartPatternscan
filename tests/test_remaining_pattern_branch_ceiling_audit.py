@@ -32,7 +32,7 @@ def test_remaining_pattern_branch_ceiling_audit_is_diagnostic_only() -> None:
 
 
 def test_governance_uses_improved_diagnostic_audits_without_promotion() -> None:
-    governance = json.loads(Path("artifacts/final_chapters/governance/chapter_governance_matrix.json").read_text(encoding="utf-8"))
+    governance = json.loads(Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json").read_text(encoding="utf-8"))
     by_pattern = {row["pattern_id"]: row for row in governance["chapters"]}
 
     assert by_pattern["bear_flags"]["tradable_score"] == 84.49
@@ -64,7 +64,7 @@ def test_targeted_pattern_ceiling_push_improves_wedges_without_promotion() -> No
     assert rows["wedges_rising"]["no_overlift_guard"]["promotion_decision"] == "STOP_NO_PROMOTION_UNDER_NO_OVERLIFT_POLICY"
     assert "scope_not_direct_long_cash_equity" in rows["wedges_rising"]["no_overlift_guard"]["remaining_tradable_blockers"]
 
-    governance = json.loads(Path("artifacts/final_chapters/governance/chapter_governance_matrix.json").read_text(encoding="utf-8"))
+    governance = json.loads(Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json").read_text(encoding="utf-8"))
     by_pattern = {row["pattern_id"]: row for row in governance["chapters"]}
     assert by_pattern["wedges_falling"]["tradable_score"] == 87.41
     assert by_pattern["wedges_falling"]["tradable_status"] == "tradable_tested_blocked"
@@ -93,7 +93,7 @@ def test_feature_filter_push_is_negative_ceiling_evidence_not_best_evidence() ->
         assert row["best_score"] < score
         assert row["no_overlift_guard"]["promotion_decision"] == "STOP_NO_PROMOTION_UNDER_NO_OVERLIFT_POLICY"
 
-    governance = json.loads(Path("artifacts/final_chapters/governance/chapter_governance_matrix.json").read_text(encoding="utf-8"))
+    governance = json.loads(Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json").read_text(encoding="utf-8"))
     by_pattern = {row["pattern_id"]: row for row in governance["chapters"]}
     for pattern_id, score in current_best.items():
         assert by_pattern[pattern_id]["tradable_score"] == score
@@ -120,7 +120,7 @@ def test_pattern_specific_branch_redesign_updates_best_evidence_without_promotio
     assert rows["triangles_symmetrical"]["best_score"] < 84.03
     assert rows["bear_flags"]["best_score"] < 80.86
 
-    governance = json.loads(Path("artifacts/final_chapters/governance/chapter_governance_matrix.json").read_text(encoding="utf-8"))
+    governance = json.loads(Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json").read_text(encoding="utf-8"))
     by_pattern = {row["pattern_id"]: row for row in governance["chapters"]}
     assert by_pattern["triangles_descending"]["tradable_score"] == 89.13
     assert by_pattern["triangles_descending"]["tradable_evidence_id"] == "local_blocker_audit"
@@ -145,7 +145,7 @@ def test_pattern_specific_fold_repair_updates_only_true_improvements() -> None:
         assert rows[pattern_id]["best_score"] == score
         assert rows[pattern_id]["no_overlift_guard"]["promotion_decision"] == "STOP_NO_PROMOTION_UNDER_NO_OVERLIFT_POLICY"
 
-    governance = json.loads(Path("artifacts/final_chapters/governance/chapter_governance_matrix.json").read_text(encoding="utf-8"))
+    governance = json.loads(Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json").read_text(encoding="utf-8"))
     by_pattern = {row["pattern_id"]: row for row in governance["chapters"]}
     assert by_pattern["triangles_symmetrical"]["tradable_score"] == 84.03
     assert by_pattern["triangles_descending"]["tradable_score"] == 89.13
@@ -175,7 +175,7 @@ def test_pattern_specific_final_push_is_last_bounded_pass() -> None:
         assert rows[pattern_id]["best_score"] == score
         assert rows[pattern_id]["no_overlift_guard"]["promotion_decision"] == "STOP_NO_PROMOTION_UNDER_NO_OVERLIFT_POLICY"
 
-    governance = json.loads(Path("artifacts/final_chapters/governance/chapter_governance_matrix.json").read_text(encoding="utf-8"))
+    governance = json.loads(Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json").read_text(encoding="utf-8"))
     by_pattern = {row["pattern_id"]: row for row in governance["chapters"]}
     assert by_pattern["triangles_symmetrical"]["tradable_score"] == 84.03
     assert by_pattern["triangles_descending"]["tradable_score"] == 89.13

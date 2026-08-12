@@ -43,7 +43,7 @@ DEFAULT_PUBLICATION_PAYLOADS = {
     ),
 }
 DEFAULT_TRADABLE_DIR = Path("artifacts/scanner_v2/chapter_tradable_layer")
-DEFAULT_GOVERNANCE_MATRIX = Path("artifacts/final_chapters/governance/chapter_governance_matrix.json")
+DEFAULT_GOVERNANCE_MATRIX = Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json")
 
 
 REQUIRED_SOURCE_SECTIONS = (

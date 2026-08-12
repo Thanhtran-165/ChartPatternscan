@@ -34,9 +34,9 @@ DEFAULT_EVENTS = Path("artifacts/scanner_v2/descending_triangles_db_source_parit
 DEFAULT_PATH = Path("artifacts/scanner_v2/descending_triangles_db_source_parity/db_active/post_breakout_path.csv")
 DEFAULT_AUDIT = Path("artifacts/scanner_v2/descending_triangle_publication_quality_audit/triangle_publication_quality_audit.json")
 DEFAULT_BRANCH = Path("artifacts/scanner_v2/descending_triangle_branch_candidates/descending_triangle_branch_candidates.json")
-DEFAULT_AI_SECTIONS = Path("artifacts/scanner_v2/source_guided_refinement_final_v1/triangle_family/descending_triangle/ai/refined/approved_ai_sections.json")
+DEFAULT_AI_SECTIONS = Path("artifacts/scanner_v2/quick_read_editorial_upgrade_v1/triangle_family/triangles_descending/approved_ai_sections.json")
 CORE_PATTERNS = Path("scanner/v2/core_patterns.json")
-REQUIRED_EDITORIAL_SECTIONS = ("summary", "tour", "failure", "statistics", "post_breakout", "size_volume", "tactics", "checklist")
+REQUIRED_EDITORIAL_SECTIONS = ("quick_read", "summary", "tour", "failure", "statistics", "post_breakout", "size_volume", "tactics", "checklist")
 
 
 def _read_json(path: Path) -> Dict[str, Any]:
@@ -578,6 +578,7 @@ def build_descending_triangle_public_chapter(
     payload["editorial_source_path"] = editorial_source_path
     spec = _spec()
     publication_spec = build_triangle_publication_spec(pattern_id="triangles_descending", title="Tam giác giảm", spec=spec)
+    spec = {**spec, "public_rule_rows": publication_spec.get("public_rule_rows", [])}
     payload["publication_spec_id"] = publication_spec["publication_spec_id"]
     charts, example_events = _build_charts(branch_events, price_db, chapter_dir)
     payload["example_events"] = example_events

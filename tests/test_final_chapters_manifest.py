@@ -29,6 +29,7 @@ from scanner.canonical_publication_chapter_factory import (
 )
 from scanner.audit_publication_style_v3 import audit_publication_style_v3
 from scanner.audit_final_chapter_pdf_quality import audit_manifest as audit_final_pdf_quality_manifest
+from scanner.audit_final_chapter_example_charts import audit_manifest as audit_final_example_chart_manifest
 from scanner.audit_final_family_shared_content import audit_manifest as audit_final_family_shared_content
 from scanner.audit_publication_entrypoints import audit_publication_entrypoints
 from scanner.promote_final_chapter import promote_final_chapter
@@ -47,7 +48,7 @@ from scanner.publication_semantic_contract import PUBLICATION_SEMANTIC_GATE_ID, 
 from scanner.validate_final_chapters_manifest import validate_final_manifest
 
 
-REQUIRED_SECTIONS = ["summary", "tour", "failure", "statistics", "post_breakout", "size_volume", "tactics", "checklist"]
+REQUIRED_SECTIONS = ["quick_read", "summary", "tour", "failure", "statistics", "post_breakout", "size_volume", "tactics", "checklist"]
 
 
 def _write_text_pdf(path: Path, text: str) -> None:
@@ -59,10 +60,15 @@ def _write_text_pdf(path: Path, text: str) -> None:
 
 def _rich_editorial_sections() -> dict[str, list[str]]:
     return {
+        "quick_read": [
+            "Đọc nhanh chương này phải mở đầu bằng hành vi giá mà người đọc có thể nhìn thấy trên biểu đồ. Người đọc nên hiểu mẫu đang nói về nhịp đi, vùng xác nhận và rủi ro đường đi trước khi xem bất kỳ bảng nào.",
+            "Điều này cho thấy các con số chính chỉ có ý nghĩa khi được đặt cạnh hình thái. Vì vậy phần mở đầu cần nói rõ mẫu có thường đi đủ xa hay không, thất bại có đáng kể hay không, và người đọc nên giữ mức thận trọng nào.",
+            "Nếu chương có mục tiêu, tỷ lệ thất bại hoặc mức kéo ngược, quick read phải chuyển chúng thành ngôn ngữ phổ thông. Cách đọc đúng là xem đây như lời dẫn vào chương, không phải bảng kết quả hay lời khuyên giao dịch.",
+        ],
         "summary": [
             "Mẫu này được trình bày như một chương đọc biểu đồ, không phải một bảng thống kê rời rạc. Người đọc nên hiểu trước hình thái, sau đó mới đọc kết quả hậu phá vỡ để biết mẫu thường cư xử thế nào.",
             "Điều này cho thấy số liệu chỉ có ý nghĩa khi gắn với đường đi giá. Vì vậy phần chính phải nói rõ khi nào mẫu đáng chú ý hơn và khi nào cần thận trọng hơn.",
-            "Nếu một con số xuất hiện trong chương, nó phải trả lời câu hỏi cách đọc thực tế là gì. Nghĩa là thống kê không đứng một mình, mà được chuyển thành hàm ý cho người đọc.",
+            "Nếu một con số xuất hiện trong chương, nó phải trả lời câu hỏi cách đọc thực tế là gì. Nghĩa là thống kê không đứng một mình, mà được diễn giải thành hàm ý cho người đọc.",
             "Phần mở đầu cũng phải chỉ ra vai trò sử dụng của chương: mẫu có thể là tham khảo đầu tư, tham khảo phòng thủ hoặc chỉ là ghi chú mô tả. Cách đọc này giúp người đọc không nhầm một hồ sơ mẫu hình với một tín hiệu giao dịch tự động.",
         ],
         "tour": [
@@ -142,7 +148,7 @@ def test_current_final_manifest_has_completed_canonical_pdf_factory_rebuild() ->
 
     assert report["status"] == "PASS"
     assert report["final_count"] == chapter_count
-    assert report["quarantine_count"] == 5
+    assert report["quarantine_count"] == 0
     assert report["failures"] == []
     assert not any(item["check"] == "canonical_publication_flow" for item in report["failures"])
 
@@ -154,6 +160,13 @@ def test_current_final_manifest_has_completed_canonical_pdf_factory_rebuild() ->
     pdf_quality_audit = audit_final_pdf_quality_manifest(Path("artifacts/final_chapters/final_chapters_manifest.json"))
     assert pdf_quality_audit["status"] == "PASS"
     assert pdf_quality_audit["counts"] == {"chapters": chapter_count, "pass": chapter_count, "fail": 0, "warnings": 0}
+
+    example_chart_audit = audit_final_example_chart_manifest(Path("artifacts/final_chapters/final_chapters_manifest.json"))
+    assert example_chart_audit["status"] == "PASS"
+    assert example_chart_audit["counts"]["chapters"] == chapter_count
+    assert example_chart_audit["counts"]["charts"] == chapter_count * 4
+    assert example_chart_audit["counts"]["chart_fail"] == 0
+    assert example_chart_audit["counts"]["chart_borderline"] == 0
 
     entrypoint_audit = audit_publication_entrypoints()
     assert entrypoint_audit["status"] == "PASS"
@@ -205,7 +218,11 @@ def test_current_final_manifest_has_completed_canonical_pdf_factory_rebuild() ->
             "islands_long",
         }.issubset(final_ids)
 
-    governance = json.loads(Path("artifacts/final_chapters/governance/chapter_governance_matrix.json").read_text(encoding="utf-8"))
+    governance = json.loads(
+        Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json").read_text(
+            encoding="utf-8"
+        )
+    )
     assert governance["governance_matrix_id"] == "dual_axis_chapter_scoring_v1"
     assert governance["counts"]["chapters"] == chapter_count
     assert governance["counts"]["publication_final"] == chapter_count
@@ -275,7 +292,7 @@ def test_current_final_manifest_has_completed_canonical_pdf_factory_rebuild() ->
     assert by_pattern["pipe_bottoms"]["tradable_blockers"] == ""
 
     preflight = json.loads(
-        Path("artifacts/final_chapters/governance/chapter_tradable_preflight_matrix.json").read_text(encoding="utf-8")
+        Path("artifacts/governance/final_chapters/governance/chapter_tradable_preflight_matrix.json").read_text(encoding="utf-8")
     )
     assert preflight["preflight_matrix_id"] == "tradable_preflight_matrix_v1"
     assert preflight["counts"]["chapters"] == chapter_count
@@ -296,7 +313,7 @@ def test_validate_final_manifest_accepts_canonical_flow_shape_for_non_default_ma
     manuscript = tmp_path / "manuscript.md"
     notes = tmp_path / "notes.md"
     source_notes = tmp_path / "source.json"
-    _write_text_pdf(pdf, "Kết quả quan trọng Mẫu hình hoạt động ra sao Cách nhận diện")
+    _write_text_pdf(pdf, "Đọc nhanh chương này Mẫu hình hoạt động ra sao Cách nhận diện")
     payload.write_text(
         json.dumps(
                 {
@@ -509,7 +526,7 @@ def test_canonical_factory_attaches_ai_editorial_gate_metadata() -> None:
 def test_style_v3_audit_rejects_pdf_with_internal_terms(tmp_path) -> None:
     pdf = tmp_path / "chapter.pdf"
     payload = tmp_path / "payload.json"
-    _write_text_pdf(pdf, "Kết quả quan trọng Mẫu hình hoạt động ra sao scanner payload")
+    _write_text_pdf(pdf, "Đọc nhanh chương này Mẫu hình hoạt động ra sao scanner payload")
     payload.write_text(
         json.dumps(
             {
@@ -541,7 +558,7 @@ def test_style_v3_audit_rejects_legacy_table_heading_leaks(tmp_path) -> None:
     pdfmetrics.registerFont(TTFont("ArialUnicodeTest", str(font_path)))
     doc = canvas.Canvas(str(pdf))
     doc.setFont("ArialUnicodeTest", 12)
-    doc.drawString(72, 760, "Cách nhận diện Tham số hiện tại Kết quả quan trọng")
+    doc.drawString(72, 760, "Cách nhận diện Tham số hiện tại Đọc nhanh chương này")
     doc.save()
     payload.write_text(
         json.dumps(
@@ -612,7 +629,7 @@ def test_source_guided_refinement_contract_accepts_complete_writing_flow(tmp_pat
         path = tmp_path / f"{name}.json"
         if name == "canonical_pdf":
             path = tmp_path / "chapter.pdf"
-            _write_text_pdf(path, "Kết quả quan trọng Mẫu hình hoạt động ra sao Cách nhận diện")
+            _write_text_pdf(path, "Đọc nhanh chương này Mẫu hình hoạt động ra sao Cách nhận diện")
         else:
             path.write_text("{}", encoding="utf-8")
         artifacts[name] = str(path)
@@ -652,9 +669,10 @@ def test_canonical_content_generator_maps_approved_ai_sections(tmp_path) -> None
     approved = tmp_path / "approved_ai_sections.json"
     approved.write_text(
         json.dumps(
-            {
-                "approved_sections": [
-                    {"id": "intro", "paragraphs": _rich_editorial_sections()["summary"]},
+                {
+                    "approved_sections": [
+                        {"id": "quick_read", "paragraphs": _rich_editorial_sections()["quick_read"]},
+                        {"id": "intro", "paragraphs": _rich_editorial_sections()["summary"]},
                     {"id": "how_it_works", "paragraphs": _rich_editorial_sections()["tour"]},
                     {"id": "failure", "paragraphs": _rich_editorial_sections()["failure"]},
                     {"id": "statistics", "paragraphs": _rich_editorial_sections()["statistics"]},
@@ -838,21 +856,26 @@ def test_promote_final_chapter_rolls_back_legacy_self_generated_pdf(tmp_path) ->
     assert any(failure["check"] == "canonical_publication_flow" for failure in report["failures"])
 
 
-def test_final_manifest_keeps_legacy_double_aggregates_quarantined() -> None:
+def test_final_manifest_excludes_legacy_double_aggregates_and_archives_governance_record() -> None:
     manifest = json.loads(Path("artifacts/final_chapters/final_chapters_manifest.json").read_text(encoding="utf-8"))
     final_ids = {chapter["pattern_id"] for chapter in manifest["chapters"]}
-    quarantined = {
+    governance_record = json.loads(
+        Path("artifacts/governance/final_chapters/quarantine_manifest.json").read_text(encoding="utf-8")
+    )
+    archived = {
         chapter["pattern_id"]: chapter
-        for chapter in manifest.get("quarantined_chapters", [])
+        for chapter in governance_record.get("quarantined_chapters", [])
         if str(chapter.get("pattern_id", "")).startswith("double_")
     }
 
+    assert manifest.get("quarantined_chapters", []) == []
     assert "double_bottoms" not in final_ids
     assert "double_tops" not in final_ids
-    assert {"double_bottoms", "double_tops"}.issubset(quarantined)
-    for chapter in quarantined.values():
+    assert {"double_bottoms", "double_tops"}.issubset(archived)
+    for chapter in archived.values():
         assert "aggregate" in chapter["reason"].lower()
-        assert Path(chapter["previous_pdf"]).exists()
+        assert chapter["removed_physical_pdf"] is True
+        assert "previous_pdf" not in chapter
 
 
 def test_final_public_pdfs_do_not_leak_internal_publication_terms() -> None:

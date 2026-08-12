@@ -19,7 +19,7 @@ from pypdf import PdfReader
 
 
 DEFAULT_MANIFEST = Path("artifacts/final_chapters/final_chapters_manifest.json")
-DEFAULT_OUT_DIR = Path("artifacts/final_chapters/visual_review/latest")
+DEFAULT_OUT_DIR = Path("artifacts/governance/final_chapters/visual_review/latest")
 REVIEW_PACK_ID = "final_chapter_visual_review_pack_v1"
 
 

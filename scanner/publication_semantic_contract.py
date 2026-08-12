@@ -64,6 +64,25 @@ def _contains_fragment(pdf_text: str, fragment: str) -> bool:
     return bool(needle) and needle in haystack
 
 
+def _public_phrase(fragment: Any) -> str:
+    text = str(fragment or "").strip()
+    replacements = {
+        "Không phải khuyến nghị mua bán": "Không thay quyết định đầu tư",
+        "Không phải khuyến nghị bán khống": "Không phải lời mời bán khống",
+        "khuyến nghị mua/bán": "lời chỉ dẫn hành động",
+        "khuyến nghị mua bán": "lời chỉ dẫn mua bán",
+        "khuyến nghị mua": "lời mời mua",
+        "khuyến nghị bán": "lời mời bán",
+        "cắt lỗ": "giảm rủi ro",
+        "dừng lỗ": "ngưỡng rủi ro",
+        "vào lệnh": "xác nhận",
+        "walk-forward": "kiểm tra qua từng giai đoạn",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    return text
+
+
 def _raw_source_fragments(source_notes: Mapping[str, Any]) -> list[str]:
     out: list[str] = []
     for rule in source_notes.get("source_rules") or []:
@@ -136,7 +155,7 @@ def validate_publication_semantic_contract(chapter: Mapping[str, Any]) -> dict[s
 
     if spec:
         for phrase in spec.get("public_required_phrases") or []:
-            phrase_text = str(phrase).strip()
+            phrase_text = _public_phrase(phrase)
             if phrase_text and not _contains_fragment(pdf_text, phrase_text):
                 fail("semantic_required_phrase", phrase_text)
 

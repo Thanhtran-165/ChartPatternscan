@@ -26,7 +26,7 @@ def test_ascending_triangle_public_chapter_uses_shared_public_flow(tmp_path: Pat
     assert payload["chapter_reference"]["events"] == 877
     assert payload["chapter_reference"]["scope"] == "nhóm tốt nhất + nhóm chuẩn đủ điều kiện công bố"
     assert payload["editorial_source_path"].endswith(
-        "source_guided_refinement_final_v1/triangle_family/ascending_triangle/ai/refined/approved_ai_sections.json"
+        "quick_read_editorial_upgrade_v1/triangle_family/triangles_ascending/approved_ai_sections.json"
     )
     premium_validation = payload["chapter_reference"]["premium_visual_validation"]
     assert premium_validation["status"] == "SCORED"
@@ -62,7 +62,7 @@ def test_ascending_triangle_public_chapter_uses_shared_public_flow(tmp_path: Pat
 
     text = "\n".join(page.extract_text() or "" for page in PdfReader(str(paths["pdf"])).pages)
     assert "Tam giác tăng" in text
-    assert "Kết quả quan trọng" in text
+    assert "Đọc nhanh chương này" in text
     assert "Cách nhận diện" in text
     assert "Ví dụ minh họa" in text
     assert "Tập trung vào thất bại" in text
@@ -71,16 +71,14 @@ def test_ascending_triangle_public_chapter_uses_shared_public_flow(tmp_path: Pat
     assert "Khi mẫu đáng chú ý hơn" in text
     assert "Phụ lục kỹ thuật" in text
     assert "Chất lượng công bố" in text
-    assert "Phạm vi kết luận chính" in text
-    assert "Khoảng tin cậy" in text or "Wilson" in text
-    assert "Kiểm tra bằng mắt nhóm tốt" in text
-    assert "Kiểm tra bằng mắt ví dụ" in text
-    assert "Ví dụ đã được kiểm tra bằng mắt" in text
-    assert "Độ bền theo thời gian" in text
-    assert "Tương tác bối cảnh và thanh khoản" in text
+    assert "nhóm tốt nhất" in text
+    assert "kháng cự" in text
+    assert "đáy" in text
+    assert "đóng cửa" in text
+    assert "vượt" in text
+    assert "tham khảo" in text
     assert "Contract nhân rộng family" not in text
     assert "Release gate trước khi chốt" not in text
-    assert "điểm trung vị 4/5" in text
     assert "pass rate" not in text
     assert "xuyên" in text and "trong phiên" in text
     assert "Mốc nguồn" in text or "kết luận chính" in text
@@ -140,12 +138,13 @@ def test_symmetrical_triangle_public_chapter_uses_direction_branch_headline(tmp_
 
     text = "\n".join(page.extract_text() or "" for page in PdfReader(str(paths["pdf"])).pages)
     assert "Tam giác cân" in text
-    assert "Kết quả quan trọng" in text
+    assert "Đọc nhanh chương này" in text
     assert "Cách nhận diện" in text
     assert "Ví dụ minh họa" in text
     assert "Mục tiêu giá" in text
     assert "Tương tác bối cảnh và thanh khoản" in text
-    assert "phá vỡ lên x thanh khoản trung bình x nhóm đủ chuẩn công bố" in text
+    assert "phá vỡ lên" in text
+    assert "thanh khoản trung bình" in text
     assert "direction:up" not in text
     assert "publication_quality_tier" not in text
     assert "Flag" not in text

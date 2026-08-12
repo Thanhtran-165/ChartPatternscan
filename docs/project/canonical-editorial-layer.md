@@ -72,7 +72,8 @@ final. Chúng chỉ được cung cấp facts, examples, source notes và đư�
 artifact AI/human đã duyệt. Content generator chung sẽ:
 
 - đọc `approved_ai_sections.json` hoặc approved human sections;
-- map các alias như `intro`, `how_it_works`, `usage` về 8 section chuẩn;
+- map các alias như `doc_nhanh_chuong_nay`, `intro`, `how_it_works`,
+  `usage` về 9 section chuẩn;
 - gắn `canonical_content_generator_id`;
 - ghi `editorial_source_path` và source kind;
 - chuyển payload đã chuẩn hóa sang editorial gate.
@@ -84,8 +85,11 @@ chỉ còn là legacy/draft adapter. Chúng không được dùng để promote 
 
 `canonical_ai_editorial_gate_v1` hiện kiểm:
 
-- đủ 8 section: `summary`, `tour`, `failure`, `statistics`,
+- đủ 9 section: `quick_read`, `summary`, `tour`, `failure`, `statistics`,
   `post_breakout`, `size_volume`, `tactics`, `checklist`;
+- `quick_read` là phần “Đọc nhanh chương này”: văn xuôi đã biên tập từ payload
+  thống kê, không phải bảng kết quả, không phải template renderer, không chứa
+  placeholder kiểu `Mục/Kết quả chính`, `được chuyển thành`, hoặc `Tham số hiện tại`;
 - mỗi section đủ số đoạn và độ dài tối thiểu;
 - có ngôn ngữ diễn giải cho người đọc, không chỉ liệt kê số;
 - không rò thuật ngữ như `MFE`, `MAE`, `breakout`, `scanner`, `pipeline`,
@@ -111,6 +115,8 @@ Nhịp viết bắt buộc từ đây:
 
 Mỗi phần chính cần đọc như một đoạn hướng dẫn sử dụng mẫu hình:
 
+- `quick_read`: mở chương bằng ngôn ngữ sách, giúp người đọc hiểu ngay mẫu nên
+  được đọc thế nào, số liệu chính nói gì và ranh giới sử dụng nằm ở đâu.
 - `summary`: định vị mẫu, kết quả chính, vai trò sử dụng và giới hạn.
 - `tour`: dẫn người đọc từ nhịp trước mẫu, vùng hình thành, đến xác nhận.
 - `failure`: mô tả giải phẫu thất bại, không chỉ nêu tỷ lệ.
@@ -175,6 +181,32 @@ Kết quả Bull Flag `style_v3`:
   `vào lệnh`, `dừng lỗ`;
 - PNG review không còn trang trắng cụt; trang cuối là phần kết thúc phụ lục có
   nội dung sử dụng.
+
+## Chuẩn quick-read bắt buộc
+
+Từ vòng `quick_read_editorial_upgrade_v1`, phần “Đọc nhanh chương này” không
+được sinh bởi renderer. Đây là lỗi gốc từng tạo cảm giác một nửa chương là văn
+đã biên tập, một nửa là bảng/câu máy móc.
+
+Luồng đúng:
+
+```text
+payload thống kê + role chapter + text hiện tại
+  -> DeepSeek/AI editorial repair hoặc human editorial pass
+  -> approved_ai_sections.json.editorial_sections.quick_read
+  -> Codex hậu kỳ để giữ đúng số liệu và không quá lời
+  -> canonical_chapter_content_generator_v1
+  -> pattern_publication_core_v1 chỉ in section đã duyệt
+```
+
+Quy tắc khóa:
+
+- thiếu `quick_read` thì build fail;
+- `quick_read` chứa fallback/template public thì audit fail;
+- renderer không được tự dựng quick-read từ bảng kết quả;
+- mọi chapter final phải có `canonical_content_source_kind = approved_ai_sections`
+  và `editorial_source_path` trỏ tới artifact đã duyệt;
+- KPI của lớp này là “chapter experience”, không phải tăng điểm thống kê.
 
 ## Vì sao cần lớp này
 

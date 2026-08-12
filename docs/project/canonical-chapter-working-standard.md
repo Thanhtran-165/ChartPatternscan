@@ -34,6 +34,10 @@ dùng logic legacy hoặc gọi nhầm builder lịch sử.
 5. **Không fallback nội dung public**  
    Lỗi runtime hoặc thiếu section phải được sửa ở nguồn dữ liệu/editorial, không
    được bù bằng câu chung chung, placeholder hoặc bảng máy móc rồi promote final.
+   Riêng phần `Đọc nhanh chương này` bắt buộc phải đến từ
+   `editorial_sections.quick_read` trong artifact đã duyệt. Renderer chỉ được
+   in phần này; nếu thiếu `quick_read` hoặc phát hiện text template/fallback,
+   build/audit phải fail.
 
 6. **Ví dụ biểu đồ là case study, không chỉ là event hợp lệ**  
    Selector tự động phải ưu tiên hình thái sạch. Với mẫu khó như vai đầu vai,
@@ -59,7 +63,9 @@ dùng logic legacy hoặc gọi nhầm builder lịch sử.
 3. Chạy scan, outcome metrics, target calibration và uncertainty.
 4. Chạy publication/preflight score.
 5. Chạy tradable layer nếu pattern phù hợp.
-6. Sinh approved editorial sections qua canonical editorial workflow.
+6. Sinh approved editorial sections qua canonical editorial workflow, gồm đủ
+   `quick_read`, `summary`, `tour`, `failure`, `statistics`, `post_breakout`,
+   `size_volume`, `tactics`, `checklist`.
 7. Chọn ví dụ minh họa; nếu role nào chỉ còn `usable`, ghi vào review queue.
 8. Render bằng `canonical_publication_chapter_factory_v1`.
 9. Chạy các audit bắt buộc:
@@ -88,6 +94,8 @@ dùng logic legacy hoặc gọi nhầm builder lịch sử.
 - Để `source_rules_public` chứa placeholder kiểu “quy tắc nguồn đã được chuyển
   thành...”.
 - Dùng fallback để che lỗi thiếu AI/editorial section.
+- Dùng renderer để tự viết “Đọc nhanh chương này” hoặc tự ghép bảng kết quả
+  thành prose public.
 - Chọn ví dụ chỉ vì VN30/VN100 nếu hình thái kém.
 - In marker kỹ thuật như `bear_trap_stoploss_publication_reframe_v1` ra PDF
   public.

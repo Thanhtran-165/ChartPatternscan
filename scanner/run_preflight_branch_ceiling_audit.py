@@ -17,8 +17,8 @@ from pathlib import Path
 from typing import Any
 
 
-DEFAULT_PREFLIGHT_MATRIX = Path("artifacts/final_chapters/governance/chapter_tradable_preflight_matrix.json")
-DEFAULT_OUT_DIR = Path("artifacts/final_chapters/governance")
+DEFAULT_PREFLIGHT_MATRIX = Path("artifacts/governance/final_chapters/governance/chapter_tradable_preflight_matrix.json")
+DEFAULT_OUT_DIR = Path("artifacts/governance/final_chapters/governance")
 AUDIT_ID = "preflight_branch_ceiling_audit_v1"
 BRANCH_SELECTION_THRESHOLD_PP = 3.0
 MATERIAL_RESIDUAL_LIFT_PP = 3.0

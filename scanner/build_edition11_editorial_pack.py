@@ -30,10 +30,10 @@ from scanner.validate_final_chapters_manifest import DEFAULT_MANIFEST  # noqa: E
 
 
 PACK_ID = "edition_1_1_deepseek_editorial_pack_v1"
-DEFAULT_OUT_DIR = Path("artifacts/final_chapters/edition_1_1")
-DEFAULT_GOVERNANCE = Path("artifacts/final_chapters/governance/chapter_governance_matrix.json")
-DEFAULT_PREFLIGHT = Path("artifacts/final_chapters/governance/chapter_tradable_preflight_matrix.json")
-DEFAULT_RANKINGS = Path("artifacts/final_chapters/book_level/aggregate_practical_rankings.json")
+DEFAULT_OUT_DIR = Path("artifacts/governance/final_chapters/edition_1_1")
+DEFAULT_GOVERNANCE = Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json")
+DEFAULT_PREFLIGHT = Path("artifacts/governance/final_chapters/governance/chapter_tradable_preflight_matrix.json")
+DEFAULT_RANKINGS = Path("artifacts/governance/final_chapters/book_level/aggregate_practical_rankings.json")
 DEFAULT_AFTER_BUY_PACK = Path("artifacts/scanner_v2/after_buy_vietnam_v2/after_buy_deep_integration_pack.json")
 DEFAULT_AFTER_BUY_COVERAGE = Path("artifacts/scanner_v2/after_buy_vietnam_v2/after_buy_chapter_coverage_matrix.json")
 

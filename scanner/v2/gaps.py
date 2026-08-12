@@ -25,6 +25,8 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+from scanner.v2.measurement_registry import lookahead_bars as _registry_lookahead
+from scanner.v2.failure_logic import failure_busted_days, failure_busted_flag
 
 from scanner.ohlcv_normalizer import OHLCVNormalizer  # noqa: E402
 from scanner.research_support_analysis import (  # noqa: E402
@@ -258,6 +260,9 @@ def _evaluate_gap(df: pd.DataFrame, row: Mapping[str, Any], *, lookahead: int) -
             "mae_pct": None,
             "target_hit": None,
             "failure_5pct": None,
+            "weak_move_5pct": None,
+            "failure_busted": None,
+            "days_to_bust": None,
             "target_first_before_adverse_5pct": None,
             "days_to_target": None,
             "throwback_pullback_30d": None,
@@ -292,6 +297,9 @@ def _evaluate_gap(df: pd.DataFrame, row: Mapping[str, Any], *, lookahead: int) -
         "mae_pct": round(float(mae), 2),
         "target_hit": target_hit,
         "failure_5pct": bool(float(mfe) < 5.0),
+        "weak_move_5pct": bool(float(mfe) < 5.0),
+        "failure_busted": failure_busted_flag(row, future, breakout_price=breakout_price, target_price=target, mfe_pct=float(mfe)),
+        "days_to_bust": failure_busted_days(row, future, breakout_price=breakout_price, target_price=target, mfe_pct=float(mfe)),
         "target_first_before_adverse_5pct": bool(target_first),
         "days_to_target": int(days_to_target) if days_to_target is not None else None,
         "throwback_pullback_30d": bool(not retest_rows.empty),
@@ -409,7 +417,7 @@ def scan_symbol(
             "pattern_quality_score": score,
             "pattern_quality_tier": "clean" if score >= 76 else ("usable" if score >= 58 else "loose"),
         }
-        record.update(_evaluate_gap(df, record, lookahead=config.evaluation_bars))
+        record.update(_evaluate_gap(df, record, lookahead=_registry_lookahead(record.get("pattern_key") or "breakaway_gaps")))
         out.append(record)
         used.append(idx)
         if len(out) >= config.max_events_per_symbol:
@@ -539,7 +547,7 @@ EVENT_FIELDS = [
     "detection_id", "symbol", "variant", "market_group", "market_regime",
     "formation_start_date", "formation_end_date", "breakout_date", "breakout_direction",
     "breakout_price", "b_exec_price", "target_price", "target_dist_pct",
-    "mfe_pct", "mae_pct", "target_hit", "failure_5pct", "target_first_before_adverse_5pct",
+    "mfe_pct", "mae_pct", "target_hit", "failure_5pct", "weak_move_5pct", "failure_busted", "days_to_bust", "target_first_before_adverse_5pct",
     "days_to_target", "pattern_quality_score", "pattern_quality_tier",
     "publication_quality_score", "publication_quality_tier", "publication_quality_reasons",
     "pattern_width_bars", "pattern_height_pct", "gap_direction", "gap_top_price",
@@ -603,7 +611,7 @@ def scan_gaps_db(
     }
     _enrich_events_from_series(scan, series_by_symbol, corporate_db=index_db)
     _assign_publication_quality_tiers(scan["detections"])
-    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=config.evaluation_bars)
+    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=_registry_lookahead(AREA_GAPS))  # gap_family placeholder — dùng loại dài nhất (63)
     paths: dict[str, Path] = {"detections": out_dir / "detections.json"}
     _write_json(paths["detections"], scan)
     for pattern_key in GAP_PATTERNS:

@@ -48,6 +48,10 @@ PUBLIC_TEXT_REPLACEMENTS = (
     ("mẫu quét", "mẫu lịch sử"),
     ("Mẫu quét", "Mẫu lịch sử"),
     ("approved_human_sections", "nội dung biên tập đã duyệt"),
+    ("được chuyển thành câu chuyện thị giác", "được diễn giải bằng ngôn ngữ biểu đồ"),
+    ("được chuyển thành", "được diễn giải thành"),
+    ("chúng tôi kỳ vọng bạn", "người đọc nên"),
+    ("chúng tôi", "chương này"),
     ("source_full_pipe", "mốc đầy đủ"),
     ("Tham số hiện tại", "Dấu hiệu cần thấy"),
     ("Spike", "Cú xuyên giá"),
@@ -113,6 +117,8 @@ PUBLIC_TEXT_REPLACEMENTS = (
     ("short cấu hình", "hồ sơ bán khống"),
     ("long-watchlist", "hồ sơ theo dõi hướng tăng"),
     ("long-theo dõi", "hồ sơ theo dõi hướng tăng"),
+    ("watchlist-reference", "tham khảo theo dõi"),
+    ("watchlist", "theo dõi"),
     ("biên thuận lợi", "mức tăng tốt nhất"),
     ("biên bất lợi", "mức kéo ngược sâu nhất"),
 )
@@ -484,6 +490,8 @@ def _repair_missing_editorial_sections_with_ai(
         "Nhiệm vụ: viết đúng các section còn thiếu trong `missing_sections`.\n"
         "Output phải là JSON hợp lệ, không markdown fence, theo schema:\n"
         "{\"editorial_sections\": {\"<missing_section_id>\": [\"đoạn hoặc checklist item\", \"...\"]}}\n"
+        "Nếu section là `quick_read`, trả 3-4 đoạn văn mở đầu tự nhiên cho tiêu đề 'Đọc nhanh chương này': "
+        "nói bằng ngôn ngữ nhà đầu tư, chuyển số liệu chính thành ý nghĩa đọc biểu đồ, không viết như bảng và không dùng câu template.\n"
         "Nếu section là `checklist`, trả 7-9 câu ngắn. Nếu section là `tactics`, trả 3-4 đoạn văn.\n"
         "Mọi đoạn phải chuyển số liệu thành cách đọc biểu đồ và không biến thành khuyến nghị giao dịch.\n"
         "<REPAIR_DOSSIER>\n"
@@ -586,6 +594,14 @@ def _geometry_terms_for_payload(prepared_payload: Mapping[str, Any]) -> list[str
         family_terms = ["scallop", "ô", "môi trái", "môi phải", "đỉnh", "tròn", "cong", "phá vỡ"]
     elif "scallop" in pattern_id or "scallop" in pattern_name:
         family_terms = ["scallop", "chữ j", "lòng chảo", "đỉnh trái", "đỉnh phải", "môi", "cong", "phá vỡ"]
+    elif "broadening_formations_right_angled_ascending" in pattern_id or "right_angled_ascending" in pattern_id:
+        family_terms = ["mở rộng", "đáy ngang", "đỉnh cao", "biên dưới", "biên trên", "phá vỡ"]
+    elif "broadening_formations_right_angled_descending" in pattern_id or "right_angled_descending" in pattern_id:
+        family_terms = ["mở rộng", "đỉnh ngang", "đáy thấp", "biên trên", "biên dưới", "phá vỡ"]
+    elif "broadening_wedges_ascending" in pattern_id:
+        family_terms = ["nêm mở rộng", "đường xu hướng", "đỉnh cao", "đáy cao", "mở rộng", "phá vỡ"]
+    elif "broadening_wedges_descending" in pattern_id:
+        family_terms = ["nêm mở rộng", "đường xu hướng", "đỉnh thấp", "đáy thấp", "mở rộng", "phá vỡ"]
     elif "broadening" in pattern_id or "broadening" in pattern_name or "mở rộng" in pattern_name:
         family_terms = ["mở rộng", "đỉnh cao hơn", "đáy thấp hơn", "đường xu hướng", "phá vỡ"]
     elif "rounding" in pattern_id or "rounding" in pattern_name or "dạng bát" in pattern_name or "bát úp" in pattern_name:
@@ -597,6 +613,8 @@ def _geometry_terms_for_payload(prepared_payload: Mapping[str, Any]) -> list[str
         family_terms = ["nến trắng dài", "ba nến", "nến thứ năm", "biên độ nến đầu", "đóng cửa", "xu hướng tăng"]
     elif "falling_three_methods" in pattern_id:
         family_terms = ["nến đen dài", "ba nến", "nến thứ năm", "biên độ nến đầu", "đóng cửa", "xu hướng giảm"]
+    elif "inside_day" in pattern_id or "inside day" in identity_text:
+        family_terms = ["inside day", "nến mẹ", "nến trong", "biên độ", "đỉnh", "đáy", "đóng cửa", "xác nhận"]
     elif "pipe" in identity_text:
         family_terms = ["tuần", "cú xuyên", "chồng lấn", "liền", "đóng cửa", "xác nhận", "đỉnh", "đáy", "nổi bật", "khối lượng"]
     elif "horn" in identity_text:
@@ -674,7 +692,7 @@ def _spirit_score(prepared_payload: Mapping[str, Any], editorial_report: Mapping
     forbidden = ["mfe", "mae", "scanner", "pipeline", "target-hit", "target-first", "payload", "factory"]
     axis = {
         "stats_to_prose": min(100, 50 + 6 * sum(joined.count(term) for term in plain_terms) + 3 * sum(joined.count(term) for term in stat_terms)),
-        "geometry_description": min(100, 20 + 12 * sum(1 for term in geometry_terms if term in joined)),
+        "geometry_description": min(100, 20 + 12 * sum(1 for term in geometry_terms if _geometry_term_present(term, joined))),
         "plain_language": max(0, 100 - 15 * sum(1 for term in forbidden if term in joined)),
         "interpretive_depth": min(100, int(total_chars / 65)),
     }
@@ -689,6 +707,26 @@ def _spirit_score(prepared_payload: Mapping[str, Any], editorial_report: Mapping
         "total_chars": total_chars,
         "gate_status": editorial_report.get("status"),
     }
+
+
+def _geometry_term_present(term: str, text: str) -> bool:
+    term = term.lower().strip()
+    if term in text:
+        return True
+    variants = {
+        "đáy thấp": ("đáy thấp dần", "đáy mới thấp", "đáy sau thấp", "đáy thấp hơn"),
+        "đỉnh cao": ("đỉnh cao dần", "đỉnh mới cao", "đỉnh sau cao", "đỉnh cao hơn"),
+        "đáy cao": ("đáy cao dần", "đáy mới cao", "đáy sau cao", "đáy cao hơn"),
+        "đỉnh thấp": ("đỉnh thấp dần", "đỉnh mới thấp", "đỉnh sau thấp", "đỉnh thấp hơn"),
+        "đỉnh cao hơn": ("đỉnh sau cao hơn", "đỉnh mới cao hơn", "cao hơn đỉnh trước", "cao hơn đỉnh cũ"),
+        "đáy thấp hơn": ("đáy sau thấp hơn", "đáy mới thấp hơn", "thấp hơn đáy trước", "thấp hơn đáy cũ"),
+        "đáy ngang": ("đáy gần như ngang", "vùng hỗ trợ nằm ngang", "hỗ trợ nằm ngang", "sàn ngang"),
+        "đỉnh ngang": ("đỉnh gần như ngang", "vùng kháng cự nằm ngang", "kháng cự nằm ngang", "mức cản ngang", "trần ngang"),
+        "biên trên": ("đường trên", "đường biên trên", "biên kháng cự"),
+        "biên dưới": ("đường dưới", "đường biên dưới", "biên hỗ trợ"),
+        "nêm mở rộng": ("nêm mở", "nêm và khoảng cách", "nêm phình"),
+    }
+    return any(candidate in text for candidate in variants.get(term, ()))
 
 
 def _editorial_guard_status(editorial_report: Mapping[str, Any], spirit: Mapping[str, Any]) -> str:

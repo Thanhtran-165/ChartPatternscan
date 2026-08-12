@@ -34,9 +34,9 @@ DEFAULT_EVENTS = Path("artifacts/scanner_v2/symmetrical_triangles_db_source_pari
 DEFAULT_PATH = Path("artifacts/scanner_v2/symmetrical_triangles_db_source_parity/db_active/post_breakout_path.csv")
 DEFAULT_AUDIT = Path("artifacts/scanner_v2/symmetrical_triangle_publication_quality_audit/triangle_publication_quality_audit.json")
 DEFAULT_BRANCH = Path("artifacts/scanner_v2/symmetrical_triangle_branch_candidates/symmetrical_triangle_branch_candidates.json")
-DEFAULT_AI_SECTIONS = Path("artifacts/scanner_v2/source_guided_refinement_final_v1/triangle_family/symmetrical_triangle/ai/refined/approved_ai_sections.json")
+DEFAULT_AI_SECTIONS = Path("artifacts/scanner_v2/quick_read_editorial_upgrade_v1/triangle_family/triangles_symmetrical/approved_ai_sections.json")
 CORE_PATTERNS = Path("scanner/v2/core_patterns.json")
-REQUIRED_EDITORIAL_SECTIONS = ("summary", "tour", "failure", "statistics", "post_breakout", "size_volume", "tactics", "checklist")
+REQUIRED_EDITORIAL_SECTIONS = ("quick_read", "summary", "tour", "failure", "statistics", "post_breakout", "size_volume", "tactics", "checklist")
 
 
 def _read_json(path: Path) -> Dict[str, Any]:
@@ -494,6 +494,11 @@ def _publication_payload(
             "interpretation": "Tam giác cân dùng kết luận theo hướng phá vỡ. Nhánh phá vỡ lên thanh khoản trung bình đủ mạnh cho chương theo dõi; toàn mẫu lên/xuống không được dùng làm kết luận chính.",
         },
         "editorial_sections": {
+            "quick_read": [
+                "Tam giác cân là mẫu nén hai chiều: đỉnh thấp dần, đáy cao dần, và giá bị ép vào một vùng hẹp hơn trước khi chọn hướng phá vỡ. Vì vậy chương này không nên đọc bằng một kết luận chung cho cả hai phía.",
+                f"Bộ quét ghi nhận {len(all_events)} mẫu, nhưng nhánh kết luận chính là phá vỡ lên trong nhóm thanh khoản trung bình với {len(branch_events)} mẫu đạt chuẩn công bố. Ở mốc thận trọng 0,5x, tỷ lệ đạt mục tiêu là {base.get('target_hit_rate')}%, tỷ lệ đạt trước kéo ngược là {base.get('target_first_before_adverse_5pct_rate')}%, và thất bại 5% là {base.get('failure_5pct_rate')}%.",
+                "Cách đọc thực tế là chờ hướng phá vỡ rồi mới xem số liệu. Nếu giá phá lên nhưng quay lại nhanh vào thân mẫu, hình học trước đó không còn đủ để nâng độ tin cậy; nếu phá xuống, chương nên được đọc như cảnh báo rủi ro riêng.",
+            ],
             "summary": [
                 f"Bộ quét ghi nhận {len(all_events)} mẫu tam giác cân. Tuy nhiên, chương này không dùng toàn mẫu vì mẫu có thể phá vỡ lên hoặc xuống.",
                 f"Nhánh kết luận chính là phá vỡ lên trong nhóm thanh khoản trung bình: {len(branch_events)} mẫu đạt chuẩn công bố.",
@@ -582,6 +587,7 @@ def build_symmetrical_triangle_public_chapter(
     payload["editorial_source_path"] = editorial_source_path
     spec = _spec()
     publication_spec = build_triangle_publication_spec(pattern_id="triangles_symmetrical", title="Tam giác cân", spec=spec)
+    spec = {**spec, "public_rule_rows": publication_spec.get("public_rule_rows", [])}
     payload["publication_spec_id"] = publication_spec["publication_spec_id"]
     charts, example_events = _build_charts(branch_events, price_db, chapter_dir)
     payload["example_events"] = example_events

@@ -37,7 +37,7 @@ from scanner.publication_rendering_primitives import (  # noqa: E402
 
 
 PUBLICATION_CORE_ID = "pattern_publication_core_v1"
-GOVERNANCE_MATRIX = Path("artifacts/final_chapters/governance/chapter_governance_matrix.json")
+GOVERNANCE_MATRIX = Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json")
 DOUBLE_FAMILY_RESCUE = Path("artifacts/scanner_v2/double_family_tradable_rescue/double_family_tradable_rescue.json")
 
 
@@ -200,6 +200,16 @@ def _safe_caption_text(value: Any) -> str:
         "MAE": "mức kéo ngược sâu nhất",
         "target-hit": "tỷ lệ đạt mục tiêu",
         "target-first": "đạt mục tiêu trước khi bị kéo ngược mạnh",
+        "khuyến nghị mua/bán": "lời chỉ dẫn hành động",
+        "khuyến nghị mua, bán hay bán khống": "lời chỉ dẫn mua, bán hay bán khống",
+        "khuyến nghị mua, bán hay nắm giữ": "lời chỉ dẫn mua, bán hay nắm giữ",
+        "khuyến nghị mua hay bán": "lời chỉ dẫn mua hay bán",
+        "khuyến nghị mua hoặc bán": "lời chỉ dẫn mua hoặc bán",
+        "khuyến nghị mua bán": "lời chỉ dẫn mua bán",
+        "khuyến nghị mua": "lời mời mua",
+        "khuyến nghị bán": "lời mời bán",
+        "điểm vào lệnh": "điểm hành động",
+        "cắt lỗ": "giảm rủi ro",
         "scanner": "bộ tiêu chí nhận diện",
         "pipeline": "quy trình",
         "proxy": "dấu hiệu thay thế",
@@ -306,6 +316,9 @@ def _example_caption(
         )
     else:
         lesson = "Điểm đáng học là phải đọc hình thái cùng đường đi sau xác nhận, thay vì chỉ nhìn tên mẫu."
+    scope_note = "" if event.get("example_scope_note") is None else str(event.get("example_scope_note")).strip()
+    if scope_note:
+        lesson = f"{lesson} Phạm vi ví dụ: {scope_note}"
     return (
         f"{fallback} {symbol} xác nhận ngày {date}: thân mẫu {width} phiên, biên độ {height}%, "
         f"{pole_label} {pole if pole == 'chưa đủ dữ liệu' else pole + '%'}, {favorable} {_fmt_public(event.get('mfe_pct'), suffix='%')}, {adverse} {_fmt_public(event.get('mae_pct'), suffix='%')}, "
@@ -322,7 +335,7 @@ def _reader_bridge(payload: Mapping[str, Any], spec: Mapping[str, Any], bridge_i
     adverse = _metric_label(spec, "adverse_move", "mức kéo ngược sâu nhất")
     if bridge_id == "results":
         return (
-            f"Nói bằng ngôn ngữ biểu đồ, bảng trên không bảo rằng cứ thấy mẫu là hành động ngay. Nó nói rằng mẫu chỉ đáng đọc kỹ khi hình thái đã rõ, "
+            f"Nói bằng ngôn ngữ biểu đồ, các con số đầu chương không bảo rằng cứ thấy mẫu là hành động ngay. Chúng chỉ nói mẫu đáng đọc kỹ hơn khi hình thái đã rõ, "
             f"và khi mục tiêu cơ sở {_base_multiple_label(spec)} được đặt cạnh thất bại 5% {_fmt(base.get('failure_5pct_rate') or ref.get('failure_5pct_rate'))}%."
         )
     if bridge_id == "identification":
@@ -438,84 +451,6 @@ def _target_rows(payload: Mapping[str, Any], spec: Mapping[str, Any]) -> list[li
     return rows
 
 
-def _results_rows(payload: Mapping[str, Any], spec: Mapping[str, Any], events: pd.DataFrame) -> list[list[Any]]:
-    ref = payload.get("chapter_reference") if isinstance(payload.get("chapter_reference"), Mapping) else {}
-    target = payload.get("target_calibration") if isinstance(payload.get("target_calibration"), Mapping) else {}
-    source_target = target.get("source_measure_rule") if isinstance(target.get("source_measure_rule"), Mapping) else {}
-    base = target.get("base_target") if isinstance(target.get("base_target"), Mapping) else {}
-    legacy = target.get("legacy_target") if isinstance(target.get("legacy_target"), Mapping) else {}
-    example_scope = spec.get("example_scope_label", "VN30/VN100")
-    example_n = int(events[events["market_group"].isin(["VN30", "VN100 ex VN30"])].shape[0]) if "market_group" in events.columns else 0
-    role_note = _public_term(spec.get("role_note", "Dùng như hồ sơ tham khảo hậu phá vỡ, không phải tín hiệu giao dịch tự động."))
-    unit = _target_unit_label(spec)
-    base_label = _base_multiple_label(spec)
-    legacy_label = _legacy_multiple_label(spec)
-    target_title = _target_focus_title(spec)
-    target_full_title = _target_full_title(spec)
-    rows = [
-        ["Mục", "Kết quả chính"],
-        ["Diện mạo", spec.get("morphology_sentence", "")],
-        ["Phạm vi kết luận chính", str(ref.get("scope") or "toàn bộ mẫu đủ điều kiện")],
-        ["Phạm vi ví dụ", f"{example_n} mẫu thuộc {example_scope}; ví dụ in ra ưu tiên nhóm này nhưng vẫn phải qua cổng hình thái sạch."],
-        ["Số mẫu đo được", f"{_fmt(ref.get('events'), 0)} mẫu / {_fmt(events['symbol'].nunique() if 'symbol' in events.columns else None, 0)} mã."],
-    ]
-    if source_target and _show_source_comparison(spec):
-        source_dist = source_target.get("median_target_dist_pct")
-        dist_text = "" if source_dist in (None, "") else f"; khoảng cách trung vị {_fmt(source_dist)}%."
-        rows.append(["Mốc nguồn Bulkowski", f"Tỷ lệ đạt {_fmt(source_target.get('target_hit_rate'))}%{dist_text}"])
-    rows.extend(
-        [
-            [target_title, f"{base_label} {unit}; tỷ lệ đạt {_fmt(base.get('target_hit_rate'))}%."],
-            *(
-                []
-                if abs(_base_multiple(spec) - _legacy_multiple(spec)) < 1e-9
-                else [[target_full_title, f"{legacy_label} {unit}; tỷ lệ đạt {_fmt(legacy.get('target_hit_rate'))}%."]]
-            ),
-            ["Thất bại 5%", f"{_fmt(base.get('failure_5pct_rate') or ref.get('failure_5pct_rate'))}% mẫu không đi được tối thiểu 5% theo hướng phá vỡ."],
-            ["Cách dùng", role_note],
-        ]
-    )
-    return rows
-
-
-def _notable_findings(payload: Mapping[str, Any], spec: Mapping[str, Any], events: pd.DataFrame) -> list[str]:
-    ref = payload.get("chapter_reference") if isinstance(payload.get("chapter_reference"), Mapping) else {}
-    target = payload.get("target_calibration") if isinstance(payload.get("target_calibration"), Mapping) else {}
-    source_target = target.get("source_measure_rule") if isinstance(target.get("source_measure_rule"), Mapping) else {}
-    base = target.get("base_target") if isinstance(target.get("base_target"), Mapping) else {}
-    legacy = target.get("legacy_target") if isinstance(target.get("legacy_target"), Mapping) else {}
-    favorable = _metric_label(spec, "favorable_move", "mức tăng tốt nhất")
-    adverse = _metric_label(spec, "adverse_move", "mức kéo ngược sâu nhất")
-    base_label = _base_multiple_label(spec)
-    legacy_label = _legacy_multiple_label(spec)
-    target_focus = _target_focus_title(spec)
-    target_phrase = target_focus if base_label in target_focus else f"{target_focus} {base_label}"
-    out = [
-        (
-            f"{target_phrase} đạt {_fmt(base.get('target_hit_rate'))}%."
-            if abs(_base_multiple(spec) - _legacy_multiple(spec)) < 1e-9
-            else f"{target_phrase} đạt {_fmt(base.get('target_hit_rate'))}%, so với mốc {legacy_label} ở {_fmt(legacy.get('target_hit_rate'))}%."
-        ),
-        f"{favorable.capitalize()} trung vị là {_fmt(ref.get('median_mfe_pct'))}%, còn {adverse} trung vị là {_fmt(ref.get('median_mae_pct'))}%.",
-    ]
-    if source_target and _show_source_comparison(spec):
-        out.insert(
-            0,
-            f"Mốc nguồn Bulkowski đạt {_fmt(source_target.get('target_hit_rate'))}%; mốc Việt Nam được ghi nhãn theo hiệu chuẩn riêng, không tự động thay thế nguồn.",
-        )
-    if spec.get("headline_scope"):
-        out.insert(0, str(spec["headline_scope"]))
-    if "liquidity_bucket" in events.columns and "failure_5pct" in events.columns:
-        high = events[events["liquidity_bucket"].astype(str) == "high"]
-        if not high.empty:
-            out.append(
-                f"Nhóm thanh khoản cao có {favorable} trung vị {_fmt(float(pd.to_numeric(high['mfe_pct'], errors='coerce').median()))}% "
-                f"và thất bại 5% {_fmt(_pct_bool(high['failure_5pct']))}%."
-            )
-    out.append(_public_term(spec.get("classification_sentence", "Đọc cùng bối cảnh, chất lượng đường giá và giới hạn dữ liệu.")))
-    return out
-
-
 def _coerce_public_rule_rows(rows: Any) -> list[list[str]]:
     out: list[list[str]] = []
     if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes)):
@@ -568,7 +503,7 @@ def _rule_rows(source_notes: Mapping[str, Any], spec: Mapping[str, Any], payload
 
 
 def _semantic_required_note(spec: Mapping[str, Any]) -> str:
-    phrases = [str(item).strip() for item in spec.get("public_required_phrases") or [] if str(item).strip()]
+    phrases = [_public_term(str(item).strip()) for item in spec.get("public_required_phrases") or [] if str(item).strip()]
     if not phrases:
         return ""
     unique_phrases = list(dict.fromkeys(phrases))
@@ -1077,6 +1012,18 @@ def _public_term(value: Any) -> str:
         "short cổ phiếu cơ sở": "bán khống cổ phiếu cơ sở",
         "long-watchlist": "hồ sơ theo dõi hướng tăng",
         "long-theo dõi": "hồ sơ theo dõi hướng tăng",
+        "Không phải khuyến nghị mua bán": "Không thay quyết định đầu tư",
+        "Không phải khuyến nghị bán khống": "Không phải lời mời bán khống",
+        "khuyến nghị mua/bán": "lời chỉ dẫn hành động",
+        "khuyến nghị mua, bán hay bán khống": "lời chỉ dẫn mua, bán hay bán khống",
+        "khuyến nghị mua, bán hay nắm giữ": "lời chỉ dẫn mua, bán hay nắm giữ",
+        "khuyến nghị mua hay bán": "lời chỉ dẫn mua hay bán",
+        "khuyến nghị mua hoặc bán": "lời chỉ dẫn mua hoặc bán",
+        "khuyến nghị mua bán": "lời chỉ dẫn mua bán",
+        "khuyến nghị mua": "lời mời mua",
+        "khuyến nghị bán": "lời mời bán",
+        "điểm vào lệnh": "điểm hành động",
+        "cắt lỗ": "giảm rủi ro",
         "dừng lỗ": "ngưỡng rủi ro",
         "vào lệnh": "xác nhận",
         "Target-first-before-adverse": "mục tiêu đến trước nhịp kéo ngược bất lợi",
@@ -1221,12 +1168,12 @@ def build_pattern_story(
     cards_table.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f0ece3")), ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#d8d0c2")), ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#d8d0c2")), ("TOPPADDING", (0, 0), (-1, -1), 9), ("BOTTOMPADDING", (0, 0), (-1, -1), 9)]))
     story.append(cards_table)
     story.append(Spacer(1, 0.35 * cm))
-    story.append(Paragraph("Kết quả quan trọng", _STYLES["H1"]))
-    story.append(_table(_results_rows(payload, spec, events), [4.0 * cm, 12.3 * cm]))
-    story.append(_callout("Điểm đáng chú ý", _notable_findings(payload, spec, events)))
-    story.append(_p(_reader_bridge(payload, spec, "results"), _STYLES["Body"]))
-    for paragraph in editorial.get("summary", []) or spec.get("summary_paragraphs", []):
-        story.append(_p(_public_paragraph(paragraph), _STYLES["Body"]))
+    story.append(Paragraph("Đọc nhanh chương này", _STYLES["H1"]))
+    quick_read = editorial.get("quick_read") if isinstance(editorial.get("quick_read"), list) else []
+    if not quick_read:
+        raise ValueError("Missing approved editorial section: quick_read")
+    for paragraph in quick_read:
+        story.append(_p(paragraph, _STYLES["Body"]))
     story.append(_image(charts["schematic"], 16.2))
     schematic_caption = _schematic_caption(
         captions.get("schematic"),
@@ -1345,7 +1292,7 @@ def build_pattern_story(
         story.append(_p(_public_paragraph(paragraph), _STYLES["Body"]))
     story.append(_table(_post_breakout_rows(events, spec), [4.5 * cm, 4.2 * cm, 7.6 * cm]))
 
-    story.append(_section_title("5", "Cách đọc kết quả quan trọng", "Biến số liệu thành quyết định đọc biểu đồ"))
+    story.append(_section_title("5", "Cách đọc các con số", "Biến số liệu thành cách đọc biểu đồ"))
     for paragraph in editorial.get("statistics", []) or spec.get("statistics_paragraphs", []):
         story.append(_p(_public_paragraph(paragraph), _STYLES["Body"]))
     story.append(_table(_reader_question_rows(payload, spec), [4.2 * cm, 4.2 * cm, 7.9 * cm]))
@@ -1385,7 +1332,7 @@ def build_pattern_story(
     story.append(_section_title("A", "Phụ lục kỹ thuật", "Các bảng chi tiết để kiểm tra lại số liệu"))
     story.append(
         _p(
-            "Phần chính phía trên là phần đọc dành cho nhà đầu tư: nhìn hình, hiểu kết quả chính, rồi biết khi nào nên thận trọng. "
+            "Phần chính phía trên là phần đọc dành cho nhà đầu tư: nhìn hình, nắm ý chính, rồi biết khi nào nên thận trọng. "
             "Phụ lục này có vai trò khác: nó là nơi kiểm tra lại độ bền của kết luận bằng các lát cắt dữ liệu chi tiết hơn.",
             _STYLES["Body"],
         )

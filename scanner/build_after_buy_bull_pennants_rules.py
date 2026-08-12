@@ -37,7 +37,7 @@ DEFAULT_SCORECARD = Path("artifacts/scanner_v2/bull_pennants_tradable_setup/bull
 DEFAULT_SELECTED_STRATEGY = Path("artifacts/scanner_v2/bull_pennants_tradable_setup/bull_pennant_tradable_selected_strategy.json")
 DEFAULT_RELEASE_CANDIDATE = Path("artifacts/scanner_v2/bull_pennants_release_candidate/bull_pennant_release_candidate.json")
 DEFAULT_CEILING_AUDIT = Path("artifacts/scanner_v2/bull_pennants_tradable_setup/bull_pennant_tradable_ceiling_audit/bull_pennant_tradable_ceiling_audit.json")
-DEFAULT_GOVERNANCE_MATRIX = Path("artifacts/final_chapters/governance/chapter_governance_matrix.json")
+DEFAULT_GOVERNANCE_MATRIX = Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json")
 
 
 REQUIRED_SOURCE_SECTIONS = (

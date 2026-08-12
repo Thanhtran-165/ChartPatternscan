@@ -39,6 +39,7 @@ FRONT_MATTER_PDF = OUT_DIR / "edition_1_front_matter.pdf"
 COVER_PDF = OUT_DIR / "edition_1_cover.pdf"
 ASSETS_DIR = ROOT / "assets"
 DEFAULT_BOOK_LOGO = ASSETS_DIR / "book_logo.png"
+INCLUDE_INTERNAL_RANKING_IN_PUBLIC_BOOK = False
 
 FONT_REGULAR_CANDIDATES = (
     Path("/opt/homebrew/Cellar/python-matplotlib/3.10.7/libexec/lib/python3.14/site-packages/matplotlib/mpl-data/fonts/ttf/DejaVuSans.ttf"),
@@ -450,17 +451,19 @@ def _build_items() -> list[BookItem]:
         raw_chapter["_manifest_order"] = index
         raw_chapters.append(raw_chapter)
     chapters = sorted(raw_chapters, key=_chapter_sort_key)
-    ranking_reader = PdfReader(str(RANKING_PDF))
-    items = [
-        BookItem(
-            kind="ranking",
-            title="Xếp hạng mẫu hình",
-            family="book_level",
-            source_pdf=RANKING_PDF,
-            source_pages=len(ranking_reader.pages),
-            included_pages=len(ranking_reader.pages),
+    items: list[BookItem] = []
+    if INCLUDE_INTERNAL_RANKING_IN_PUBLIC_BOOK:
+        ranking_reader = PdfReader(str(RANKING_PDF))
+        items.append(
+            BookItem(
+                kind="ranking",
+                title="Xếp hạng mẫu hình",
+                family="book_level",
+                source_pdf=RANKING_PDF,
+                source_pages=len(ranking_reader.pages),
+                included_pages=len(ranking_reader.pages),
+            )
         )
-    ]
     for chapter in chapters:
         pdf = ROOT / str(chapter.get("pdf") or "")
         reader = PdfReader(str(pdf))
@@ -511,8 +514,10 @@ def _build_front_matter(items: list[BookItem], output: Path) -> int:
     story.append(_p("Thông tin ấn bản", styles["H1"]))
     for paragraph in [
         "Bulkowski Việt Nam là một atlas về mẫu hình giá trên thị trường chứng khoán Việt Nam. Cuốn sách đi từ hình thái trên biểu đồ tới hành vi sau xác nhận: mẫu được nhận diện như thế nào, phá vỡ ở đâu, đi tiếp hay thất bại ra sao, và người đọc nên hiểu các con số ấy trong bối cảnh nào.",
-        "Tinh thần của ấn bản này là thực chứng. Mỗi chương được viết như một hồ sơ mẫu hình: có mô tả nhận diện, ví dụ biểu đồ, bảng kết quả, phần diễn giải và cảnh báo sử dụng. Các con số không đứng riêng lẻ; chúng được đặt cạnh đường đi giá, xác suất thất bại, mức kéo ngược và độ bền qua từng nhóm kiểm tra.",
-        "Cuốn sách không phải khuyến nghị mua bán chứng khoán. Nó cung cấp một bản đồ xác suất để người đọc hiểu mẫu hình nào đáng quan sát, mẫu nào chỉ nên dùng để cảnh báo rủi ro, và mẫu nào cần được đọc thận trọng vì dữ liệu hoặc đường đi sau xác nhận chưa đủ vững.",
+        "Ấn bản này lấy cảm hứng phương pháp từ hai mạch công trình của Thomas N. Bulkowski. Từ các tài liệu catalog mẫu hình giá, sách học cách xem mỗi mẫu hình như một hồ sơ thực chứng: có quy tắc nhận diện, điểm xác nhận, mục tiêu đo lường, tỷ lệ đạt mục tiêu, thất bại và ví dụ minh họa. Từ mạch After the Buy, sách học cách đọc phần sau xác nhận: mẫu đi tiếp ra sao, kéo ngược như thế nào, khi nào nên thận trọng với đường đi giá và vì sao một mẫu hợp lệ vẫn có thể trở thành trải nghiệm khó dùng.",
+        "Nội dung trong sách không phải bản dịch hay bản sao của tài liệu gốc. Các ý tưởng phương pháp được địa phương hóa lên dữ liệu cổ phiếu Việt Nam, với bộ quét, thước đo, ví dụ biểu đồ và diễn giải được xây dựng lại cho thị trường này. Vì vậy, các con số trong sách là kết quả của dữ liệu Việt Nam, không phải số liệu của Bulkowski cho thị trường Mỹ.",
+        "Tinh thần của ấn bản này là thực chứng. Mỗi chương được viết như một hồ sơ mẫu hình: có mô tả nhận diện, ví dụ biểu đồ, bảng kết quả, phần diễn giải và cảnh báo sử dụng. Các con số không đứng riêng lẻ; chúng được đặt cạnh đường đi giá, xác suất thất bại, mức kéo ngược, phần sau xác nhận và độ bền qua từng nhóm kiểm tra.",
+        "Cuốn sách không thay người đọc ra quyết định đầu tư. Nó cung cấp một bản đồ xác suất để người đọc hiểu mẫu hình nào đáng quan sát, mẫu nào chỉ nên dùng để cảnh báo rủi ro, và mẫu nào cần được đọc thận trọng vì dữ liệu hoặc đường đi sau xác nhận chưa đủ vững.",
     ]:
         story.append(_p(paragraph, styles["Body"]))
     info_rows = [
@@ -521,6 +526,8 @@ def _build_front_matter(items: list[BookItem], output: Path) -> int:
         ["Ngày tạo", datetime.now().strftime("%Y-%m-%d")],
         ["Số chương", f"{sum(1 for item in items if item.kind == 'chapter')} chương mẫu hình"],
         ["Phạm vi", "Mẫu hình giá trên cổ phiếu Việt Nam trong phạm vi dữ liệu lịch sử đã thu thập."],
+        ["Cảm hứng phương pháp", "Thomas N. Bulkowski: catalog mẫu hình giá, thống kê hậu phá vỡ và cách đọc hành vi sau xác nhận."],
+        ["Cách địa phương hóa", "Quy tắc quét, ví dụ, thống kê và diễn giải được xây lại trên dữ liệu Việt Nam; không sử dụng số liệu gốc như kết quả của thị trường Việt Nam."],
         ["Bản quyền", "Sản phẩm là bản quyền của Bloger Chim Cut."],
         ["Phát hành", "Sản phẩm miễn phí cho cộng đồng."],
         ["Cách đọc", "Tài liệu tham khảo xác suất; không phải hệ thống tín hiệu giao dịch cá nhân hóa."],
@@ -580,11 +587,13 @@ def _build_front_matter(items: list[BookItem], output: Path) -> int:
     story.append(_table(toc_rows, [13.6 * cm, 1.6 * cm], styles))
     story.append(PageBreak())
 
-    story.append(_p("Ghi chú về dữ liệu và giới hạn sử dụng", styles["H1"]))
+    story.append(_p("Giới hạn dữ liệu và cách đọc thống kê", styles["H1"]))
     for paragraph in [
-        "Mọi thống kê trong sách đều là kết quả lịch sử, không phải định luật. Dữ liệu Việt Nam còn có những giới hạn tự nhiên về độ dài chuỗi, trạng thái niêm yết, thanh khoản, điều chỉnh giá và khả năng tái dựng toàn bộ bối cảnh tại từng thời điểm. Vì thế, các con số nên được xem là bằng chứng có điều kiện.",
-        "Một mẫu hình phía giảm không tự động trở thành cơ hội giao dịch trên cổ phiếu cơ sở. Trong nhiều chương, giá trị thực tế của mẫu nằm ở việc nhận diện rủi ro, giảm tự tin với vị thế đang có, hoặc hiểu trạng thái thị trường. Ngược lại, một mẫu phía tăng có kết quả tốt vẫn cần được đặt cạnh thanh khoản, biến động và bối cảnh chung.",
-        "Ấn bản này ưu tiên mạch đọc liền lạc. Các phụ lục kiểm định và dấu vết kỹ thuật được tách khỏi thân sách để người đọc không bị đứt mạch; khi cần đào sâu, có thể đối chiếu với bộ hồ sơ dữ liệu đi kèm. Trong bản sách, điều quan trọng nhất là hiểu đúng vai trò của từng mẫu hình trước khi dùng nó trong thực tế.",
+        "Các con số trong sách là lịch sử đã đo được, không phải lời hứa về tương lai. Một tỷ lệ cao không có nghĩa là mẫu sẽ lặp lại trong lần kế tiếp; một tỷ lệ thấp cũng không có nghĩa là mẫu vô dụng trong mọi bối cảnh. Thống kê ở đây nên được đọc như một bản đồ xác suất, không phải một mệnh lệnh hành động.",
+        "Dữ liệu Việt Nam có những giới hạn mà người đọc cần giữ trong đầu: chuỗi lịch sử không dài như các thị trường lâu đời, thanh khoản giữa các cổ phiếu rất khác nhau, và không phải mọi trạng thái niêm yết, tạm ngừng, hủy niêm yết hay điều chỉnh giá đều có thể được tái dựng hoàn hảo như một cơ sở dữ liệu point-in-time tuyệt đối.",
+        "Các phương pháp thống kê trong sách cũng không tạo ra độ chính xác tuyệt đối. Khoảng tin cậy, kiểm tra độ bền, phân nhóm mẫu và kiểm tra qua từng giai đoạn chỉ giúp người đọc thấy kết quả có ổn định hơn hay mong manh hơn; chúng không loại bỏ hoàn toàn sai lệch dữ liệu, nhiễu thị trường, lựa chọn mẫu hay khả năng mẫu hình mất hiệu lực trong tương lai.",
+        "Một số chương có nhiều mẫu và cho cảm giác vững hơn; một số chương có mẫu mỏng hơn nên kết luận phải thận trọng hơn. Vì vậy, hãy đọc số mẫu, vai trò sử dụng và phần thất bại cùng nhau. Nếu một mẫu có đường đi sau xác nhận kém bền, sách sẽ giữ nhãn thận trọng dù hình thái của nó có vẻ quen thuộc.",
+        "Các mẫu phía giảm trong cổ phiếu cơ sở Việt Nam chủ yếu được dùng để đọc rủi ro, bear-trap hoặc điểm cần thận trọng với vị thế đang có. Chúng không được trình bày như lời mời bán khống phổ quát. Ngược lại, các mẫu phía mua dù có kết quả tốt vẫn cần được đặt cạnh thanh khoản, biến động và bối cảnh thị trường.",
     ]:
         story.append(_p(paragraph, styles["Body"]))
 
@@ -786,7 +795,8 @@ def build_edition() -> dict[str, Any]:
         "front_matter_pages": front_count,
         "total_pages": len(PdfReader(str(EDITION_PDF)).pages),
         "chapter_count": sum(1 for item in items if item.kind == "chapter"),
-        "ranking_pages": items[0].included_pages if items and items[0].kind == "ranking" else 0,
+        "ranking_pages": sum(item.included_pages for item in items if item.kind == "ranking"),
+        "ranking_policy": "Popularity and scanner-priority rankings are kept as internal artifacts and excluded from the public book.",
         "appendix_policy": "Technical appendices and internal publication-gate assessment sections are omitted from the merged Edition 1 PDF.",
         "book_logo": str(_resolve_book_logo().relative_to(ROOT)) if _resolve_book_logo() else None,
         "items": [

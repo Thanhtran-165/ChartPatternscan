@@ -14,6 +14,7 @@ CANONICAL_EDITORIAL_WORKFLOW_ID = "canonical_editorial_workflow_v1"
 CANONICAL_AI_EDITORIAL_GATE_ID = "canonical_ai_editorial_gate_v1"
 
 REQUIRED_EDITORIAL_SECTIONS = (
+    "quick_read",
     "summary",
     "tour",
     "failure",
@@ -25,6 +26,7 @@ REQUIRED_EDITORIAL_SECTIONS = (
 )
 
 MIN_SECTION_PARAGRAPHS = {
+    "quick_read": 3,
     "summary": 3,
     "tour": 2,
     "failure": 2,
@@ -36,6 +38,7 @@ MIN_SECTION_PARAGRAPHS = {
 }
 
 MIN_SECTION_CHARS = {
+    "quick_read": 420,
     "summary": 700,
     "tour": 380,
     "failure": 420,
@@ -73,6 +76,11 @@ STAT_ONLY_CUES = (
 )
 
 FORBIDDEN_PUBLIC_TERMS = (
+    "Mục/Kết quả chính",
+    "Mục Kết quả chính",
+    "Mục\nKết quả chính",
+    "được chuyển thành",
+    "Tham số hiện tại",
     "MFE",
     "MAE",
     "breakout",
@@ -184,7 +192,7 @@ def validate_canonical_editorial_sections(payload: Mapping[str, Any]) -> dict[st
         leaked = [term for term in FORBIDDEN_PUBLIC_TERMS if term.lower() in text.lower()]
         if leaked:
             fail("editorial_section_forbidden_terms", section, ", ".join(sorted(set(leaked))))
-        if section in {"summary", "statistics", "tactics"} and cue_count < 4:
+        if section in {"quick_read", "summary", "statistics", "tactics"} and cue_count < 4:
             warn("editorial_section_could_be_richer", section, f"only {cue_count} interpretive cues")
 
     return {

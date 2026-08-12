@@ -21,8 +21,8 @@ from typing import Any, Mapping
 
 
 DEFAULT_MANIFEST = Path("artifacts/final_chapters/final_chapters_manifest.json")
-DEFAULT_OUT_DIR = Path("artifacts/final_chapters/governance")
-DEFAULT_PREFLIGHT_MATRIX = Path("artifacts/final_chapters/governance/chapter_tradable_preflight_matrix.json")
+DEFAULT_OUT_DIR = Path("artifacts/governance/final_chapters/governance")
+DEFAULT_PREFLIGHT_MATRIX = Path("artifacts/governance/final_chapters/governance/chapter_tradable_preflight_matrix.json")
 DEFAULT_GENERIC_TRADABLE_DIR = Path("artifacts/scanner_v2/chapter_tradable_layer")
 DEFAULT_BRANCH_OPTIMIZATION_DIR = Path("artifacts/scanner_v2/chapter_branch_optimization")
 DEFAULT_PRIORITY_OPTIMIZATION_DIR = Path("artifacts/scanner_v2/priority_candidate_tradable_optimization")

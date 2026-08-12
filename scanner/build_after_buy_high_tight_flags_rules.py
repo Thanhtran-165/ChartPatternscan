@@ -35,7 +35,7 @@ DEFAULT_OUT_DIR = DEFAULT_AFTER_BUY_OUT_DIR / "high_tight_flags"
 DEFAULT_SOURCE_NOTES = Path("artifacts/scanner_v2/flag_like_family_source_grounding/high_tight_flags_source_notes.json")
 DEFAULT_BRANCH_OPTIMIZATION = Path("artifacts/scanner_v2/chapter_branch_optimization/high_tight_flags/branch_optimization_summary.json")
 DEFAULT_GENERIC_TRADABLE_DIR = Path("artifacts/scanner_v2/chapter_tradable_layer/high_tight_flags")
-DEFAULT_GOVERNANCE_MATRIX = Path("artifacts/final_chapters/governance/chapter_governance_matrix.json")
+DEFAULT_GOVERNANCE_MATRIX = Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json")
 
 
 REQUIRED_SOURCE_SECTIONS = (

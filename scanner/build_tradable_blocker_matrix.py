@@ -12,8 +12,8 @@ from pathlib import Path
 from typing import Any, Mapping
 
 
-GOVERNANCE_PATH = Path("artifacts/final_chapters/governance/chapter_governance_matrix.json")
-OUT_DIR = Path("artifacts/final_chapters/governance")
+GOVERNANCE_PATH = Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json")
+OUT_DIR = Path("artifacts/governance/final_chapters/governance")
 MATRIX_ID = "tradable_blocker_matrix_v1"
 
 LOCAL_AUDITS: dict[str, list[Path]] = {

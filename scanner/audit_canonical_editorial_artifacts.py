@@ -126,7 +126,7 @@ def write_report(report: Mapping[str, Any], out_dir: Path) -> dict[str, str]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Audit approved editorial artifacts for all final chapters.")
     parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
-    parser.add_argument("--out-dir", default="artifacts/final_chapters/governance")
+    parser.add_argument("--out-dir", default="artifacts/governance/final_chapters/governance")
     args = parser.parse_args()
     report = audit_manifest(Path(args.manifest))
     paths = write_report(report, Path(args.out_dir))

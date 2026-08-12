@@ -24,7 +24,7 @@ This project does not promote a chapter to `tradable-final-95` just because the 
    - Build scanner/source branches only for the blocker that is actually observed.
 
 5. Blocker matrix
-   - Record the primary blocker and next action in `artifacts/final_chapters/governance/tradable_blocker_matrix.*`.
+   - Record the primary blocker and next action in `artifacts/governance/final_chapters/governance/tradable_blocker_matrix.*`.
    - If the blocker is real under current data, lock the chapter at the correct use label instead of forcing a higher tier.
 
 6. No-overlift decision

@@ -22,6 +22,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+from scanner.v2.measurement_registry import lookahead_bars as _registry_lookahead
 
 from scanner.ohlcv_normalizer import OHLCVNormalizer  # noqa: E402
 from scanner.pivot_detector import Pivot, PivotDetector, PivotType  # noqa: E402
@@ -243,7 +244,7 @@ def scan_symbol(
             if any(abs(breakout_idx - prev) <= config.breakout_cooldown_bars for prev in used_breakouts):
                 continue
             record = {"symbol": symbol, "pattern_key": PATTERN_KEY, **candidate}
-            record.update(_evaluate_detection(df, record, lookahead=126))
+            record.update(_evaluate_detection(df, record, lookahead=_registry_lookahead(record.get("pattern_key") or "wedges_rising")))
             out.append(record)
             used_breakouts.append(breakout_idx)
             if len(out) >= max_events:
@@ -387,7 +388,7 @@ EVENT_FIELDS = [
     "detection_id", "symbol", "variant", "market_group", "market_regime",
     "formation_start_idx", "formation_end_idx", "formation_start_date", "formation_end_date",
     "breakout_idx", "breakout_date", "breakout_direction", "breakout_price", "b_exec_price",
-    "target_price", "target_dist_pct", "mfe_pct", "mae_pct", "target_hit", "failure_5pct",
+    "target_price", "target_dist_pct", "mfe_pct", "mae_pct", "target_hit", "failure_5pct", "weak_move_5pct", "failure_busted", "days_to_bust",
     "target_first_before_adverse_5pct", "days_to_target", "pattern_quality_score",
     "pattern_quality_tier", "pattern_width_bars", "pattern_height_pct", "pole_move_pct",
     "flag_to_pole_pct", "upper_slope_deg", "lower_slope_deg", "high_spread_pct",
@@ -476,7 +477,7 @@ def scan_rising_wedges_db(
     stats["source"] = scan["source"]
     stats["db_source_meta"] = _db_meta(db_path)
     stats["detector_config"] = config.to_dict()
-    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=126)
+    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=_registry_lookahead(scan["pattern_key"]))
     _add_wedge_target_calibration(stats, scan, path_rows)
 
     paths = {

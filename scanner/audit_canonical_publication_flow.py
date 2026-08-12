@@ -32,7 +32,7 @@ from scanner.publication_flow_contract import PUBLICATION_CORE_ID  # noqa: E402
 
 
 DEFAULT_MANIFEST = Path("artifacts/final_chapters/final_chapters_manifest.json")
-DEFAULT_OUT_DIR = Path("artifacts/final_chapters/governance")
+DEFAULT_OUT_DIR = Path("artifacts/governance/final_chapters/governance")
 AUDIT_ID = "canonical_publication_flow_audit_v1"
 
 

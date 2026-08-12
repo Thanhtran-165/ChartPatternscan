@@ -56,6 +56,30 @@ PATTERN_REQUIRED_PHRASES = {
     ),
 }
 
+PATTERN_PUBLIC_RULE_ROWS = {
+    "triangles_ascending": [
+        ["Kháng cự phía trên tương đối ngang.", "Các đỉnh trong mẫu phải chạm cùng một vùng giá đủ rõ; nếu vùng này quá dốc hoặc quá rộng, mẫu bị hạ chất lượng."],
+        ["Đáy sau cao hơn đáy trước.", "Đường hỗ trợ đi lên cho thấy lực mua nâng dần dưới vùng kháng cự."],
+        ["Biên độ có xu hướng nén lại.", "Mẫu đáng tin hơn khi không gian dao động hẹp dần trước phiên xác nhận."],
+        ["Chỉ xác nhận khi giá đóng cửa vượt kháng cự.", "Nến xuyên trong phiên nhưng đóng cửa quay lại dưới vùng kháng cự không được xem là phá vỡ đầy đủ."],
+        ["Mục tiêu đo bằng chiều cao tam giác.", "Mốc 1,0x là mốc nguồn của chương; 0,5x được dùng như lớp đọc thận trọng."],
+    ],
+    "triangles_descending": [
+        ["Hỗ trợ phía dưới tương đối ngang.", "Các đáy trong mẫu phải cùng nằm quanh một vùng đỡ đủ rõ."],
+        ["Đỉnh sau thấp hơn đỉnh trước.", "Đường kháng cự đi xuống cho thấy lực bán ép dần vào vùng hỗ trợ."],
+        ["Biên độ có xu hướng nén lại.", "Mẫu thiếu nén dễ trở thành vùng dao động rộng hơn là tam giác giảm."],
+        ["Chỉ xác nhận khi giá đóng cửa phá xuống hỗ trợ.", "Không dùng cú xuyên trong phiên làm xác nhận nếu giá đóng cửa hồi lại vào thân mẫu."],
+        ["Mục tiêu đo bằng chiều cao tam giác.", "Mốc đầy đủ giữ vai trò nguồn; các mốc thấp hơn giúp đọc mức thận trọng trong dữ liệu Việt Nam."],
+    ],
+    "triangles_symmetrical": [
+        ["Hai biên phải hội tụ.", "Đỉnh thấp dần và đáy cao dần cùng ép giá vào vùng hẹp hơn."],
+        ["Mẫu có thể phá vỡ theo hai hướng.", "Kết luận phải tách hướng phá vỡ; không gộp phá lên và phá xuống thành một câu chung."],
+        ["Chờ giá đóng cửa phá khỏi biên.", "Chỉ xác nhận khi giá đóng cửa nằm rõ ngoài biên theo hướng phá vỡ."],
+        ["Đường đi sau phá vỡ quyết định chất lượng.", "Đọc tỷ lệ đạt trước kéo ngược cùng MAE, không chỉ nhìn tỷ lệ chạm mục tiêu."],
+        ["Mục tiêu đo bằng chiều cao vùng nén.", "Mốc 0,5x là mốc thận trọng; 1,0x là tham chiếu đầy đủ khi phá vỡ đi xa."],
+    ],
+}
+
 
 def build_triangle_publication_spec(*, pattern_id: str, title: str, spec: Mapping[str, Any]) -> dict[str, Any]:
     """Build a machine-checkable semantic spec for one Triangle chapter."""
@@ -71,6 +95,7 @@ def build_triangle_publication_spec(*, pattern_id: str, title: str, spec: Mappin
         "variant_specific": True,
         "public_required_phrases": required,
         "public_forbidden_terms": list(PUBLIC_FORBIDDEN_TERMS),
+        "public_rule_rows": PATTERN_PUBLIC_RULE_ROWS.get(pattern_id, []),
         "title": title,
         "source_chapter": spec.get("local_source_chapter"),
         "public_story_contract": {

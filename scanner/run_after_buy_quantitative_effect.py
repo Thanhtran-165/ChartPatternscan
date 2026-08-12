@@ -30,7 +30,7 @@ from scanner.run_chapter_branch_optimization import run_all_branch_optimizations
 EFFECT_ID = "after_buy_quantitative_effect_v1"
 DEFAULT_AFTER_BUY_V2_DIR = Path("artifacts/scanner_v2/after_buy_vietnam_v2")
 DEFAULT_OUT_DIR = DEFAULT_AFTER_BUY_V2_DIR / "quantitative_effect"
-DEFAULT_GOVERNANCE_MATRIX = Path("artifacts/final_chapters/governance/chapter_governance_matrix.json")
+DEFAULT_GOVERNANCE_MATRIX = Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json")
 
 
 def _read_json(path: Path) -> Mapping[str, Any]:

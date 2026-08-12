@@ -31,12 +31,12 @@ DEFAULT_OUT_DIR = Path("artifacts/scanner_v2/flag_family_public_chapters")
 DEFAULT_BULL_STATS = Path("artifacts/scanner_v2/bull_flags_db_source_parity/db_active/statistics.json")
 DEFAULT_BULL_EVENTS = Path("artifacts/scanner_v2/bull_flags_db_source_parity/db_active/events.csv")
 DEFAULT_BULL_PATH = Path("artifacts/scanner_v2/bull_flags_db_source_parity/db_active/post_breakout_path.csv")
-DEFAULT_BULL_AI = Path("artifacts/scanner_v2/source_guided_refinement_final_v1/flag_family/bull_flag/ai/refined/approved_ai_sections.json")
+DEFAULT_BULL_AI = Path("artifacts/scanner_v2/quick_read_editorial_upgrade_v1/flag_family/bull_flags/approved_ai_sections.json")
 DEFAULT_BULL_SOURCE_NOTES = Path("artifacts/scanner_v2/bull_flags_source_grounding/bull_flag_source_notes.json")
 DEFAULT_BEAR_STATS = Path("artifacts/scanner_v2/bear_flags_db_source_parity/db_active/statistics.json")
 DEFAULT_BEAR_EVENTS = Path("artifacts/scanner_v2/bear_flags_db_source_parity/db_active/events.csv")
 DEFAULT_BEAR_PATH = Path("artifacts/scanner_v2/bear_flags_db_source_parity/db_active/post_breakout_path.csv")
-DEFAULT_BEAR_AI = Path("artifacts/scanner_v2/source_guided_refinement_final_v1/flag_family/bear_flag/ai/refined/approved_ai_sections.json")
+DEFAULT_BEAR_AI = Path("artifacts/scanner_v2/quick_read_editorial_upgrade_v1/flag_family/bear_flags/approved_ai_sections.json")
 DEFAULT_BEAR_SOURCE_NOTES = Path("artifacts/scanner_v2/bear_flags_source_grounding/bear_flag_source_notes.json")
 
 
@@ -349,6 +349,11 @@ def _build_bear_publication_payload(stats: Mapping[str, Any], events: pd.DataFra
             "interpretation": "Bear Flag uses headline branch metrics for the public main claim and full-sample rows for appendix/reference.",
         },
         "editorial_sections": {
+            "quick_read": [
+                "Cờ giảm là mẫu nên đọc bằng thái độ phòng thủ. Nó xuất hiện sau một nhịp giảm rõ, khi giá hồi hoặc đi ngang ngắn trong thân cờ rồi phá xuống; điểm đáng quan sát không phải là cơ hội bán khống, mà là rủi ro nhịp giảm tiếp diễn.",
+                "Trong dữ liệu Việt Nam, chương này không dùng toàn bộ mẫu để đưa ra kết luận mạnh. Toàn mẫu giúp thấy bức tranh rủi ro rộng, còn các nhánh tốt hơn cho biết khi nào mẫu đáng chú ý hơn và khi nào chỉ nên xem như cảnh báo.",
+                "Cách đọc thực tế là đặt phiên phá xuống cạnh mức kéo ngược và tốc độ đi tiếp. Nếu giá phá xuống nhưng nhanh chóng bật ngược, mẫu vẫn có giá trị cảnh báo nhưng không đủ sạch để đọc như một cấu trúc giảm đáng tin.",
+            ],
             "summary": [
                 "Cờ giảm trong dữ liệu Việt Nam không nên được đọc như một cơ hội bán khống mặc định. Giá trị chính là nhận diện tình huống rủi ro: sau một nhịp giảm mạnh, cổ phiếu hồi ngắn trong thân cờ rồi phá xuống.",
                 "Chương này giữ cùng cấu trúc đọc với cờ tăng: mô tả hình học mẫu, đo kết quả hậu phá vỡ, rồi mới nói cách sử dụng. Khác biệt nằm ở vai trò: cờ giảm là bản đồ phòng thủ.",
@@ -429,7 +434,7 @@ def build_flag_family_public_chapters(
     bull_ai_sections = external_ai.get("sections", {}) if isinstance(external_ai.get("sections"), Mapping) else {}
     missing_bull_sections = [
         key
-        for key in ("summary", "tour", "failure", "statistics", "post_breakout", "size_volume", "tactics", "checklist")
+        for key in ("quick_read", "summary", "tour", "failure", "statistics", "post_breakout", "size_volume", "tactics", "checklist")
         if not bull_ai_sections.get(key)
     ]
     if missing_bull_sections:

@@ -31,9 +31,9 @@ DEFAULT_PATH = Path("artifacts/scanner_v2/ascending_triangles_db_source_parity/d
 DEFAULT_AUDIT = Path("artifacts/scanner_v2/triangle_publication_quality_audit/triangle_publication_quality_audit.json")
 DEFAULT_PREMIUM_VALIDATION = Path("artifacts/scanner_v2/triangle_publication_quality_audit/manual_visual_scoring/premium_visual_validation_template.csv")
 DEFAULT_EXAMPLE_VALIDATION = Path("artifacts/scanner_v2/triangle_publication_quality_audit/manual_visual_scoring/ascending_triangle_example_validation.csv")
-DEFAULT_AI_SECTIONS = Path("artifacts/scanner_v2/source_guided_refinement_final_v1/triangle_family/ascending_triangle/ai/refined/approved_ai_sections.json")
+DEFAULT_AI_SECTIONS = Path("artifacts/scanner_v2/quick_read_editorial_upgrade_v1/triangle_family/triangles_ascending/approved_ai_sections.json")
 CORE_PATTERNS = Path("scanner/v2/core_patterns.json")
-REQUIRED_EDITORIAL_SECTIONS = ("summary", "tour", "failure", "statistics", "post_breakout", "size_volume", "tactics", "checklist")
+REQUIRED_EDITORIAL_SECTIONS = ("quick_read", "summary", "tour", "failure", "statistics", "post_breakout", "size_volume", "tactics", "checklist")
 
 
 def _read_json(path: Path) -> Mapping[str, Any]:
@@ -179,6 +179,11 @@ def _publication_payload(stats: Mapping[str, Any], events: pd.DataFrame, all_eve
             "interpretation": "Tam giác tăng dùng mốc đầy đủ 1,0x chiều cao làm mốc nguồn/headline sau calibration; 0,5x chỉ là mốc thận trọng để đọc nhịp ngắn.",
         },
         "editorial_sections": {
+            "quick_read": [
+                "Tam giác tăng là mẫu nén giá theo hướng đi lên: vùng kháng cự phía trên tương đối ngang, còn các đáy bên dưới nâng dần. Người đọc nên nhìn nó như một quá trình bên mua ép dần lên vùng cung cố định, không phải chỉ là một hình tam giác trên chart.",
+                f"Bộ quét ghi nhận {len(all_events)} mẫu; phần diễn giải chính dùng {len(events)} mẫu thuộc nhóm tốt nhất/chuẩn. Mức đi thuận lợi trung vị là {base.get('median_mfe_pct')}%, còn mức kéo ngược sâu nhất trung vị là {base.get('median_mae_pct')}%, vì vậy chương luôn đọc kết quả cùng rủi ro đường đi.",
+                "Điểm cần giữ lại là mẫu chỉ có ý nghĩa sau khi giá đóng cửa vượt vùng kháng cự. Trước phiên xác nhận, đây mới là cấu trúc đang hình thành; sau xác nhận, câu hỏi thực tế là giá có đi đủ xa trước khi bị kéo ngược mạnh hay không.",
+            ],
             "summary": [
                 f"Tam giác tăng là mẫu có kháng cự tương đối ngang và đáy sau cao hơn đáy trước. Bộ quét ghi nhận {len(all_events)} mẫu; phần diễn giải chính dùng {len(events)} mẫu thuộc nhóm tốt nhất/chuẩn.",
                 f"Mức đi thuận lợi trung vị trong nhóm đủ điều kiện công bố là {base.get('median_mfe_pct')}%, còn mức kéo ngược sâu nhất trung vị là {base.get('median_mae_pct')}%. Điều này cho thấy mẫu có bất đối xứng hậu phá vỡ đáng chú ý, nhưng vẫn phải đọc cùng thất bại 5% và thứ tự đường đi.",
@@ -558,6 +563,7 @@ def build_triangle_family_public_chapters(
     payload["editorial_source_path"] = editorial_source_path
     spec = _triangle_spec()
     publication_spec = build_triangle_publication_spec(pattern_id="triangles_ascending", title="Tam giác tăng", spec=spec)
+    spec = {**spec, "public_rule_rows": publication_spec.get("public_rule_rows", [])}
     payload["publication_spec_id"] = publication_spec["publication_spec_id"]
     selected_examples = _select_examples(events)
     payload["example_events"] = _attach_example_validation(selected_examples)

@@ -210,7 +210,7 @@ def write_report(report: Mapping[str, Any], out_dir: Path) -> dict[str, str]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Audit PDF publication entrypoints.")
-    parser.add_argument("--out-dir", default="artifacts/final_chapters/governance")
+    parser.add_argument("--out-dir", default="artifacts/governance/final_chapters/governance")
     args = parser.parse_args()
     report = audit_publication_entrypoints()
     paths = write_report(report, Path(args.out_dir))

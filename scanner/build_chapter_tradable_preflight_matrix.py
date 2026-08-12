@@ -21,7 +21,7 @@ from typing import Any
 
 
 DEFAULT_MANIFEST = Path("artifacts/final_chapters/final_chapters_manifest.json")
-DEFAULT_OUT_DIR = Path("artifacts/final_chapters/governance")
+DEFAULT_OUT_DIR = Path("artifacts/governance/final_chapters/governance")
 DEFAULT_TARGET_CALIBRATION = Path("artifacts/scanner_v2/final_chapters_target_calibration_audit/chapter_target_calibration_summary.json")
 PREFLIGHT_MATRIX_ID = "tradable_preflight_matrix_v1"
 

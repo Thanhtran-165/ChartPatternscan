@@ -16,6 +16,7 @@ from typing import Any, Mapping
 
 from scanner.audit_canonical_publication_flow import audit_manifest as audit_canonical_manifest
 from scanner.audit_final_chapter_deep_pdf_review import build_audit as audit_deep_pdf_review
+from scanner.audit_final_chapter_example_charts import audit_manifest as audit_example_charts
 from scanner.audit_final_chapter_morphology_assets import audit_manifest as audit_morphology_assets
 from scanner.audit_final_chapter_pdf_quality import audit_manifest as audit_pdf_quality_manifest
 from scanner.audit_publication_entrypoints import audit_publication_entrypoints
@@ -25,7 +26,7 @@ from scanner.validate_final_chapters_manifest import validate_final_manifest
 
 
 DEFAULT_MANIFEST = Path("artifacts/final_chapters/final_chapters_manifest.json")
-DEFAULT_OUT_DIR = Path("artifacts/final_chapters/governance")
+DEFAULT_OUT_DIR = Path("artifacts/governance/final_chapters/governance")
 AUDIT_ID = "final_chapter_crosscheck_audit_v1"
 
 
@@ -74,10 +75,10 @@ def _source_rows(manifest: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 
 def _governance_summary() -> dict[str, Any]:
-    governance = _read_json(Path("artifacts/final_chapters/governance/chapter_governance_matrix.json"))
-    preflight = _read_json(Path("artifacts/final_chapters/governance/chapter_tradable_preflight_matrix.json"))
+    governance = _read_json(Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json"))
+    preflight = _read_json(Path("artifacts/governance/final_chapters/governance/chapter_tradable_preflight_matrix.json"))
     target = _read_json(Path("artifacts/scanner_v2/final_chapters_target_calibration_audit/chapter_target_calibration_summary.json"))
-    blockers = _read_json(Path("artifacts/final_chapters/governance/tradable_blocker_matrix.json"))
+    blockers = _read_json(Path("artifacts/governance/final_chapters/governance/tradable_blocker_matrix.json"))
     return {
         "governance_matrix_id": governance.get("governance_matrix_id"),
         "governance_counts": governance.get("counts"),
@@ -103,9 +104,10 @@ def audit_final_chapter_crosscheck(
     pdf_report = audit_pdf_quality_manifest(manifest_path)
     deep_pdf_report = audit_deep_pdf_review(manifest_path)
     morphology_report = audit_morphology_assets(manifest_path)
+    example_chart_report = audit_example_charts(manifest_path)
     entrypoint_report = audit_publication_entrypoints()
     visual_report = (
-        build_visual_review_pack(manifest_path, Path("artifacts/final_chapters/visual_review/latest"))
+        build_visual_review_pack(manifest_path, Path("artifacts/governance/final_chapters/visual_review/latest"))
         if build_visual_pack
         else {"status": "SKIPPED"}
     )
@@ -129,6 +131,7 @@ def audit_final_chapter_crosscheck(
         "pdf_quality": pdf_report.get("status"),
         "deep_pdf_review": deep_pdf_report.get("status"),
         "morphology_assets": morphology_report.get("status"),
+        "example_charts": example_chart_report.get("status"),
         "publication_entrypoints": entrypoint_report.get("status"),
         "visual_review_pack": visual_report.get("status"),
         "source_grounding_coverage": "PASS" if not source_failures else "FAIL",
@@ -145,6 +148,7 @@ def audit_final_chapter_crosscheck(
             "pdf_quality": pdf_report.get("counts"),
             "deep_pdf_review": deep_pdf_report.get("counts"),
             "morphology_assets": morphology_report.get("counts"),
+            "example_charts": example_chart_report.get("counts"),
             "canonical": canonical_report.get("counts"),
         },
         "source_grounding_counts": {

@@ -6,6 +6,8 @@ the contract and release-gate modules.
 """
 
 from __future__ import annotations
+from .measurement_registry import lookahead_bars as _registry_lookahead
+from .failure_logic import failure_busted_days, failure_busted_flag
 
 import csv
 import json
@@ -321,7 +323,9 @@ class FlagExperimentDetector:
         }
 
 
-def _evaluate_detection(df: pd.DataFrame, detection: Mapping[str, Any], *, lookahead: int = 63) -> Dict[str, Any]:
+def _evaluate_detection(df: pd.DataFrame, detection: Mapping[str, Any], *, lookahead: Optional[int] = None) -> Dict[str, Any]:
+    if lookahead is None:
+        lookahead = _registry_lookahead(detection.get("pattern_key") or "flags_experiment")
     breakout_idx = int(detection["breakout_idx"])
     breakout_price = float(detection["breakout_price"])
     target = float(detection["target_price"])
@@ -337,6 +341,9 @@ def _evaluate_detection(df: pd.DataFrame, detection: Mapping[str, Any], *, looka
             "target_dist_pct": None,
             "target_hit": None,
             "failure_5pct": None,
+            "weak_move_5pct": None,
+            "failure_busted": None,
+            "days_to_bust": None,
         }
     target_dist_pct = abs(target - breakout_price) / breakout_price * 100.0
     if direction == "up":
@@ -371,6 +378,9 @@ def _evaluate_detection(df: pd.DataFrame, detection: Mapping[str, Any], *, looka
         "target_dist_pct": round(float(target_dist_pct), 2),
         "target_hit": target_hit,
         "failure_5pct": bool(float(mfe) < 5.0),
+        "weak_move_5pct": bool(float(mfe) < 5.0),
+        "failure_busted": failure_busted_flag(detection, future, breakout_price=breakout_price, target_price=target, mfe_pct=float(mfe)),
+        "days_to_bust": failure_busted_days(detection, future, breakout_price=breakout_price, target_price=target, mfe_pct=float(mfe)),
         "target_first_before_adverse_5pct": bool(target_first),
         "days_to_target": int(days_to_target) if days_to_target is not None else None,
     }
@@ -537,7 +547,7 @@ EVENT_FIELDS = [
     "mfe_pct",
     "mae_pct",
     "target_hit",
-    "failure_5pct",
+    "failure_5pct", "weak_move_5pct", "failure_busted", "days_to_bust",
     "target_first_before_adverse_5pct",
     "days_to_target",
     "pattern_quality_score",
@@ -564,7 +574,9 @@ EVENT_FIELDS = [
 ]
 
 
-def _path_rows(scan: Mapping[str, Any], *, source_dir: Path, horizon_bars: int = 120) -> List[Dict[str, Any]]:
+def _path_rows(scan: Mapping[str, Any], *, source_dir: Path, horizon_bars: Optional[int] = None) -> List[Dict[str, Any]]:
+    if horizon_bars is None:
+        horizon_bars = _registry_lookahead(scan.get("pattern_key") or "flags_experiment")
     symbol_paths = {_symbol_from_path(path): path for path in sorted(source_dir.glob("*.json"))}
     cache: Dict[str, pd.DataFrame] = {}
     out: List[Dict[str, Any]] = []

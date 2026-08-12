@@ -50,6 +50,12 @@ mỗi family tự viết một hàm sinh nội dung riêng rồi gọi thẳng r
 biệt giữa các chapter phải nằm ở dữ kiện đã khóa, không nằm ở logic viết public
 riêng.
 
+Từ `quick_read_editorial_upgrade_v1`, `editorial_sections` bắt buộc có 9 phần,
+trong đó `quick_read` là nguồn duy nhất cho mục “Đọc nhanh chương này”. Renderer
+không được tự dựng mục này từ bảng kết quả hoặc template. Nếu thiếu `quick_read`
+hoặc section chứa dấu vết fallback như `Mục/Kết quả chính`, `được chuyển thành`,
+`Tham số hiện tại`, build phải fail thay vì render tạm.
+
 ## Policy viết nội dung mới
 
 Từ sau vòng Bull Flag source-guided refinement, baseline viết nội dung mới là:
@@ -79,6 +85,8 @@ Các artifact tối thiểu của một chapter viết theo policy này:
 - `source_style_dossier`: dossier phong cách/hình thái trích từ chương gốc liên quan.
 - `source_guided_ai_sections`: bản AI source-guided đầu tiên đã qua gate.
 - `refined_ai_sections`: bản biên tập lại từ AI source-guided candidate.
+- `quick_read`: section “Đọc nhanh chương này” đã qua AI/human editorial và
+  Codex hậu kỳ, nằm trong `approved_ai_sections.json`.
 - `canonical_pdf`: PDF render bằng canonical factory.
 - `style_v3_audit`: audit PDF đã render.
 
@@ -133,9 +141,9 @@ PYTHONPATH=. ./.venv/bin/python -m scanner.audit_canonical_publication_flow
 
 Kết quả được ghi vào:
 
-- `artifacts/final_chapters/governance/canonical_publication_flow_audit.json`
-- `artifacts/final_chapters/governance/canonical_publication_flow_audit.csv`
-- `artifacts/final_chapters/governance/canonical_publication_flow_audit.md`
+- `artifacts/governance/final_chapters/governance/canonical_publication_flow_audit.json`
+- `artifacts/governance/final_chapters/governance/canonical_publication_flow_audit.csv`
+- `artifacts/governance/final_chapters/governance/canonical_publication_flow_audit.md`
 
 Nếu audit FAIL, chapter chưa được gọi là canonical final dù các điểm thống kê
 hoặc gate cũ có thể đã pass.

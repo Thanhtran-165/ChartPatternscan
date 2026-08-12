@@ -44,3 +44,8 @@ complete_extraction_phase1.json
 chart_patterns_encyclopedia_extraction.json
 chart_patterns_detection_rules.json
 chart_patterns_detailed_statistics.json
+
+# Local run data (do not commit)
+logs/
+.tmp/
+tmp/

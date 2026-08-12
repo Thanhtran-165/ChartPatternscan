@@ -41,7 +41,7 @@ from scanner.after_buy_source_grounding import (  # noqa: E402
 
 PACK_ID = "after_buy_vietnam_deep_integration_v1"
 DEFAULT_SOURCE_MAP = DEFAULT_AFTER_BUY_OUT_DIR / "after_buy_source_map.json"
-DEFAULT_GOVERNANCE_MATRIX = Path("artifacts/final_chapters/governance/chapter_governance_matrix.json")
+DEFAULT_GOVERNANCE_MATRIX = Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json")
 DEFAULT_OUT_DIR = Path("artifacts/scanner_v2/after_buy_vietnam_v2")
 
 RULE_ARTIFACT_GLOB = "*/*.json"

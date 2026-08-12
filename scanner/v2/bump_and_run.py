@@ -23,6 +23,8 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+from scanner.v2.measurement_registry import lookahead_bars as _registry_lookahead
+from scanner.v2.failure_logic import failure_busted_days, failure_busted_flag
 
 from scanner.ohlcv_normalizer import OHLCVNormalizer  # noqa: E402
 from scanner.pivot_detector import Pivot, PivotDetector, PivotType  # noqa: E402
@@ -293,13 +295,24 @@ def scan_symbol(
     return out, {"rows": int(len(df)), "pivots": int(len(pivots)), "normalizer": norm_stats, "detector_config": config.to_dict()}
 
 
-def _evaluate_detection(df: pd.DataFrame, det: Mapping[str, Any], horizon: int = 252) -> Dict[str, Any]:
+def _evaluate_detection(df: pd.DataFrame, det: Mapping[str, Any], horizon: Optional[int] = None) -> Dict[str, Any]:
+    if horizon is None:
+        horizon = _registry_lookahead(det.get("pattern_key") or "bump_and_run_reversal_bottoms")
     breakout_idx = int(det["breakout_idx"])
     breakout_price = float(det["breakout_price"])
     direction = 1 if det["breakout_direction"] == "up" else -1
     forward = df.iloc[breakout_idx + 1 : min(len(df), breakout_idx + 1 + horizon)].copy()
     if forward.empty or breakout_price <= 0:
-        return {"mfe_pct": None, "mae_pct": None, "target_hit": False, "failure_5pct": True, "evaluated_bars": 0}
+        return {
+            "mfe_pct": None,
+            "mae_pct": None,
+            "target_hit": False,
+            "failure_5pct": True,
+            "weak_move_5pct": None,
+            "failure_busted": None,
+            "days_to_bust": None,
+            "evaluated_bars": 0,
+        }
     if direction == 1:
         favorable = (pd.to_numeric(forward["high"], errors="coerce") / breakout_price - 1.0) * 100.0
         adverse = (1.0 - pd.to_numeric(forward["low"], errors="coerce") / breakout_price) * 100.0
@@ -319,6 +332,9 @@ def _evaluate_detection(df: pd.DataFrame, det: Mapping[str, Any], horizon: int =
         "mae_pct": round(mae, 2),
         "target_hit": bool(target_day is not None),
         "failure_5pct": bool(mfe < 5.0),
+        "weak_move_5pct": bool(mfe < 5.0),
+        "failure_busted": failure_busted_flag(det, forward, breakout_price=breakout_price, target_price=float(det["target_price"]), mfe_pct=float(mfe)),
+        "days_to_bust": failure_busted_days(det, forward, breakout_price=breakout_price, target_price=float(det["target_price"]), mfe_pct=float(mfe)),
         "target_first_before_adverse_5pct": bool(target_day is not None and (adverse_day is None or target_day < adverse_day)),
         "days_to_target": target_day,
         "evaluated_bars": int(len(forward)),
@@ -445,7 +461,7 @@ EVENT_FIELDS = [
     "mfe_pct",
     "mae_pct",
     "target_hit",
-    "failure_5pct",
+    "failure_5pct", "weak_move_5pct", "failure_busted", "days_to_bust",
     "target_first_before_adverse_5pct",
     "days_to_target",
     "pattern_quality_score",
@@ -532,7 +548,7 @@ def scan_bump_and_run_db(
     }
     _enrich_events_from_series(scan, series_by_symbol, corporate_db=index_db)
     _assign_publication_quality_tiers(scan["detections"])
-    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=252)
+    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=_registry_lookahead(scan["pattern_key"]))
     stats = summarize(scan, pattern_key=pattern_key)
     stats["source"] = scan["source"]
     stats["db_source_meta"] = _db_meta(db_path)

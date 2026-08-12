@@ -34,12 +34,12 @@ CANONICAL_PUBLICATION_STYLE_VERSION = "canonical_publication_style_v3"
 CANONICAL_PUBLICATION_FLOW = f"{CANONICAL_PUBLICATION_FACTORY_ID} + {PUBLICATION_CORE_ID}"
 
 REQUIRED_READER_SECTIONS = (
-    "Kết quả quan trọng",
+    "Đọc nhanh chương này",
     "Mẫu hình hoạt động ra sao",
     "Cách nhận diện",
     "Ví dụ minh họa",
     "Tập trung vào thất bại",
-    "Cách đọc kết quả quan trọng",
+    "Cách đọc các con số",
     "Khi mẫu đáng chú ý hơn",
     "Cách sử dụng thực tế",
     "Phụ lục kỹ thuật",

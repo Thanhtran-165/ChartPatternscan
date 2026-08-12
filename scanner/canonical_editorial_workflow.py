@@ -24,6 +24,14 @@ EDITORIAL_BLOCK_SEQUENCE = (
 )
 
 SECTION_ROLES: dict[str, dict[str, Any]] = {
+    "quick_read": {
+        "reader_job": "Open the chapter with a human-readable fast read: what the pattern is, what the main numbers imply, and how cautiously the reader should use the chapter.",
+        "must_answer": [
+            "What is the one-sentence chart behavior?",
+            "Which two or three numbers matter most, and what do they mean in plain Vietnamese?",
+            "What should the reader remember before looking at the examples and tables?",
+        ],
+    },
     "summary": {
         "reader_job": "Orient the reader: what this pattern is, what evidence exists, and what the chapter may and may not claim.",
         "must_answer": [
@@ -110,6 +118,7 @@ PUBLIC_CHAPTER_STYLE_BLUEPRINT: dict[str, Any] = {
         "Avoid newsletter tone, hype, certainty language, and direct buy/sell language.",
     ],
     "section_depth_target": {
+        "quick_read": "3-4 paragraphs; a natural opening, not a metric table or abstract",
         "summary": "4 paragraphs; a full reader orientation, not a short abstract",
         "tour": "4 paragraphs; walk the chart from prior move to confirmation and common mistakes",
         "failure": "3-4 paragraphs; describe anatomy of failure and what it teaches",
@@ -298,9 +307,9 @@ def build_canonical_editorial_prompt(dossier: Mapping[str, Any], block_name: str
         "public_chapter_writer": (
             "Output riêng cho block này phải viết chapter: trả về đúng `required_output_schema`, "
             "bao gồm `editorial_sections`, `example_captions`, và `claims_to_verify`. "
-            "Bắt buộc `editorial_sections` phải có đủ và đúng chính xác 8 keys: "
-            "`summary`, `tour`, `failure`, `statistics`, `post_breakout`, `size_volume`, `tactics`, `checklist`. "
-            "Không được bỏ `tactics` hoặc `checklist` dù nội dung dài; nếu cần, rút ngắn các phần trước để vẫn trả đủ 8 keys."
+            "Bắt buộc `editorial_sections` phải có đủ và đúng chính xác 9 keys: "
+            "`quick_read`, `summary`, `tour`, `failure`, `statistics`, `post_breakout`, `size_volume`, `tactics`, `checklist`. "
+            "Không được bỏ `quick_read`, `tactics` hoặc `checklist` dù nội dung dài; nếu cần, rút ngắn các phần trước để vẫn trả đủ 9 keys."
         ),
         "deterministic_synthesizer": (
             "Output riêng cho block này chỉ trả về danh sách sửa deterministic, không viết lại chapter."
@@ -324,7 +333,9 @@ def build_canonical_editorial_prompt(dossier: Mapping[str, Any], block_name: str
         "public_chapter_writer": (
             "Hãy viết editorial_sections theo required_output_schema. Mỗi section phải dùng section_roles và public_chapter_style_blueprint "
             "để trả lời đúng reader_job, must_answer và section_depth_target. Viết thành đoạn văn giàu diễn giải, không viết như danh sách số liệu. "
-            "Trước khi trả lời, tự kiểm rằng đủ 8 section bắt buộc; `checklist` là danh sách 7-9 câu ngắn, còn `tactics` là 3-4 đoạn văn về cách đọc thận trọng. "
+            "`quick_read` là phần mở đầu dưới tiêu đề 'Đọc nhanh chương này': viết như lời dẫn tự nhiên, không viết bảng, không dùng câu template, "
+            "nhưng vẫn phải nhắc những con số chính từ facts_locked nếu chúng thật sự quan trọng. "
+            "Trước khi trả lời, tự kiểm rằng đủ 9 section bắt buộc; `checklist` là danh sách 7-9 câu ngắn, còn `tactics` là 3-4 đoạn văn về cách đọc thận trọng. "
             "Riêng phần mô tả hình học phải bám sát source_rule_inventory: nêu rõ cấu trúc mẫu, khung thời gian, điều kiện xác nhận, điều kiện loại trừ và bẫy nhìn nhầm."
         ),
         "critic_red_team": (

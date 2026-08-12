@@ -7,6 +7,7 @@ branch of the ordinary Bull Flag scanner.
 """
 
 from __future__ import annotations
+from .measurement_registry import lookahead_bars as _registry_lookahead
 
 import argparse
 import json
@@ -349,7 +350,7 @@ HIGH_TIGHT_FLAG_EVENT_FIELDS = sorted(set(EVENT_FIELDS + ["event_id", "compressi
 def write_artifacts(scan: dict[str, Any], out_dir: Path, *, source_dir: Path) -> dict[str, Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     _enrich_events(scan, source_dir=source_dir)
-    path_rows = _path_rows(scan, source_dir=source_dir, horizon_bars=120)
+    path_rows = _path_rows(scan, source_dir=source_dir, horizon_bars=_registry_lookahead(scan["pattern_key"]))
     stats = summarize(scan, path_rows)
 
     detections = list(scan.get("detections") or [])

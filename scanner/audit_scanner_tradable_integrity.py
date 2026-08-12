@@ -27,8 +27,8 @@ from scanner.run_chapter_tradable_layer import CHAPTER_SPECS, ChapterSpec  # noq
 
 AUDIT_ID = "scanner_tradable_integrity_gate_v1"
 DEFAULT_MANIFEST = Path("artifacts/final_chapters/final_chapters_manifest.json")
-DEFAULT_PREFLIGHT_MATRIX = Path("artifacts/final_chapters/governance/chapter_tradable_preflight_matrix.json")
-DEFAULT_GOVERNANCE_MATRIX = Path("artifacts/final_chapters/governance/chapter_governance_matrix.json")
+DEFAULT_PREFLIGHT_MATRIX = Path("artifacts/governance/final_chapters/governance/chapter_tradable_preflight_matrix.json")
+DEFAULT_GOVERNANCE_MATRIX = Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json")
 
 
 @dataclass(frozen=True)

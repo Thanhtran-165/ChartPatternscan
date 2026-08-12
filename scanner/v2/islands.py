@@ -25,6 +25,8 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+from scanner.v2.measurement_registry import lookahead_bars as _registry_lookahead
+from scanner.v2.failure_logic import failure_busted_days, failure_busted_flag
 
 from scanner.run_bear_flag_db_source_parity_audit import (  # noqa: E402
     DEFAULT_DB,
@@ -97,7 +99,7 @@ def _csv_fields(rows: Sequence[Mapping[str, Any]]) -> list[str]:
         "mfe_pct",
         "mae_pct",
         "target_hit",
-        "failure_5pct",
+        "failure_5pct", "weak_move_5pct", "failure_busted", "days_to_bust",
         "target_first_before_adverse_5pct",
     ]
     keys: set[str] = set()
@@ -169,6 +171,8 @@ def _gap_down(df: pd.DataFrame, idx: int, cfg: IslandConfig) -> Optional[dict[st
 
 
 def _evaluate_island(df: pd.DataFrame, row: Mapping[str, Any], *, lookahead: int) -> dict[str, Any]:
+    row = dict(row)  # bản sao — không sửa row gốc
+    row.setdefault("pattern_key", "island_reversals")
     idx = int(row["breakout_idx"])
     direction = 1 if row["breakout_direction"] == "up" else -1
     breakout_price = float(row["breakout_price"])
@@ -181,6 +185,9 @@ def _evaluate_island(df: pd.DataFrame, row: Mapping[str, Any], *, lookahead: int
             "mae_pct": None,
             "target_hit": None,
             "failure_5pct": None,
+            "weak_move_5pct": None,
+            "failure_busted": None,
+            "days_to_bust": None,
             "target_first_before_adverse_5pct": None,
             "time_to_target_bars": None,
         }
@@ -207,6 +214,9 @@ def _evaluate_island(df: pd.DataFrame, row: Mapping[str, Any], *, lookahead: int
         "mae_pct": round(float(mae_series.max()), 2) if not mae_series.dropna().empty else None,
         "target_hit": target_hit,
         "failure_5pct": bool(float(mfe_series.max()) < 5.0) if not mfe_series.dropna().empty else None,
+        "weak_move_5pct": bool(float(mfe_series.max()) < 5.0) if not mfe_series.dropna().empty else None,
+        "failure_busted": failure_busted_flag(row, future, breakout_price=breakout_price, target_price=target, mfe_pct=float(mfe_series.max()) if not mfe_series.dropna().empty else None),
+        "days_to_bust": failure_busted_days(row, future, breakout_price=breakout_price, target_price=target, mfe_pct=float(mfe_series.max()) if not mfe_series.dropna().empty else None),
         "target_first_before_adverse_5pct": bool(target_hit and (first_adverse is None or int(first_target or 10**9) < first_adverse)),
         "time_to_target_bars": first_target,
     }
@@ -327,7 +337,7 @@ def scan_symbol_islands(df: pd.DataFrame, *, symbol: str, config: IslandConfig) 
                 "pivot_indices": json.dumps([i - 1, i, j - 1, j]),
                 "created_at": _utc_now(),
             }
-            row.update(_evaluate_island(df, row, lookahead=config.evaluation_bars))
+            row.update(_evaluate_island(df, row, lookahead=_registry_lookahead(row.get("pattern_key") or "island_reversals")))
             detections.append(row)
             last_breakout_idx = j
             break
@@ -421,7 +431,7 @@ def scan_island_family_db(
         pattern_scan["statistics"] = _summarize(pattern_rows, config=config, symbols_scanned=len(symbols), db_path=db_path)
         _write_json(pattern_dir / "scan.json", pattern_scan)
         _write_json(pattern_dir / "statistics.json", pattern_scan["statistics"])
-        path_rows = _path_rows_from_series(pattern_scan, series_by_symbol, horizon_bars=config.evaluation_bars)
+        path_rows = _path_rows_from_series(pattern_scan, series_by_symbol, horizon_bars=_registry_lookahead(ISLAND_REVERSALS))  # island_family placeholder — dùng reversal
         _write_csv(pattern_dir / "events.csv", pattern_rows, _csv_fields(pattern_rows))
         _write_csv(pattern_dir / "post_breakout_path.csv", path_rows, _csv_fields(path_rows))
         paths[f"{pattern_id}_scan"] = pattern_dir / "scan.json"

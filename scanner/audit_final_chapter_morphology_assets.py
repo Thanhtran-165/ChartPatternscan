@@ -21,7 +21,7 @@ from scanner.rebuild_source_guided_final_chapters import _load_charts, _slug_fro
 
 
 DEFAULT_MANIFEST = Path("artifacts/final_chapters/final_chapters_manifest.json")
-DEFAULT_OUT_DIR = Path("artifacts/final_chapters/governance")
+DEFAULT_OUT_DIR = Path("artifacts/governance/final_chapters/governance")
 AUDIT_ID = "final_chapter_morphology_asset_audit_v1"
 MIN_SCHEMATIC_WIDTH = 1000
 MIN_SCHEMATIC_HEIGHT = 440

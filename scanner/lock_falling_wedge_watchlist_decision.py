@@ -9,7 +9,7 @@ from typing import Any, Mapping
 
 
 PATTERN_ID = "wedges_falling"
-GOVERNANCE_PATH = Path("artifacts/final_chapters/governance/chapter_governance_matrix.json")
+GOVERNANCE_PATH = Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json")
 LOCAL_AUDIT = Path("artifacts/scanner_v2/falling_wedge_tradable_blocker_audit/falling_wedge_tradable_blocker_audit.json")
 OUT_DIR = Path("artifacts/scanner_v2/falling_wedge_watchlist_lock")
 LOCK_ID = "falling_wedge_watchlist_lock_v1"

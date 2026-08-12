@@ -24,6 +24,8 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+from scanner.v2.measurement_registry import lookahead_bars as _registry_lookahead
+from scanner.v2.failure_logic import failure_busted_days, failure_busted_flag
 
 from scanner.ohlcv_normalizer import OHLCVNormalizer  # noqa: E402
 from scanner.pivot_detector import Pivot, PivotDetector, PivotType  # noqa: E402
@@ -137,7 +139,9 @@ def _score_band(value: Optional[float], *, good: float, weak: float, reverse: bo
     return (value - weak) / max(good - weak, 1e-9) * 100.0 * weight
 
 
-def _evaluate_detection(df: pd.DataFrame, detection: Mapping[str, Any], *, lookahead: int = 252) -> Dict[str, Any]:
+def _evaluate_detection(df: pd.DataFrame, detection: Mapping[str, Any], *, lookahead: Optional[int] = None) -> Dict[str, Any]:
+    if lookahead is None:
+        lookahead = _registry_lookahead(detection.get("pattern_key") or "rectangle_bottoms")
     breakout_idx = int(detection["breakout_idx"])
     breakout_price = float(detection["breakout_price"])
     target = float(detection["target_price"])
@@ -153,6 +157,9 @@ def _evaluate_detection(df: pd.DataFrame, detection: Mapping[str, Any], *, looka
             "target_dist_pct": None,
             "target_hit": None,
             "failure_5pct": None,
+            "weak_move_5pct": None,
+            "failure_busted": None,
+            "days_to_bust": None,
             "target_first_before_adverse_5pct": None,
             "days_to_target": None,
             "throwback_pullback_30d": None,
@@ -193,6 +200,9 @@ def _evaluate_detection(df: pd.DataFrame, detection: Mapping[str, Any], *, looka
         "target_dist_pct": round(float(target_dist_pct), 2),
         "target_hit": target_hit,
         "failure_5pct": bool(float(mfe) < 5.0),
+        "weak_move_5pct": bool(float(mfe) < 5.0),
+        "failure_busted": failure_busted_flag(detection, future, breakout_price=breakout_price, target_price=target, mfe_pct=float(mfe)),
+        "days_to_bust": failure_busted_days(detection, future, breakout_price=breakout_price, target_price=target, mfe_pct=float(mfe)),
         "target_first_before_adverse_5pct": bool(target_first),
         "days_to_target": int(days_to_target) if days_to_target is not None else None,
         "throwback_pullback_30d": bool(not retest_rows.empty),
@@ -508,7 +518,7 @@ EVENT_FIELDS = [
     "mfe_pct",
     "mae_pct",
     "target_hit",
-    "failure_5pct",
+    "failure_5pct", "weak_move_5pct", "failure_busted", "days_to_bust",
     "target_first_before_adverse_5pct",
     "days_to_target",
     "pattern_quality_score",
@@ -595,7 +605,7 @@ def scan_rectangles_db(
     }
     _enrich_events_from_series(scan, series_by_symbol, corporate_db=index_db)
     _assign_publication_quality_tiers(scan["detections"])
-    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=252)
+    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=_registry_lookahead(scan["pattern_key"]))
     stats = summarize(scan, pattern_key=pattern_key)
     stats["source"] = scan["source"]
     stats["db_source_meta"] = _db_meta(db_path)

@@ -29,7 +29,7 @@ DEFAULT_OUT_DIR = DEFAULT_AFTER_BUY_OUT_DIR / "broadening_bottoms"
 DEFAULT_SOURCE_NOTES = Path("artifacts/scanner_v2/broadening_family_public_chapters/broadening_bottoms/broadening_bottoms_source_notes.json")
 DEFAULT_GENERIC_TRADABLE_DIR = Path("artifacts/scanner_v2/chapter_tradable_layer/broadening_bottoms")
 DEFAULT_BRANCH_OPTIMIZATION = Path("artifacts/scanner_v2/chapter_branch_optimization/broadening_bottoms/branch_optimization_summary.json")
-DEFAULT_GOVERNANCE_MATRIX = Path("artifacts/final_chapters/governance/chapter_governance_matrix.json")
+DEFAULT_GOVERNANCE_MATRIX = Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json")
 
 
 REQUIRED_SOURCE_SECTIONS = (

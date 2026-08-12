@@ -24,6 +24,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+from scanner.v2.measurement_registry import lookahead_bars as _registry_lookahead
 
 from scanner.ohlcv_normalizer import OHLCVNormalizer  # noqa: E402
 from scanner.pivot_detector import Pivot, PivotDetector, PivotType  # noqa: E402
@@ -464,7 +465,7 @@ def scan_symbol(
         if any(abs(breakout_idx - prev) <= config.breakout_cooldown_bars for prev in used_breakouts):
             continue
         record = {"symbol": symbol, "pattern_key": variant, **candidate}
-        record.update(_evaluate_detection(df, record, lookahead=252))
+        record.update(_evaluate_detection(df, record, lookahead=_registry_lookahead(record.get("pattern_key") or "cup_with_handle")))
         out.append(record)
         used_breakouts.append(breakout_idx)
         if len(out) >= max_events:
@@ -580,7 +581,7 @@ EVENT_FIELDS = [
     "mfe_pct",
     "mae_pct",
     "target_hit",
-    "failure_5pct",
+    "failure_5pct", "weak_move_5pct", "failure_busted", "days_to_bust",
     "target_first_before_adverse_5pct",
     "days_to_target",
     "pattern_quality_score",
@@ -695,7 +696,7 @@ def scan_cup_with_handle_db(
     stats["source"] = scan["source"]
     stats["db_source_meta"] = _db_meta(db_path)
     stats["detector_config"] = config.to_dict()
-    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=252)
+    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=_registry_lookahead(scan["pattern_key"]))
     _add_target_calibration(stats, scan, path_rows)
     paths = {
         "detections": out_dir / "detections.json",

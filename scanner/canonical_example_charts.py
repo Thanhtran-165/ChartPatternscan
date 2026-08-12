@@ -13,6 +13,12 @@ from matplotlib.patches import Rectangle
 
 
 DEFAULT_PRICE_DB = Path("../market_cache/stock_ohlcv/latest.sqlite")
+PRICE_DB_CANDIDATES = (
+    Path("vietnam_stocks.db"),
+    Path("../market_cache/stock_ohlcv/latest.sqlite"),
+)
+VN100_EXAMPLE_SCOPE = {"VN30", "VN100 ex VN30"}
+EXAMPLE_ROLES = ("textbook_success", "middle_case", "failure")
 
 
 def _truthy(value: Any) -> bool:
@@ -50,6 +56,64 @@ def _load_ohlcv(price_db: Path, symbol: str) -> pd.DataFrame:
     for col in ("open", "high", "low", "close", "volume"):
         df[col] = pd.to_numeric(df[col], errors="coerce")
     return df.dropna(subset=["date", "open", "high", "low", "close"]).sort_values("date").reset_index(drop=True)
+
+
+def _breakout_price_alignment_error(df: pd.DataFrame, event: Mapping[str, Any]) -> float:
+    breakout_price = _num(event.get("breakout_price"))
+    breakout_date = _date(event.get("breakout_date"))
+    if breakout_price is None or breakout_date is None or df.empty:
+        return math.inf
+    idx = int(df["date"].searchsorted(breakout_date, side="left"))
+    if idx < 0 or idx >= len(df):
+        return math.inf
+    row = df.iloc[idx]
+    candidates = [_num(row.get(col)) for col in ("open", "high", "low", "close")]
+    candidates = [value for value in candidates if value is not None and value > 0]
+    if not candidates:
+        return math.inf
+    return min(abs(value / breakout_price - 1.0) for value in candidates)
+
+
+def _resolve_price_db_for_event(price_db: Path, event: Mapping[str, Any]) -> tuple[Path, pd.DataFrame, dict[str, Any]]:
+    """Choose the OHLCV source that is on the same price scale as the event.
+
+    Final chapters are often rerendered long after the scanner ran.  A mutable
+    "latest" OHLCV snapshot can be backfilled or adjusted differently, which
+    makes old event prices, targets and geometric trendlines land on the wrong
+    vertical scale.  We therefore score candidate DBs against the event's
+    breakout price and render with the closest source.
+    """
+
+    symbol = str(event.get("symbol") or event.get("ticker") or "").strip()
+    candidates: list[Path] = []
+    for candidate in (price_db, *PRICE_DB_CANDIDATES):
+        if candidate not in candidates and candidate.exists():
+            candidates.append(candidate)
+    scored: list[tuple[float, Path, pd.DataFrame]] = []
+    for candidate in candidates:
+        try:
+            df = _load_ohlcv(candidate, symbol)
+        except Exception:  # noqa: BLE001
+            continue
+        error = _breakout_price_alignment_error(df, event)
+        scored.append((error, candidate, df))
+    if not scored:
+        return price_db, pd.DataFrame(), {"status": "FAIL", "reason": "no_price_db_loaded", "price_db": str(price_db)}
+    scored.sort(key=lambda item: item[0])
+    best_error, best_db, best_df = scored[0]
+    requested_error = next((error for error, candidate, _ in scored if candidate == price_db), math.inf)
+    return (
+        best_db,
+        best_df,
+        {
+            "status": "PASS" if math.isfinite(best_error) and best_error <= 0.035 else "WARN",
+            "price_db": str(best_db),
+            "requested_price_db": str(price_db),
+            "breakout_price_alignment_error_pct": round(best_error * 100.0, 4) if math.isfinite(best_error) else None,
+            "requested_alignment_error_pct": round(requested_error * 100.0, 4) if math.isfinite(requested_error) else None,
+            "used_alternate_price_db": best_db != price_db,
+        },
+    )
 
 
 def _slice_window(df: pd.DataFrame, event: Mapping[str, Any], *, pre_bars: int = 45, post_bars: int = 45) -> tuple[pd.DataFrame, int]:
@@ -105,6 +169,17 @@ def _ranked_source(events: pd.DataFrame) -> pd.DataFrame:
         if column in source.columns:
             source[column] = pd.to_numeric(source[column], errors="coerce")
     return source
+
+
+def _vn100_scope(frame: pd.DataFrame) -> pd.DataFrame:
+    if "market_group" not in frame.columns:
+        return frame.iloc[:0].copy()
+    return frame[frame["market_group"].isin(VN100_EXAMPLE_SCOPE)].copy()
+
+
+def _example_scope_label(row: Mapping[str, Any]) -> str:
+    market_group = str(row.get("market_group") or "").strip()
+    return "VN100" if market_group in VN100_EXAMPLE_SCOPE else "outside_vn100"
 
 
 def _numeric_column(frame: pd.DataFrame, column: str) -> pd.Series:
@@ -245,20 +320,65 @@ def _select_examples(events: pd.DataFrame, existing: Mapping[str, Any] | None, p
         pool = pool.sort_values(cols, ascending=ascending[: len(cols)]) if cols else pool
         return pool.iloc[0].to_dict()
 
-    success = visual_source
-    if {"target_hit", "target_first_before_adverse_5pct"}.issubset(visual_source.columns):
-        success = visual_source[visual_source["target_hit"] & visual_source["target_first_before_adverse_5pct"]]
-    if success.empty and {"target_hit", "target_first_before_adverse_5pct"}.issubset(source.columns):
-        success = source[source["target_hit"] & source["target_first_before_adverse_5pct"]]
-    row = pick(success if not success.empty else visual_source, ["_width_distance", "_height_distance", "_visual_score", "_market_rank", "mfe_pct"], [True, True, False, True, False])
+    def role_row(
+        *,
+        role: str,
+        visual_frame: pd.DataFrame,
+        all_frame: pd.DataFrame,
+        sort_cols: list[str],
+        ascending: list[bool],
+    ) -> Mapping[str, Any] | None:
+        for frame, source_label in (
+            (_vn100_scope(visual_frame), "vn100_visual"),
+            (_vn100_scope(all_frame), "vn100_all"),
+            (visual_frame, "outside_vn100_visual"),
+            (all_frame, "outside_vn100_all"),
+        ):
+            row = pick(frame, sort_cols, ascending, prefer_market=True)
+            if row:
+                row = dict(row)
+                row["example_scope_policy"] = "vn100_preferred_role_preserving_v1"
+                row["example_scope_source"] = source_label
+                row["example_scope_label"] = _example_scope_label(row)
+                if row["example_scope_label"] != "VN100":
+                    row["example_scope_note"] = f"Không có ví dụ {role} đủ điều kiện trong VN100; dùng ngoài VN100 để giữ đúng vai ví dụ."
+                return row
+        return None
+
+    success_visual = visual_source.iloc[:0]
+    success_all = source.iloc[:0]
+    if "target_hit" in visual_source.columns:
+        success_visual = visual_source[visual_source["target_hit"]]
+        if "target_first_before_adverse_5pct" in visual_source.columns:
+            first = success_visual[success_visual["target_first_before_adverse_5pct"]]
+            if not first.empty:
+                success_visual = first
+    if "target_hit" in source.columns:
+        success_all = source[source["target_hit"]]
+        if "target_first_before_adverse_5pct" in source.columns:
+            first = success_all[success_all["target_first_before_adverse_5pct"]]
+            if not first.empty:
+                success_all = first
+    row = role_row(
+        role="textbook_success",
+        visual_frame=success_visual,
+        all_frame=success_all,
+        sort_cols=["_width_distance", "_height_distance", "_visual_score", "_market_rank", "mfe_pct"],
+        ascending=[True, True, False, True, False],
+    )
     if row:
         selected["textbook_success"] = row
         used.add(_event_key(row))
 
     failure = visual_source[visual_source["failure_5pct"]] if "failure_5pct" in visual_source.columns else visual_source.iloc[:0]
-    if failure.empty and "failure_5pct" in source.columns:
-        failure = source[source["failure_5pct"]]
-    row = pick(failure if not failure.empty else visual_source, ["_width_distance", "_height_distance", "_visual_score", "_market_rank", "mae_pct"], [True, True, False, True, False])
+    failure_all = source[source["failure_5pct"]] if "failure_5pct" in source.columns else source.iloc[:0]
+    row = role_row(
+        role="failure",
+        visual_frame=failure,
+        all_frame=failure_all,
+        sort_cols=["_width_distance", "_height_distance", "_visual_score", "_market_rank", "mae_pct"],
+        ascending=[True, True, False, True, False],
+    )
     if row:
         selected["failure"] = row
         used.add(_event_key(row))
@@ -269,17 +389,16 @@ def _select_examples(events: pd.DataFrame, existing: Mapping[str, Any] | None, p
     if "mfe_pct" in middle.columns:
         med = float(pd.to_numeric(source["mfe_pct"], errors="coerce").median()) if "mfe_pct" in source.columns else float(pd.to_numeric(middle["mfe_pct"], errors="coerce").median())
         middle["_median_distance"] = (pd.to_numeric(middle["mfe_pct"], errors="coerce") - med).abs()
-    row = pick(middle, ["_median_distance", "_visual_score", "_width_distance", "_height_distance", "_market_rank"], [True, False, True, True, True], prefer_market=False)
+    row = role_row(
+        role="middle_case",
+        visual_frame=middle,
+        all_frame=source,
+        sort_cols=["_median_distance", "_visual_score", "_width_distance", "_height_distance", "_market_rank"],
+        ascending=[True, False, True, True, True],
+    )
     if row:
         selected["middle_case"] = row
         used.add(_event_key(row))
-    for role in ("textbook_success", "middle_case", "failure"):
-        if role in selected:
-            continue
-        row = pick(source, ["_visual_score", "_width_distance", "_height_distance", "_market_rank"], [False, True, True, True])
-        if row:
-            selected[role] = row
-            used.add(_event_key(row))
     return selected
 
 
@@ -636,14 +755,14 @@ def _draw_geometry(ax: Any, df: pd.DataFrame, event: Mapping[str, Any], pattern_
     _label_extrema(ax, df, event, pattern_id)
 
 
-def render_canonical_example_chart(*, price_db: Path, event: Mapping[str, Any], pattern_id: str, out_path: Path, title: str) -> bool:
+def render_canonical_example_chart(*, price_db: Path, event: Mapping[str, Any], pattern_id: str, out_path: Path, title: str) -> tuple[bool, dict[str, Any]]:
     symbol = str(event.get("symbol") or event.get("ticker") or "").strip()
     if not symbol:
-        return False
-    raw = _load_ohlcv(price_db, symbol)
+        return False, {"status": "FAIL", "reason": "missing_symbol"}
+    resolved_db, raw, price_source_report = _resolve_price_db_for_event(price_db, event)
     df, offset = _slice_window(raw, event)
     if df.empty:
-        return False
+        return False, {**price_source_report, "reason": "empty_price_window"}
     fs = _date(event.get("formation_start_date") or event.get("formation_start"))
     fe = _date(event.get("formation_end_date") or event.get("formation_end"))
     bd = _date(event.get("breakout_date"))
@@ -682,7 +801,7 @@ def render_canonical_example_chart(*, price_db: Path, event: Mapping[str, Any], 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path)
     plt.close(fig)
-    return True
+    return True, price_source_report
 
 
 def build_canonical_example_charts(
@@ -695,6 +814,9 @@ def build_canonical_example_charts(
     schematic: Path | None = None,
 ) -> tuple[dict[str, Path], dict[str, Mapping[str, Any]], dict[str, Any]]:
     out_dir.mkdir(parents=True, exist_ok=True)
+    for role in EXAMPLE_ROLES:
+        for stale in out_dir.glob(f"{role}_*.png"):
+            stale.unlink()
     charts: dict[str, Path] = {}
     if schematic and schematic.exists():
         schematic_target = out_dir / schematic.name
@@ -704,6 +826,7 @@ def build_canonical_example_charts(
     selected = _select_examples(events, existing_examples, pattern_id)
     title_map = {"textbook_success": "ví dụ đạt mục tiêu", "middle_case": "ví dụ trung vị", "failure": "ví dụ thất bại"}
     failures: list[dict[str, str]] = []
+    price_sources: dict[str, Mapping[str, Any]] = {}
     for key in ("textbook_success", "middle_case", "failure"):
         event = selected.get(key)
         if not event:
@@ -713,9 +836,20 @@ def build_canonical_example_charts(
         breakout_date = str(event.get("breakout_date") or "unknown")
         out_path = out_dir / f"{key}_{symbol}_{breakout_date}.png"
         title = f"{symbol} - {title_map[key]} ({breakout_date})"
-        if render_canonical_example_chart(price_db=price_db, event=event, pattern_id=pattern_id, out_path=out_path, title=title):
+        rendered, price_source_report = render_canonical_example_chart(price_db=price_db, event=event, pattern_id=pattern_id, out_path=out_path, title=title)
+        price_sources[key] = price_source_report
+        if rendered:
             charts[key] = out_path
         else:
             failures.append({"key": key, "reason": "render_failed"})
-    report = {"status": "PASS" if not failures else "WARN", "pattern_id": pattern_id, "chart_dir": str(out_dir), "rendered_keys": sorted(charts.keys()), "failures": failures}
+    price_source_warnings = [key for key, report in price_sources.items() if report.get("status") != "PASS"]
+    report = {
+        "status": "PASS" if not failures and not price_source_warnings else "WARN",
+        "pattern_id": pattern_id,
+        "chart_dir": str(out_dir),
+        "rendered_keys": sorted(charts.keys()),
+        "failures": failures,
+        "price_sources": price_sources,
+        "price_source_warnings": price_source_warnings,
+    }
     return charts, selected, report

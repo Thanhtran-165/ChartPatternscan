@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 def test_preflight_branch_ceiling_audit_stops_all_priority_patterns() -> None:
-    payload = json.loads(Path("artifacts/final_chapters/governance/preflight_branch_ceiling_audit.json").read_text(encoding="utf-8"))
+    payload = json.loads(Path("artifacts/governance/final_chapters/governance/preflight_branch_ceiling_audit.json").read_text(encoding="utf-8"))
 
     assert payload["audit_id"] == "preflight_branch_ceiling_audit_v1"
     assert payload["counts"] == {
@@ -24,7 +24,7 @@ def test_preflight_branch_ceiling_audit_stops_all_priority_patterns() -> None:
 
 
 def test_preflight_branch_ceiling_keeps_rising_wedge_as_data_scope_ceiling() -> None:
-    payload = json.loads(Path("artifacts/final_chapters/governance/preflight_branch_ceiling_audit.json").read_text(encoding="utf-8"))
+    payload = json.loads(Path("artifacts/governance/final_chapters/governance/preflight_branch_ceiling_audit.json").read_text(encoding="utf-8"))
     rows = {row["pattern_id"]: row for row in payload["rows"]}
 
     rising = rows["wedges_rising"]
@@ -37,7 +37,7 @@ def test_preflight_branch_ceiling_keeps_rising_wedge_as_data_scope_ceiling() -> 
 
 
 def test_preflight_branch_ceiling_records_material_lifts_already_captured() -> None:
-    payload = json.loads(Path("artifacts/final_chapters/governance/preflight_branch_ceiling_audit.json").read_text(encoding="utf-8"))
+    payload = json.loads(Path("artifacts/governance/final_chapters/governance/preflight_branch_ceiling_audit.json").read_text(encoding="utf-8"))
     rows = {row["pattern_id"]: row for row in payload["rows"]}
 
     assert rows["bear_flags"]["selected_lift_vs_aggregate_pp"] == 28.47

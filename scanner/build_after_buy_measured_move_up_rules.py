@@ -30,7 +30,7 @@ DEFAULT_SOURCE_NOTES = Path("artifacts/scanner_v2/measured_move_family_public_ch
 DEFAULT_SCORECARD = Path("artifacts/scanner_v2/chapter_tradable_layer/measured_move_up/scorecard.json")
 DEFAULT_SELECTED_STRATEGY = Path("artifacts/scanner_v2/chapter_tradable_layer/measured_move_up/selected_strategy.json")
 DEFAULT_RELEASE_CANDIDATE = Path("artifacts/scanner_v2/chapter_tradable_layer/measured_move_up/release_candidate.json")
-DEFAULT_GOVERNANCE_MATRIX = Path("artifacts/final_chapters/governance/chapter_governance_matrix.json")
+DEFAULT_GOVERNANCE_MATRIX = Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json")
 
 
 REQUIRED_SOURCE_SECTIONS = (

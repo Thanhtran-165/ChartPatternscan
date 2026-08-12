@@ -35,8 +35,8 @@ from scanner.build_chapter_governance_matrix import (
 )
 
 
-DEFAULT_GOVERNANCE = Path("artifacts/final_chapters/governance/chapter_governance_matrix.json")
-DEFAULT_OUT_DIR = Path("artifacts/final_chapters/governance")
+DEFAULT_GOVERNANCE = Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json")
+DEFAULT_OUT_DIR = Path("artifacts/governance/final_chapters/governance")
 AUDIT_ID = "tradable_candidate_ceiling_audit_v1"
 PROMOTION_THRESHOLD = 95.0
 MATERIAL_SCORE_LIFT = 3.0

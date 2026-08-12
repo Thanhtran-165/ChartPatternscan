@@ -24,6 +24,8 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+from scanner.v2.measurement_registry import lookahead_bars as _registry_lookahead
+from scanner.v2.failure_logic import failure_busted_days, failure_busted_flag
 
 from scanner.double_pattern_utils import resolve_double_bottom_variant, resolve_double_top_variant  # noqa: E402
 from scanner.ohlcv_normalizer import OHLCVNormalizer  # noqa: E402
@@ -164,7 +166,9 @@ def _prior_trend_pct(df: pd.DataFrame, *, pivot_idx: int, pivot_price: float, di
     return round((pivot_price - ref) / ref * 100.0, 2)
 
 
-def _evaluate_detection(df: pd.DataFrame, detection: Mapping[str, Any], *, lookahead: int = 252) -> Dict[str, Any]:
+def _evaluate_detection(df: pd.DataFrame, detection: Mapping[str, Any], *, lookahead: Optional[int] = None) -> Dict[str, Any]:
+    if lookahead is None:
+        lookahead = _registry_lookahead(detection.get("pattern_key") or "double_bottoms")
     breakout_idx = int(detection["breakout_idx"])
     breakout_price = float(detection["breakout_price"])
     target = float(detection["target_price"])
@@ -180,6 +184,9 @@ def _evaluate_detection(df: pd.DataFrame, detection: Mapping[str, Any], *, looka
             "target_dist_pct": None,
             "target_hit": None,
             "failure_5pct": None,
+            "weak_move_5pct": None,
+            "failure_busted": None,
+            "days_to_bust": None,
         }
     if direction == "up":
         mfe = (float(future["high"].max()) - breakout_price) / breakout_price * 100.0
@@ -214,6 +221,9 @@ def _evaluate_detection(df: pd.DataFrame, detection: Mapping[str, Any], *, looka
         "target_dist_pct": round(float(target_dist_pct), 2),
         "target_hit": target_hit,
         "failure_5pct": bool(float(mfe) < 5.0),
+        "weak_move_5pct": bool(float(mfe) < 5.0),
+        "failure_busted": failure_busted_flag(detection, future, breakout_price=breakout_price, target_price=target, mfe_pct=float(mfe)),
+        "days_to_bust": failure_busted_days(detection, future, breakout_price=breakout_price, target_price=target, mfe_pct=float(mfe)),
         "target_first_before_adverse_5pct": bool(target_first),
         "days_to_target": int(days_to_target) if days_to_target is not None else None,
     }
@@ -607,7 +617,7 @@ EVENT_FIELDS = [
     "mfe_pct",
     "mae_pct",
     "target_hit",
-    "failure_5pct",
+    "failure_5pct", "weak_move_5pct", "failure_busted", "days_to_bust",
     "target_first_before_adverse_5pct",
     "days_to_target",
     "pattern_quality_score",
@@ -718,7 +728,7 @@ def scan_double_patterns_db(
     stats["source"] = scan["source"]
     stats["db_source_meta"] = _db_meta(db_path)
     stats["detector_config"] = config.to_dict()
-    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=252)
+    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=_registry_lookahead(scan["pattern_key"]))
     _add_target_calibration(stats, scan, path_rows)
     paths = {
         "detections": out_dir / "detections.json",

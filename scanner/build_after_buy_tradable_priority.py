@@ -27,7 +27,7 @@ from scanner.after_buy_source_grounding import (  # noqa: E402
 
 PRIORITY_ID = "after_buy_vietnam_tradable_priority_v1"
 DEFAULT_SOURCE_MAP = DEFAULT_AFTER_BUY_OUT_DIR / "after_buy_source_map.json"
-DEFAULT_GOVERNANCE = Path("artifacts/final_chapters/governance/chapter_governance_matrix.json")
+DEFAULT_GOVERNANCE = Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json")
 DEFAULT_OUT_DIR = DEFAULT_AFTER_BUY_OUT_DIR
 
 

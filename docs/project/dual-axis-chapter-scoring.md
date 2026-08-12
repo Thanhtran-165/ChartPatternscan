@@ -86,18 +86,18 @@ Rule hiện hành là `double_family_tradable_rescue_v1`:
 
 Ma trận hiện hành nằm ở:
 
-- `artifacts/final_chapters/governance/chapter_governance_matrix.json`
-- `artifacts/final_chapters/governance/chapter_governance_matrix.csv`
-- `artifacts/final_chapters/governance/chapter_governance_matrix.md`
-- `artifacts/final_chapters/governance/chapter_tradable_preflight_matrix.json`
-- `artifacts/final_chapters/governance/chapter_tradable_preflight_matrix.csv`
-- `artifacts/final_chapters/governance/chapter_tradable_preflight_matrix.md`
-- `artifacts/final_chapters/governance/preflight_branch_ceiling_audit.json`
-- `artifacts/final_chapters/governance/preflight_branch_ceiling_audit.csv`
-- `artifacts/final_chapters/governance/preflight_branch_ceiling_audit.md`
-- `artifacts/final_chapters/governance/tradable_candidate_ceiling_audit.json`
-- `artifacts/final_chapters/governance/tradable_candidate_ceiling_audit.csv`
-- `artifacts/final_chapters/governance/tradable_candidate_ceiling_audit.md`
+- `artifacts/governance/final_chapters/governance/chapter_governance_matrix.json`
+- `artifacts/governance/final_chapters/governance/chapter_governance_matrix.csv`
+- `artifacts/governance/final_chapters/governance/chapter_governance_matrix.md`
+- `artifacts/governance/final_chapters/governance/chapter_tradable_preflight_matrix.json`
+- `artifacts/governance/final_chapters/governance/chapter_tradable_preflight_matrix.csv`
+- `artifacts/governance/final_chapters/governance/chapter_tradable_preflight_matrix.md`
+- `artifacts/governance/final_chapters/governance/preflight_branch_ceiling_audit.json`
+- `artifacts/governance/final_chapters/governance/preflight_branch_ceiling_audit.csv`
+- `artifacts/governance/final_chapters/governance/preflight_branch_ceiling_audit.md`
+- `artifacts/governance/final_chapters/governance/tradable_candidate_ceiling_audit.json`
+- `artifacts/governance/final_chapters/governance/tradable_candidate_ceiling_audit.csv`
+- `artifacts/governance/final_chapters/governance/tradable_candidate_ceiling_audit.md`
 - `artifacts/scanner_v2/double_family_tradable_rescue/double_family_tradable_rescue.json`
 - `artifacts/scanner_v2/double_family_tradable_rescue/double_family_tradable_rescue.csv`
 - `artifacts/scanner_v2/double_family_tradable_rescue/double_family_tradable_rescue.md`

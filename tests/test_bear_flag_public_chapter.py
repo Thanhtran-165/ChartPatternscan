@@ -33,8 +33,9 @@ def test_bear_flag_public_chapter_emits_defensive_pdf_with_examples(tmp_path: Pa
 
     text = "\n".join(page.extract_text() or "" for page in PdfReader(str(paths["pdf"])).pages)
     assert len(text) > 14_000
-    assert "Kết quả quan trọng" in text
-    assert "Nhóm điều kiện đọc chính" in text
+    assert "Đọc nhanh chương này" in text
+    assert "cờ giảm" in text.lower()
+    assert "phòng thủ" in text.lower()
     assert "defensive_expanded" not in text
     assert "Audit nhánh scanner" not in text
     assert "Cách nhận diện" in text
@@ -45,7 +46,7 @@ def test_bear_flag_public_chapter_emits_defensive_pdf_with_examples(tmp_path: Pa
     assert "Khi mẫu đáng chú ý hơn" in text
     assert "Cách sử dụng thực tế" in text
     assert "Phụ lục kỹ thuật" in text
-    assert "không phải khuyến nghị bán khống" in text
+    assert "không phải hệ thống giao dịch tự động" in text
 
     payload = json.loads(paths["payload"].read_text(encoding="utf-8"))
     assert payload["factory_id"] == CANONICAL_PUBLICATION_FACTORY_ID

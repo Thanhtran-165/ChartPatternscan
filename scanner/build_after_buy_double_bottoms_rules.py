@@ -32,7 +32,7 @@ RULESET_ID = "after_buy_double_bottoms_rules_v1"
 DEFAULT_SOURCE_MAP = DEFAULT_AFTER_BUY_OUT_DIR / "after_buy_source_map.json"
 DEFAULT_OUT_DIR = DEFAULT_AFTER_BUY_OUT_DIR / "double_bottoms"
 DEFAULT_TRADABLE_DIR = Path("artifacts/scanner_v2/chapter_tradable_layer")
-DEFAULT_GOVERNANCE_MATRIX = Path("artifacts/final_chapters/governance/chapter_governance_matrix.json")
+DEFAULT_GOVERNANCE_MATRIX = Path("artifacts/governance/final_chapters/governance/chapter_governance_matrix.json")
 DEFAULT_RESCUE = Path("artifacts/scanner_v2/double_family_tradable_rescue/double_bottoms/double_bottoms_tradable_rescue.json")
 DOUBLE_BOTTOM_VARIANTS = (
     "double_bottoms_adam_adam",

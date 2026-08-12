@@ -30,7 +30,7 @@ from scanner.canonical_deepseek_editorial_adapter import (  # noqa: E402
 from scanner.validate_final_chapters_manifest import DEFAULT_MANIFEST  # noqa: E402
 
 
-OUT_DIR = ROOT / "artifacts/final_chapters/governance/public_rule_backfill"
+OUT_DIR = ROOT / "artifacts/governance/final_chapters/governance/public_rule_backfill"
 BACKFILL_ID = "final_chapter_public_rule_backfill_v1"
 
 

@@ -27,7 +27,7 @@ from scanner.rebuild_source_guided_final_chapters import _load_charts  # noqa: E
 
 
 DEFAULT_MANIFEST = Path("artifacts/final_chapters/final_chapters_manifest.json")
-DEFAULT_OUT_DIR = Path("artifacts/final_chapters/governance")
+DEFAULT_OUT_DIR = Path("artifacts/governance/final_chapters/governance")
 AUDIT_ID = "final_chapter_pdf_quality_audit_v1"
 
 GLOBAL_FORBIDDEN_PATTERNS = {
