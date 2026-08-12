@@ -118,7 +118,7 @@ def _score_band(value: Optional[float], *, good: float, weak: float, reverse: bo
     return (value - weak) / max(good - weak, 1e-9) * 100.0 * weight
 
 
-def _evaluate_detection(df: pd.DataFrame, detection: Mapping[str, Any], *, lookahead: int = 120) -> Dict[str, Any]:
+def _evaluate_detection(df: pd.DataFrame, detection: Mapping[str, Any], *, lookahead: int = 252) -> Dict[str, Any]:
     breakout_idx = int(detection["breakout_idx"])
     breakout_price = float(detection["breakout_price"])
     target = float(detection["target_price"])
@@ -528,7 +528,7 @@ def _add_target_calibration(stats: Dict[str, Any], scan: Mapping[str, Any], path
         return
     if "event_id" not in events.columns and "detection_id" in events.columns:
         events["event_id"] = events["detection_id"]
-    sensitivity = target_sensitivity(PatternArtifacts(pattern_key, events, path), pattern_key, horizon_days=120)
+    sensitivity = target_sensitivity(PatternArtifacts(pattern_key, events, path), pattern_key, horizon_days=252)
     stats["target_family_sensitivity"] = sensitivity
     stats["target_calibration_decision"] = (build_target_calibration_decisions(sensitivity, family_labels=(pattern_key,)) or [None])[0]
     stats["target_family"] = {"local_base": 0.5, "local_stretch": 0.75, "legacy_full_height": 1.0}
@@ -649,7 +649,7 @@ def scan_head_shoulders_patterns_db(
         }
         _enrich_events_from_series(scan, series_by_symbol, corporate_db=index_db)
         _assign_publication_quality_tiers(scan["detections"], defensive=("tops" in pattern_key))
-        path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=120)
+        path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=252)
         stats = summarize(scan)
         stats["source"] = scan["source"]
         stats["db_source_meta"] = _db_meta(db_path)

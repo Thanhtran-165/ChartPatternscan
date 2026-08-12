@@ -54,7 +54,7 @@ class IslandConfig:
     max_long_bars: int = 40
     prior_trend_lookback_bars: int = 20
     min_prior_trend_pct: float = 3.0
-    evaluation_bars: int = 120
+    evaluation_bars: int = 42
     min_volume_ratio: float = 0.0
     cooldown_bars: int = 20
     max_events_per_symbol: int = 12

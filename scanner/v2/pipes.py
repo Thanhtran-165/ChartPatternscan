@@ -341,7 +341,7 @@ class PipeDetector:
         }
 
 
-def _evaluate_detection(df: pd.DataFrame, detection: Mapping[str, Any], *, lookahead: int = 120) -> Dict[str, Any]:
+def _evaluate_detection(df: pd.DataFrame, detection: Mapping[str, Any], *, lookahead: int = 63) -> Dict[str, Any]:
     breakout_idx = int(detection["breakout_idx"])
     breakout_price = float(detection["breakout_price"])
     target = float(detection["target_price"])
@@ -553,7 +553,7 @@ def _add_target_calibration(stats: Dict[str, Any], scan: Mapping[str, Any], path
         return
     if "event_id" not in events.columns and "detection_id" in events.columns:
         events["event_id"] = events["detection_id"]
-    sensitivity = target_sensitivity(PatternArtifacts(pattern_key, events, path), pattern_key, horizon_days=120)
+    sensitivity = target_sensitivity(PatternArtifacts(pattern_key, events, path), pattern_key, horizon_days=63)
     stats["target_family_sensitivity"] = sensitivity
     stats["target_calibration_decision"] = (build_target_calibration_decisions(sensitivity, family_labels=(pattern_key,)) or [None])[0]
     stats["target_family"] = {"half_height": 0.5, "three_quarter_height": 0.75, "source_full_height": 1.0}
@@ -664,7 +664,7 @@ def scan_pipes_db(
     }
     _enrich_events_from_series(scan, series_by_symbol, corporate_db=index_db)
     _assign_publication_quality_tiers(scan["detections"])
-    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=120)
+    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=63)
     stats = summarize(scan, pattern_key=pattern_key)
     stats["source"] = scan["source"]
     stats["db_source_meta"] = _db_meta(db_path)

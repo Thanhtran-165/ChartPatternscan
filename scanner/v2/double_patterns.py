@@ -164,7 +164,7 @@ def _prior_trend_pct(df: pd.DataFrame, *, pivot_idx: int, pivot_price: float, di
     return round((pivot_price - ref) / ref * 100.0, 2)
 
 
-def _evaluate_detection(df: pd.DataFrame, detection: Mapping[str, Any], *, lookahead: int = 120) -> Dict[str, Any]:
+def _evaluate_detection(df: pd.DataFrame, detection: Mapping[str, Any], *, lookahead: int = 252) -> Dict[str, Any]:
     breakout_idx = int(detection["breakout_idx"])
     breakout_price = float(detection["breakout_price"])
     target = float(detection["target_price"])
@@ -655,7 +655,7 @@ def _add_target_calibration(stats: Dict[str, Any], scan: Mapping[str, Any], path
         return
     if "event_id" not in events.columns and "detection_id" in events.columns:
         events["event_id"] = events["detection_id"]
-    sensitivity = target_sensitivity(PatternArtifacts(family, events, path), family, horizon_days=120)
+    sensitivity = target_sensitivity(PatternArtifacts(family, events, path), family, horizon_days=252)
     stats["target_family_sensitivity"] = sensitivity
     stats["target_calibration_decision"] = (build_target_calibration_decisions(sensitivity, family_labels=(family,)) or [None])[0]
     stats["target_family"] = {"local_base": 0.5, "local_stretch": 0.75, "legacy_full_height": 1.0}
@@ -718,7 +718,7 @@ def scan_double_patterns_db(
     stats["source"] = scan["source"]
     stats["db_source_meta"] = _db_meta(db_path)
     stats["detector_config"] = config.to_dict()
-    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=120)
+    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=252)
     _add_target_calibration(stats, scan, path_rows)
     paths = {
         "detections": out_dir / "detections.json",

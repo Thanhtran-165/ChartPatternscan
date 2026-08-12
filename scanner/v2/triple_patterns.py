@@ -281,7 +281,7 @@ def scan_symbol(
         if any(abs(confirmation_idx - prev) <= config.breakout_cooldown_bars for prev in used_confirmations):
             continue
         record = {"symbol": symbol, "pattern_key": pattern_key, **candidate}
-        record.update(_evaluate_detection(df, record))
+        record.update(_evaluate_detection(df, record, lookahead=252))
         out.append(record)
         used_confirmations.append(confirmation_idx)
         if len(out) >= max_events:
@@ -500,7 +500,7 @@ def scan_triple_patterns_db(
     }
     _enrich_events_from_series(scan, series_by_symbol, corporate_db=index_db)
     _assign_publication_quality_tiers(scan["detections"])
-    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=120)
+    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=252)
     stats = summarize(scan, pattern_key=pattern_key)
     stats["source"] = scan["source"]
     stats["db_source_meta"] = _db_meta(db_path)

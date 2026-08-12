@@ -293,7 +293,7 @@ def scan_symbol(
     return out, {"rows": int(len(df)), "pivots": int(len(pivots)), "normalizer": norm_stats, "detector_config": config.to_dict()}
 
 
-def _evaluate_detection(df: pd.DataFrame, det: Mapping[str, Any], horizon: int = 120) -> Dict[str, Any]:
+def _evaluate_detection(df: pd.DataFrame, det: Mapping[str, Any], horizon: int = 252) -> Dict[str, Any]:
     breakout_idx = int(det["breakout_idx"])
     breakout_price = float(det["breakout_price"])
     direction = 1 if det["breakout_direction"] == "up" else -1
@@ -532,7 +532,7 @@ def scan_bump_and_run_db(
     }
     _enrich_events_from_series(scan, series_by_symbol, corporate_db=index_db)
     _assign_publication_quality_tiers(scan["detections"])
-    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=120)
+    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=252)
     stats = summarize(scan, pattern_key=pattern_key)
     stats["source"] = scan["source"]
     stats["db_source_meta"] = _db_meta(db_path)

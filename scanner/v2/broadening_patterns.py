@@ -468,7 +468,7 @@ def scan_symbol(
             if any(abs(breakout_idx - prev) <= config.breakout_cooldown_bars for prev in used_breakouts):
                 continue
             record = {"symbol": symbol, "pattern_key": pattern_key, **candidate}
-            record.update(_evaluate_detection(df, record))
+            record.update(_evaluate_detection(df, record, lookahead=252))
             out.append(record)
             used_breakouts.append(breakout_idx)
             if len(out) >= max_events:
@@ -640,7 +640,7 @@ def _add_target_calibration(pattern_key: str, stats: Dict[str, Any], scan: Mappi
         return
     if "event_id" not in events.columns and "detection_id" in events.columns:
         events["event_id"] = events["detection_id"]
-    sensitivity = target_sensitivity(PatternArtifacts(pattern_key, events, path), pattern_key, horizon_days=120)
+    sensitivity = target_sensitivity(PatternArtifacts(pattern_key, events, path), pattern_key, horizon_days=252)
     stats["target_family_sensitivity"] = sensitivity
     stats["target_calibration_decision"] = (build_target_calibration_decisions(sensitivity, family_labels=(pattern_key,)) or [None])[0]
     stats["target_family"] = {"local_base": 0.5, "local_stretch": 0.75, "source_measure": 1.0}
@@ -703,7 +703,7 @@ def scan_broadening_pattern_db(
     stats["source"] = scan["source"]
     stats["db_source_meta"] = _db_meta(db_path)
     stats["detector_config"] = config.to_dict()
-    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=120)
+    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=252)
     _add_target_calibration(pattern_key, stats, scan, path_rows)
     paths = {
         "detections": out_dir / "detections.json",

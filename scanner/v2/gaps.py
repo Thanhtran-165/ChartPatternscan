@@ -60,7 +60,7 @@ class GapConfig:
     prior_trend_lookback_bars: int = 20
     consolidation_lookback_bars: int = 20
     post_classification_bars: int = 20
-    evaluation_bars: int = 120
+    evaluation_bars: int = 63
     min_volume_ratio: float = 1.10
     breakout_cooldown_bars: int = 35
     max_events_per_symbol: int = 10
@@ -529,7 +529,7 @@ def _add_target_calibration(stats: Dict[str, Any], events: pd.DataFrame, path_ro
         return
     if "event_id" not in events.columns and "detection_id" in events.columns:
         events = events.assign(event_id=events["detection_id"])
-    sensitivity = target_sensitivity(PatternArtifacts(pattern_key, events, path), pattern_key, horizon_days=120)
+    sensitivity = target_sensitivity(PatternArtifacts(pattern_key, events, path), pattern_key, horizon_days=63)
     stats["target_family_sensitivity"] = sensitivity
     stats["target_calibration_decision"] = (build_target_calibration_decisions(sensitivity, family_labels=(pattern_key,)) or [None])[0]
     stats["target_family"] = {"half_gap": 0.5, "three_quarter_gap": 0.75, "full_gap": 1.0}

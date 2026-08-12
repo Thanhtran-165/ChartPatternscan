@@ -310,7 +310,7 @@ def scan_symbol(
     out: list[dict[str, Any]] = []
     for candidate in rows:
         record = {"symbol": symbol, "pattern_key": pattern_key, **candidate}
-        record.update(_evaluate_detection(df, record, lookahead=156))
+        record.update(_evaluate_detection(df, record, lookahead=252))
         out.append(record)
     return out, {"rows": int(len(df_raw)), "weekly_rows": int(len(df)), "detections": int(len(out)), "normalizer": norm_stats, "detector_config": config.to_dict()}
 
@@ -436,7 +436,7 @@ def _add_target_calibration(stats: Dict[str, Any], scan: Mapping[str, Any], path
         return
     if "event_id" not in events.columns and "detection_id" in events.columns:
         events["event_id"] = events["detection_id"]
-    sensitivity = target_sensitivity(PatternArtifacts(pattern_key, events, path), pattern_key, horizon_days=156)
+    sensitivity = target_sensitivity(PatternArtifacts(pattern_key, events, path), pattern_key, horizon_days=252)
     stats["target_family_sensitivity"] = sensitivity
     stats["target_calibration_decision"] = (build_target_calibration_decisions(sensitivity, family_labels=(pattern_key,)) or [None])[0]
     stats["target_family"] = {"half_height": 0.5, "three_quarter_height": 0.75, "source_full_height": 1.0}
@@ -545,7 +545,7 @@ def scan_rounding_db(
     }
     _enrich_events_from_series(scan, series_by_symbol, corporate_db=index_db)
     _assign_publication_quality_tiers(scan["detections"])
-    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=156)
+    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=252)
     stats = summarize(scan, pattern_key=pattern_key)
     stats["source"] = scan["source"]
     stats["db_source_meta"] = _db_meta(db_path)

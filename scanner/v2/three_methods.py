@@ -386,7 +386,7 @@ def scan_symbol(
     rows = ThreeMethodsDetector(pattern_key, config).scan(df)
     out: list[dict[str, Any]] = []
     for row in rows:
-        out.append({**row, **_evaluate_detection(df, row, lookahead=60)})
+        out.append({**row, **_evaluate_detection(df, row, lookahead=20)})
     return out, {"rows": int(len(df)), "normalizer": norm_stats, "detector_config": config.to_dict()}
 
 
@@ -506,7 +506,7 @@ def _add_target_calibration(stats: Dict[str, Any], scan: Mapping[str, Any], path
         return
     if "event_id" not in events.columns and "detection_id" in events.columns:
         events["event_id"] = events["detection_id"]
-    sensitivity = target_sensitivity(PatternArtifacts(pattern_key, events, path), pattern_key, horizon_days=60)
+    sensitivity = target_sensitivity(PatternArtifacts(pattern_key, events, path), pattern_key, horizon_days=20)
     stats["target_family_sensitivity"] = sensitivity
     stats["target_calibration_decision"] = (build_target_calibration_decisions(sensitivity, family_labels=(pattern_key,)) or [None])[0]
     stats["target_family"] = {"half_first_bar_range": 0.5, "full_first_bar_range": 1.0}
@@ -617,7 +617,7 @@ def scan_three_methods_db(
     }
     _enrich_events_from_series(scan, series_by_symbol, corporate_db=index_db)
     _assign_publication_quality_tiers(scan["detections"])
-    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=60)
+    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=20)
     stats = summarize(scan, pattern_key)
     stats["source"] = scan["source"]
     stats["db_source_meta"] = _db_meta(db_path)
