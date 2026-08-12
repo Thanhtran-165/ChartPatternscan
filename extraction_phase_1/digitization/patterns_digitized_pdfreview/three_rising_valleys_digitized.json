@@ -1,0 +1,67 @@
+{
+  "pattern_name": "Three Rising Valleys",
+  "aliases": ["three rising valleys", "3 rising valleys", "ascending three valleys"],
+  "pattern_type": "reversal_bullish",
+  "digitization_version": "1.0.0",
+  "digitization_source": "PDF_REVIEW_20260812 (Bulkowski ECP, chapter 48)",
+
+  "sample_size": {
+    "bull_market": 248,
+    "bear_market": 248,
+    "total": 496,
+    "notes": "Uniquely balanced sample (50/50 bull/bear). Forms after a downtrend; bullish reversal signal on breakout."
+  },
+
+  "post_breakout_measurement": {
+    "target_calculation": {
+      "method": "highest_peak_projection",
+      "description": "Target = highest peak + (highest peak - lowest valley). Project upward from breakout above the highest peak.",
+      "formula": "target_price = highest_peak_price + (highest_peak_price - lowest_valley_price)"
+    },
+    "ultimate_high_method": {
+      "definition": "Highest price after upward breakout before 20% reversal",
+      "bull_market_days": 125,
+      "bear_market_days": 94
+    },
+    "failure_definition": {
+      "threshold_pct": 5.0,
+      "description": "Break-even failure: price fails to rise 5% above the highest peak after breakout."
+    },
+    "failure_rate": {
+      "at_5pct_breakeven_bull": 5,
+      "at_5pct_breakeven_bear": 9,
+      "notes": "Only break-even (5%) value extracted from PDF review; full curve not captured. Reproducer should query chapter 48 for 10%/15%/20%."
+    },
+    "average_rise": {
+      "bull_market_pct": 41,
+      "bear_market_pct": 22
+    },
+    "lookahead_bars": 110,
+    "lookahead_range_days": "94-125",
+    "lookahead_note": "Median ~110 days. Slower than three falling peaks (35d) — bullish reversals take longer."
+  },
+
+  "performance_statistics": {
+    "average_rise_pct_overall": 32,
+    "failure_rate_5pct_breakeven_overall": 7,
+    "time_to_ultimate_high_days_median": 110,
+    "best_market": "bull (41% rise, 5% BE failure — strong bullish reversal, HIGH avg rise)",
+    "comparison_vs_three_falling_peaks": "Slower (110d vs 35d), larger avg move in bull market (41% vs 17%)."
+  },
+
+  "notes": [
+    "PDF source: Encyclopedia of Chart Patterns (2nd ed.), chapter 48, p721-740.",
+    "Legacy digitized file three_rising_valleys_digitized.json has detection_signature but post_breakout_measurement ONLY has lookahead_bars: 252 — NO failure rate, sample, target. This file fills that gap.",
+    "IMPORTANT: lookahead in PDF is 110 days, NOT 252 — legacy file's default is wrong by 2.3x.",
+    "Three Rising Valleys has one of the HIGHEST average rises in bull market (41%) — comparable to High Tight Flags."
+  ],
+
+  "pdf_review_source": {
+    "file": "PDF_REVIEW_20260812.md",
+    "section": "2.3 (Bổ sung) three_rising_valleys",
+    "pdf_book": "ECP (Encyclopedia of Chart Patterns, 2nd ed.)",
+    "chapter": "48",
+    "pages_checked": "721-740 (20 pages)",
+    "tables": ["Table 48.2", "Table 48.3"]
+  }
+}

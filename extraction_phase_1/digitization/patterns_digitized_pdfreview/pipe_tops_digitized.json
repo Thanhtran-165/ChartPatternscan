@@ -1,0 +1,75 @@
+{
+  "pattern_name": "Pipe Tops",
+  "aliases": ["pipe top", "pipe tops", "two pipe tops"],
+  "pattern_type": "reversal_bearish",
+  "digitization_version": "1.0.0",
+  "digitization_source": "PDF_REVIEW_20260812 (Bulkowski ECP, chapter 36)",
+
+  "sample_size": {
+    "bull_market": 412,
+    "bear_market": 418,
+    "total": 830,
+    "chart_type": "weekly",
+    "notes": "Sampled on weekly chart (same as Pipe Bottoms), not daily."
+  },
+
+  "post_breakout_measurement": {
+    "target_calculation": {
+      "method": "measure_rule_lowest_low",
+      "description": "Compute formation height from highest high to lowest low of the pipe; project height downward from breakout point.",
+      "formula": "target_price = breakout_price - (highest_high - lowest_low)",
+      "pct_meeting_target_bull": 70,
+      "pct_meeting_target_bear": 68
+    },
+    "ultimate_low_method": {
+      "definition": "Lowest price after downward breakout before 20% reversal",
+      "bull_market_days": 75,
+      "bear_market_days": 54
+    },
+    "failure_definition": {
+      "threshold_pct": 5.0,
+      "description": "Break-even failure: price fails to decline 5% below breakout (i.e., rises back above pipe)."
+    },
+    "failure_rate": {
+      "at_5pct_breakeven_bull": 11,
+      "at_5pct_breakeven_bear": 2,
+      "at_10pct_bull": 25,
+      "at_10pct_bear": 13,
+      "at_15pct_bull": 44,
+      "at_15pct_bear": 29,
+      "at_20pct_bull": 59,
+      "at_20pct_bear": 43
+    },
+    "average_decline": {
+      "bull_market_pct": 20,
+      "bear_market_pct": 27
+    },
+    "lookahead_bars": 65,
+    "lookahead_range_days": "54-75",
+    "lookahead_note": "Median of PDF 'days to ultimate low' = ~65 days; bull 75, bear 54."
+  },
+
+  "performance_statistics": {
+    "average_decline_pct_overall": 23,
+    "failure_rate_5pct_breakeven_overall": 7,
+    "time_to_ultimate_low_days_median": 65,
+    "pct_meeting_measure_rule_overall": 69,
+    "chart_type": "weekly"
+  },
+
+  "notes": [
+    "PDF source: Encyclopedia of Chart Patterns (2nd ed.), chapter 36, Table 36.2/36.3.",
+    "Sample is on WEEKLY chart (consistent with Pipe Bottoms) — not daily. Failure rate at break-even (5%) is very low in bear market (2%).",
+    "BE failure 11%/2% (bull/bear) = the LOWEST in bear market among pipe-style patterns; this is a strong bearish reversal signal.",
+    "Digitized file does NOT exist for pipe_tops in the legacy folder (only pipe_bottoms_digitized.json). This file is the first spec for pipe_tops."
+  ],
+
+  "pdf_review_source": {
+    "file": "PDF_REVIEW_20260812.md",
+    "section": "2.1 #3 pipe_tops",
+    "pdf_book": "ECP (Encyclopedia of Chart Patterns, 2nd ed.)",
+    "chapter": "36",
+    "pages_checked": "573-585 (13 pages)",
+    "tables": ["Table 36.2", "Table 36.3"]
+  }
+}

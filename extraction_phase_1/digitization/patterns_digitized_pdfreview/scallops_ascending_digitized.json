@@ -1,0 +1,82 @@
+{
+  "pattern_name": "Scallops Ascending (4 variants)",
+  "aliases": ["ascending scallop", "scallop ascending", "scallop asc"],
+  "pattern_type": "continuation_or_reversal_both",
+  "digitization_version": "1.0.0",
+  "digitization_source": "PDF_REVIEW_20260812 (Bulkowski ECP, chapter 38)",
+
+  "sample_size": {
+    "total": 1380,
+    "variants": {
+      "bull_upward_breakout": 736,
+      "bear_upward_breakout": 365,
+      "bull_downward_breakout": 161,
+      "bear_downward_breakout": 118
+    },
+    "notes": "Sample covers 4 variants (UA/UD x Bull/Bear). Ascending scallop has a rising left side."
+  },
+
+  "post_breakout_measurement": {
+    "target_calculation": {
+      "method": "pattern_height",
+      "description": "Compute scallop height (peak - start); project from breakout point in breakout direction.",
+      "formula": "target_price = breakout_price +/- scallop_height"
+    },
+    "ultimate_high_method": {
+      "definition": "Highest price after upward breakout before 20% reversal",
+      "bull_UA_days": 162,
+      "bear_UA_days": 68
+    },
+    "ultimate_low_method": {
+      "definition": "Lowest price after downward breakout before 20% reversal",
+      "bull_UD_days": 44,
+      "bear_UD_days": 35
+    },
+    "failure_definition": {
+      "threshold_pct": 5.0,
+      "description": "Break-even failure: price fails to move 5% in breakout direction."
+    },
+    "failure_rate_at_5pct_breakeven": {
+      "bull_UA": 10,
+      "bear_UA": 16,
+      "bull_UD": 27,
+      "bear_UD": 14
+    },
+    "average_move_pct": {
+      "bull_UA_rise": 31,
+      "bear_UA_rise": 19,
+      "bull_UD_decline": -14,
+      "bear_UD_decline": -19
+    },
+    "lookahead_bars": 68,
+    "lookahead_range_days": "35-162",
+    "lookahead_note": "Median ~68 days. Wide range: bull/UA longest (162), bear/UD shortest (35). Use per-variant if available."
+  },
+
+  "performance_statistics": {
+    "variants_breakdown": {
+      "bull_UA": {"sample": 736, "avg_rise_pct": 31, "be_failure_pct": 10, "ultimate_days": 162},
+      "bear_UA": {"sample": 365, "avg_rise_pct": 19, "be_failure_pct": 16, "ultimate_days": 68},
+      "bull_UD": {"sample": 161, "avg_decline_pct": -14, "be_failure_pct": 27, "ultimate_days": 44},
+      "bear_UD": {"sample": 118, "avg_decline_pct": -19, "be_failure_pct": 14, "ultimate_days": 35}
+    },
+    "best_performer": "bull/UA (31% rise, only 10% BE failure)",
+    "worst_performer": "bull/UD (27% BE failure — descending breakout in bull market is unreliable)"
+  },
+
+  "notes": [
+    "PDF source: Encyclopedia of Chart Patterns (2nd ed.), chapter 38, p647-676.",
+    "Legacy digitized file scallop_ascending_descending_digitized.json groups all 4 scallop variants together with NO failure_rate / sample_size / target — this file fills that gap for Ascending variants.",
+    "Critical: bull/UD (downward breakout in bull market) has 27% BE failure — very unreliable. Most other variants are continuation (UA) and reliable.",
+    "Ascending scallop's J-shape has the OPENING on the lower-left, HANDLE on the upper-right."
+  ],
+
+  "pdf_review_source": {
+    "file": "PDF_REVIEW_20260812.md",
+    "section": "2.2 #8 scallops_ascending",
+    "pdf_book": "ECP (Encyclopedia of Chart Patterns, 2nd ed.)",
+    "chapter": "38",
+    "pages_checked": "647-676 (30 pages)",
+    "tables": ["Table 38.2", "Table 38.3"]
+  }
+}

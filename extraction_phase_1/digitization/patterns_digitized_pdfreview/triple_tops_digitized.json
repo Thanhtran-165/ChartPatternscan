@@ -1,0 +1,73 @@
+{
+  "pattern_name": "Triple Tops",
+  "aliases": ["triple top", "triple tops"],
+  "pattern_type": "reversal_bearish",
+  "digitization_version": "1.0.0",
+  "digitization_source": "PDF_REVIEW_20260812 (Bulkowski ECP, chapter 51)",
+
+  "sample_size": {
+    "bull_market": 278,
+    "bear_market": 349,
+    "total": 627,
+    "notes": "Bear-market sample larger — typical for bearish reversal patterns."
+  },
+
+  "post_breakout_measurement": {
+    "target_calculation": {
+      "method": "pattern_height",
+      "description": "Target = lowest trough (between tops) - (top - trough). Project downward from breakout below the lowest trough.",
+      "formula": "target_price = lowest_trough_price - (highest_top_price - lowest_trough_price)"
+    },
+    "ultimate_low_method": {
+      "definition": "Lowest price after downward breakout before 20% reversal",
+      "bull_market_days": 60,
+      "bear_market_days": 42
+    },
+    "failure_definition": {
+      "threshold_pct": 5.0,
+      "description": "Break-even failure: price fails to decline 5% below breakout (i.e., rises back above the lowest trough)."
+    },
+    "failure_rate": {
+      "at_5pct_breakeven_bull": 10,
+      "at_5pct_breakeven_bear": 5,
+      "at_10pct_bull": 29,
+      "at_10pct_bear": 17,
+      "at_15pct_bull": 49,
+      "at_15pct_bear": 31,
+      "at_20pct_bull": 63,
+      "at_20pct_bear": 46,
+      "source_table": "Table 51.3"
+    },
+    "average_decline": {
+      "bull_market_pct": 19,
+      "bear_market_pct": 24
+    },
+    "lookahead_bars": 51,
+    "lookahead_range_days": "42-60",
+    "lookahead_note": "Median ~51 days. Triple tops are FASTER than triple bottoms (51d vs 123d) — bearish reversals resolve quicker."
+  },
+
+  "performance_statistics": {
+    "average_decline_pct_overall": 22,
+    "failure_rate_5pct_breakeven_overall": 7,
+    "time_to_ultimate_low_days_median": 51,
+    "best_market": "bear (24% decline, 5% BE failure — strong bearish reversal)",
+    "comparison_vs_triple_bottom": "Faster (51d vs 123d), smaller avg move (22% vs 30%), but lower BE failure in bear market."
+  },
+
+  "notes": [
+    "PDF source: Encyclopedia of Chart Patterns (2nd ed.), chapter 51, p802-820, Table 51.2/51.3.",
+    "Legacy digitized file triple_bottoms_tops_digitized.json has WRONG numbers (failure_rate 6/4, average_decline 19% — close but BE failure 6 should be 10 for bull). PDF: BE failure 10/5, average decline 19/24.",
+    "Triple top in bull market is LESS RELIABLE than in bear market (10% vs 5% BE failure) — bull market resilience.",
+    "Full failure-rate curve (5%, 10%, 15%, 20%) available in PDF Table 51.3 — see failure_rate object above."
+  ],
+
+  "pdf_review_source": {
+    "file": "PDF_REVIEW_20260812.md",
+    "section": "2.3 (Bổ sung) triple_tops",
+    "pdf_book": "ECP (Encyclopedia of Chart Patterns, 2nd ed.)",
+    "chapter": "51",
+    "pages_checked": "802-820 (19 pages)",
+    "tables": ["Table 51.2", "Table 51.3"]
+  }
+}

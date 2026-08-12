@@ -1,0 +1,82 @@
+{
+  "pattern_name": "Scallops Descending (4 variants)",
+  "aliases": ["descending scallop", "scallop descending", "scallop desc", "inverted scallop"],
+  "pattern_type": "continuation_or_reversal_both",
+  "digitization_version": "1.0.0",
+  "digitization_source": "PDF_REVIEW_20260812 (Bulkowski ECP, chapter 39)",
+
+  "sample_size": {
+    "total": 1104,
+    "variants": {
+      "bull_upward_breakout": 232,
+      "bear_upward_breakout": 142,
+      "bull_downward_breakout": 457,
+      "bear_downward_breakout": 273
+    },
+    "notes": "Sample covers 4 variants (UA/UD x Bull/Bear). Descending scallop has a falling left side."
+  },
+
+  "post_breakout_measurement": {
+    "target_calculation": {
+      "method": "pattern_height",
+      "description": "Compute scallop height; project from breakout point in breakout direction.",
+      "formula": "target_price = breakout_price +/- scallop_height"
+    },
+    "ultimate_high_method": {
+      "definition": "Highest price after upward breakout before 20% reversal",
+      "bull_UA_days": 106,
+      "bear_UA_days": 70
+    },
+    "ultimate_low_method": {
+      "definition": "Lowest price after downward breakout before 20% reversal",
+      "bull_UD_days": 47,
+      "bear_UD_days": 30
+    },
+    "failure_definition": {
+      "threshold_pct": 5.0,
+      "description": "Break-even failure: price fails to move 5% in breakout direction."
+    },
+    "failure_rate_at_5pct_breakeven": {
+      "bull_UA": 22,
+      "bear_UA": 20,
+      "bull_UD": 15,
+      "bear_UD": 8
+    },
+    "average_move_pct": {
+      "bull_UA_rise": 22,
+      "bear_UA_rise": 20,
+      "bull_UD_decline": -17,
+      "bear_UD_decline": -23
+    },
+    "lookahead_bars": 59,
+    "lookahead_range_days": "30-106",
+    "lookahead_note": "Median ~59 days. Descending scallops are FASTER than ascending (shorter time to ultimate)."
+  },
+
+  "performance_statistics": {
+    "variants_breakdown": {
+      "bull_UA": {"sample": 232, "avg_rise_pct": 22, "be_failure_pct": 22, "ultimate_days": 106},
+      "bear_UA": {"sample": 142, "avg_rise_pct": 20, "be_failure_pct": 20, "ultimate_days": 70},
+      "bull_UD": {"sample": 457, "avg_decline_pct": -17, "be_failure_pct": 15, "ultimate_days": 47},
+      "bear_UD": {"sample": 273, "avg_decline_pct": -23, "be_failure_pct": 8, "ultimate_days": 30}
+    },
+    "best_performer": "bear/UD (23% decline, only 8% BE failure — strong bearish continuation)",
+    "worst_performer": "bull/UA (22% BE failure — upward breakout of descending scallop in bull market is weak)"
+  },
+
+  "notes": [
+    "PDF source: Encyclopedia of Chart Patterns (2nd ed.), chapter 39, p677-706.",
+    "Legacy digitized file scallop_ascending_descending_digitized.json groups all 4 scallop variants together with NO failure_rate / sample_size — this file fills that gap for Descending variants.",
+    "Critical: descending scallops in BEAR market with DOWNWARD breakout (bear/UD) are the MOST RELIABLE (8% BE failure, 23% decline) — this is a bearish continuation pattern.",
+    "Inverted variants (mirror image about horizontal axis) exist but Bulkowski groups them under same statistics — UA/UD variant captures them."
+  ],
+
+  "pdf_review_source": {
+    "file": "PDF_REVIEW_20260812.md",
+    "section": "2.2 #8 scallops_ascending (followed by descending)",
+    "pdf_book": "ECP (Encyclopedia of Chart Patterns, 2nd ed.)",
+    "chapter": "39",
+    "pages_checked": "677-706 (30 pages)",
+    "tables": ["Table 39.2", "Table 39.3"]
+  }
+}

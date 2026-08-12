@@ -1,0 +1,67 @@
+{
+  "pattern_name": "Three Falling Peaks",
+  "aliases": ["three falling peaks", "3 falling peaks", "descending three peaks"],
+  "pattern_type": "reversal_bearish",
+  "digitization_version": "1.0.0",
+  "digitization_source": "PDF_REVIEW_20260812 (Bulkowski ECP, chapter 47)",
+
+  "sample_size": {
+    "bull_market": 321,
+    "bear_market": 206,
+    "total": 527,
+    "notes": "Forms after an uptrend; bearish reversal signal on breakdown."
+  },
+
+  "post_breakout_measurement": {
+    "target_calculation": {
+      "method": "lowest_valley_projection",
+      "description": "Target = lowest valley - (highest peak - lowest valley). Project downward from breakdown below the lowest valley.",
+      "formula": "target_price = lowest_valley_price - (highest_peak_price - lowest_valley_price)"
+    },
+    "ultimate_low_method": {
+      "definition": "Lowest price after downward breakout before 20% reversal",
+      "bull_market_days": 36,
+      "bear_market_days": 34
+    },
+    "failure_definition": {
+      "threshold_pct": 5.0,
+      "description": "Break-even failure: price fails to decline 5% below the lowest valley after breakdown."
+    },
+    "failure_rate": {
+      "at_5pct_breakeven_bull": 12,
+      "at_5pct_breakeven_bear": 4,
+      "notes": "Only break-even (5%) value extracted from PDF review; full curve not captured. Reproducer should query chapter 47 for 10%/15%/20%."
+    },
+    "average_decline": {
+      "bull_market_pct": 17,
+      "bear_market_pct": 24
+    },
+    "lookahead_bars": 35,
+    "lookahead_range_days": "34-36",
+    "lookahead_note": "Very tight range — both markets resolve quickly (~35 days). This is a FAST pattern."
+  },
+
+  "performance_statistics": {
+    "average_decline_pct_overall": 21,
+    "failure_rate_5pct_breakeven_overall": 8,
+    "time_to_ultimate_low_days_median": 35,
+    "best_market": "bear (24% decline, 4% BE failure — strong bearish reversal)",
+    "speed_characteristic": "One of the FASTEST reversal patterns (~35 days to ultimate low vs 51+ for triple tops)."
+  },
+
+  "notes": [
+    "PDF source: Encyclopedia of Chart Patterns (2nd ed.), chapter 47, p707-720.",
+    "Legacy digitized file three_falling_peaks_digitized.json has detection_signature but post_breakout_measurement ONLY has lookahead_bars: 252 — NO failure rate, sample, target. This file fills that gap.",
+    "IMPORTANT: lookahead in PDF is 35 days, NOT 252 — the legacy file's 252 default is wrong by 7x.",
+    "Three Falling Peaks is faster and slightly less reliable than Triple Tops in bull market (12% vs 10% BE failure)."
+  ],
+
+  "pdf_review_source": {
+    "file": "PDF_REVIEW_20260812.md",
+    "section": "2.3 (Bổ sung) three_falling_peaks",
+    "pdf_book": "ECP (Encyclopedia of Chart Patterns, 2nd ed.)",
+    "chapter": "47",
+    "pages_checked": "707-720 (14 pages)",
+    "tables": ["Table 47.2", "Table 47.3"]
+  }
+}

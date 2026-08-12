@@ -1,0 +1,79 @@
+{
+  "pattern_name": "High Tight Flags",
+  "aliases": ["high tight flag", "HTF", "high tight flagpole"],
+  "pattern_type": "continuation_bullish",
+  "digitization_version": "1.0.0",
+  "digitization_source": "PDF_REVIEW_20260812 (Bulkowski ECP, chapter 22)",
+
+  "sample_size": {
+    "bull_market": 253,
+    "bear_market": 54,
+    "total": 307,
+    "notes": "Small sample — this is a RARE pattern, but the most powerful continuation signal in Bulkowski's catalog."
+  },
+
+  "post_breakout_measurement": {
+    "target_calculation": {
+      "method": "flagpole_height",
+      "description": "Target = breakout + flagpole height. The flagpole is the near-vertical 100%+ rise preceding the tight consolidation.",
+      "formula": "target_price = breakout_price + flagpole_height",
+      "pct_meeting_target_bull": 90,
+      "pct_meeting_target_bear": 91
+    },
+    "ultimate_high_method": {
+      "definition": "Highest price after upward breakout before 20% reversal",
+      "bull_market_days": 39,
+      "bear_market_days": 25
+    },
+    "failure_definition": {
+      "threshold_pct": 5.0,
+      "description": "Break-even failure: price fails to rise 5% above the flag consolidation high after breakout."
+    },
+    "failure_rate": {
+      "at_5pct_breakeven_bull": 0,
+      "at_5pct_breakeven_bear": 0,
+      "notes": "ZERO percent break-even failure in BOTH markets — this is UNPRECEDENTED in Bulkowski's statistics. HTF is the most reliable bullish continuation pattern."
+    },
+    "average_rise": {
+      "bull_market_pct": 69,
+      "bear_market_pct": 42
+    },
+    "lookahead_bars": 32,
+    "lookahead_range_days": "25-39",
+    "lookahead_note": "Median ~32 days. HTF resolves FAST (within 1-2 months)."
+  },
+
+  "performance_statistics": {
+    "average_rise_pct_overall": 56,
+    "failure_rate_5pct_breakeven_overall": 0,
+    "time_to_ultimate_high_days_median": 32,
+    "pct_meeting_measure_rule_overall": 90,
+    "busted_pattern_performance": "N/A — Bulkowski could not find busted HTF examples in the dataset.",
+    "rank_in_bulkowski_catalog": "STRONGEST performer by failure rate (0%); top 3 by average rise."
+  },
+
+  "detection_signature_hint": {
+    "flagpole": "Near-vertical rise of 100%+ over 1-2 months (often 90-200% in 8 weeks).",
+    "consolidation": "Tight sideways consolidation for 4-5 weeks, max 20-25% retracement of flagpole.",
+    "volume": "Volume DRIES UP during consolidation, then spikes on breakout.",
+    "key_checklist": ["prior_flagpole_100pct_plus", "tight_consolidation_4-5_weeks", "volume_dryup", "breakout_above_flag_high"]
+  },
+
+  "notes": [
+    "PDF source: Encyclopedia of Chart Patterns (2nd ed.), chapter 22, p373-397, Table 22.2.",
+    "CRITICAL: HTF has 0% break-even failure in BOTH markets — UNPRECEDENTED. This is the MOST RELIABLE bullish continuation pattern in Bulkowski's catalog.",
+    "Legacy digitized folder only has flags_digitized.json (general bull/bear flags) — NO specific high_tight_flags spec. This file is the FIRST spec for HTF.",
+    "Sample size is small (307) because HTF is RARE — only forms after explosive 100%+ runs (e.g., biotech breakouts, meme stocks).",
+    "Detection requires explicit flagpole detection — must NOT trigger on regular flags. Use flagpole_height_pct >= 100 as primary filter.",
+    "Detector in legacy folder uses temporal lookahead=120 as placeholder — PDF says 32 days actual. Replace with this spec's value."
+  ],
+
+  "pdf_review_source": {
+    "file": "PDF_REVIEW_20260812.md",
+    "section": "2.3 #11 high_tight_flags",
+    "pdf_book": "ECP (Encyclopedia of Chart Patterns, 2nd ed.)",
+    "chapter": "22",
+    "pages_checked": "373-397 (25 pages)",
+    "tables": ["Table 22.2"]
+  }
+}

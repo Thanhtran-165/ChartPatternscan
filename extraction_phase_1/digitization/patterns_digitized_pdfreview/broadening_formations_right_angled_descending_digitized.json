@@ -1,0 +1,77 @@
+{
+  "pattern_name": "Broadening Formations, Right-Angled and Descending",
+  "aliases": ["right-angled descending broadening", "descending broadening", "diffusion top/bottom descending"],
+  "pattern_type": "continuation_or_reversal_both",
+  "digitization_version": "1.0.0",
+  "digitization_source": "PDF_REVIEW_20260812 (Bulkowski ECP, chapter 7)",
+
+  "sample_size": {
+    "total": 274,
+    "variants": {
+      "bull_upward_breakout": 104,
+      "bear_upward_breakout": 36,
+      "bull_downward_breakout": 87,
+      "bear_downward_breakout": 47
+    },
+    "notes": "Right-angled descending: horizontal upper boundary + falling lower boundary (lows descending)."
+  },
+
+  "post_breakout_measurement": {
+    "target_calculation": {
+      "method": "pattern_height",
+      "description": "Compute formation height (highest high - lowest low at breakout point); project from breakout in breakout direction.",
+      "formula": "target_price = breakout_price +/- formation_height"
+    },
+    "ultimate_high_method": {
+      "definition": "Highest price after upward breakout before 20% reversal",
+      "see_table": "Table 7.4"
+    },
+    "ultimate_low_method": {
+      "definition": "Lowest price after downward breakout before 20% reversal",
+      "see_table": "Table 7.4"
+    },
+    "failure_definition": {
+      "threshold_pct": 5.0,
+      "description": "Break-even failure: price fails to move 5% in breakout direction. See Table 7.3 for full curve."
+    },
+    "failure_rate": {
+      "see_table": "Table 7.3 (full curve 5%-35%)",
+      "special_ratio_note": "Bulkowski notes for UD: bull BE failure is approximately 3x bear BE failure (bull market more resilient to downward breakout).",
+      "notes": "Full failure-rate curve in Table 7.3 — values not extracted verbatim into this spec; reproducer should query PDF page 75-90."
+    },
+    "average_move_pct": {
+      "bull_UA_rise": 28,
+      "bear_UA_rise": 23,
+      "bull_UD_decline": -15,
+      "bear_UD_decline": -23
+    },
+    "lookahead_bars": 252,
+    "lookahead_range_days": "TBD (PDF Table 7.4 not yet extracted verbatim)",
+    "lookahead_note": "Lookahead inherited from legacy default 252 bars (PDF Table 7.4 not yet extracted verbatim). Reproducer should run pdftotext -f 75 -l 90 for actual days to fill lookahead_range_days."
+  },
+
+  "performance_statistics": {
+    "variants_breakdown": {
+      "bull_UA": {"sample": 104, "avg_rise_pct": 28},
+      "bear_UA": {"sample": 36, "avg_rise_pct": 23},
+      "bull_UD": {"sample": 87, "avg_decline_pct": -15},
+      "bear_UD": {"sample": 47, "avg_decline_pct": -23}
+    },
+    "notes": "More balanced sample distribution than ascending variant. Bear/UD is the strongest mover (23% decline)."
+  },
+
+  "notes": [
+    "PDF source: Encyclopedia of Chart Patterns (2nd ed.), chapter 7, p75-90.",
+    "Legacy digitized file broadening_formations_right_angled_descending_digitized.json has detection_signature but post_breakout_measurement ONLY has lookahead_bars: 252 — NO failure rate, sample, target. This file fills that gap.",
+    "Bulkowski's full failure-rate curve (Table 7.3) and days-to-ultimate (Table 7.4) need reproducer to extract verbatim — page 75-90."
+  ],
+
+  "pdf_review_source": {
+    "file": "PDF_REVIEW_20260812.md",
+    "section": "2.3 #12b broadening_formations_right_angled (descending)",
+    "pdf_book": "ECP (Encyclopedia of Chart Patterns, 2nd ed.)",
+    "chapter": "7",
+    "pages_checked": "75-90 (16 pages)",
+    "tables": ["Table 7.2", "Table 7.3", "Table 7.4"]
+  }
+}

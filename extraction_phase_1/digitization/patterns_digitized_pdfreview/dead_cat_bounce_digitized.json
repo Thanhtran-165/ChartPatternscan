@@ -1,0 +1,104 @@
+{
+  "pattern_name": "Dead Cat Bounce",
+  "aliases": ["dead cat bounce", "DCB", "downward exhaustion bounce"],
+  "pattern_type": "event_driven_continuation_bearish",
+  "digitization_version": "1.0.0",
+  "digitization_source": "PDF_REVIEW_20260812 (Bulkowski ECP, chapter 54)",
+
+  "sample_size": {
+    "bull_market": 454,
+    "bear_market": 222,
+    "total": 676,
+    "reversal_vs_continuation": {
+      "bull_reversal": 237,
+      "bull_continuation": 217,
+      "bear_reversal": 115,
+      "bear_continuation": 107
+    },
+    "notes": "Mixed R/C profile — NOT a pure reversal pattern. Often continuation of the prior decline."
+  },
+
+  "event_structure": {
+    "pattern_class": "event-driven (NOT a pure price-formation pattern)",
+    "three_phases": [
+      {
+        "phase": 1,
+        "name": "event_decline",
+        "description": "Sharp price drop on news/event (earnings miss, guidance cut, sector shock).",
+        "see_table": "Table 54.3 (event decline statistics)"
+      },
+      {
+        "phase": 2,
+        "name": "bounce",
+        "description": "Short-lived rebound as shorts cover and dip buyers enter. Typically 1-7 trading days.",
+        "bounce_pct_bull": 28,
+        "bounce_pct_bear": 35,
+        "see_table": "Table 54.4 (bounce statistics)"
+      },
+      {
+        "phase": 3,
+        "name": "postbounce_decline",
+        "description": "Resume decline — usually exceeds the bounce and continues lower for weeks/months.",
+        "postbounce_decline_pct_bull": 30,
+        "postbounce_decline_pct_bear": 40,
+        "see_table": "Table 54.5 (postbounce statistics)"
+      }
+    ]
+  },
+
+  "post_breakout_measurement": {
+    "target_calculation": {
+      "method": "event_decline_extension",
+      "description": "Target = bounce high - (event decline height). Project downward from the bounce peak.",
+      "formula": "target_price = bounce_high_price - (pre_event_price - event_low_price)",
+      "notes": "This is NOT the same as classic chart pattern measure rule. DCB target depends on the EVENT magnitude, not pattern geometry."
+    },
+    "failure_definition": {
+      "threshold_pct": null,
+      "description": "DCB has NO traditional break-even failure rate. Failure is defined as: postbounce decline does NOT make a new low below event_low. Quantify as pct of cases where postbounce decline < bounce high."
+    },
+    "lookahead_bars": null,
+    "lookahead_phases": {
+      "bounce_window_days": "1-7",
+      "postbounce_window_months": "~6",
+      "notes": "Two distinct lookahead windows — pipeline must track them separately."
+    },
+    "average_move_pct": {
+      "bounce_bull": 28,
+      "bounce_bear": 35,
+      "postbounce_decline_bull": -30,
+      "postbounce_decline_bear": -40
+    }
+  },
+
+  "performance_statistics": {
+    "tables_in_pdf": [
+      "Table 54.2 (general statistics)",
+      "Table 54.3 (event decline)",
+      "Table 54.4 (bounce)",
+      "Table 54.5 (postbounce decline)",
+      "Table 54.6 (frequency by time)",
+      "Table 54.7 (frequency by price)",
+      "Table 54.8 (tactics)"
+    ],
+    "best_market": "bear (40% postbounce decline — strongest continuation)",
+    "reliability_note": "Bounce is temporary; treat as SHORT signal opportunity, not long."
+  },
+
+  "notes": [
+    "PDF source: Encyclopedia of Chart Patterns (2nd ed.), chapter 54, p852-887 (36 pages — large chapter).",
+    "CRITICAL: Dead Cat Bounce is EVENT-DRIVEN, not a price-formation pattern. It CANNOT use the same measure rule / failure framework as classical chart patterns (head & shoulders, triple tops, etc.).",
+    "Legacy digitized folder has NO file dead_cat_bounce_digitized.json — detector uses temporal lookahead=120 as placeholder. This file is the FIRST spec for DCB.",
+    "Pipeline MUST track 3 phases separately: event → bounce (1-7d) → postbounce decline (~6mo). Using a single lookahead_bars value is INCORRECT.",
+    "Bulkowski provides 7 statistical tables (54.2 through 54.8) — reproducer should extract all for full picture."
+  ],
+
+  "pdf_review_source": {
+    "file": "PDF_REVIEW_20260812.md",
+    "section": "2.3 #10 dead_cat_bounce",
+    "pdf_book": "ECP (Encyclopedia of Chart Patterns, 2nd ed.)",
+    "chapter": "54",
+    "pages_checked": "852-887 (36 pages)",
+    "tables": ["Table 54.2", "Table 54.3", "Table 54.4", "Table 54.5", "Table 54.6", "Table 54.7", "Table 54.8"]
+  }
+}
