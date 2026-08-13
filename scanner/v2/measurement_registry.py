@@ -59,11 +59,18 @@ _VARIANT_LOOKAHEAD: Dict[str, Dict[str, Any]] = {
     # digitized key biến thể: rounding average_days_bottom 84 / top 63
     "rounding_bottoms": {"lookahead_bull": 84, "lookahead_bear": None, "source": "digitized", "note": "digitized average_days_bottom = 84"},
     "rounding_tops": {"lookahead_bull": 63, "lookahead_bear": None, "source": "digitized", "note": "digitized average_days_top = 63"},
-    # digitized key biến thể: gaps breakaway 42 / continuation 21 / exhaustion 5
-    "breakaway_gaps": {"lookahead_bull": 42, "lookahead_bear": None, "source": "digitized", "note": "digitized breakaway_average_days = 42"},
-    "continuation_gaps": {"lookahead_bull": 21, "lookahead_bear": None, "source": "digitized", "note": "digitized continuation_average_days = 21"},
-    "exhaustion_gaps": {"lookahead_bull": 5, "lookahead_bear": None, "source": "digitized", "note": "digitized exhaustion_average_days = 5"},
-    "area_gaps": {"lookahead_bull": 63, "lookahead_bear": None, "source": "digitized", "note": "area_gaps không có số riêng → lookahead_bars 63"},
+    # M5 PDF 13/08 (family_gaps_20260813.md): gaps KHÔNG có "days to ultimate" —
+    # sách đo "Average time to close the gap" (thời gian gap bị lấp). Số digitized
+    # (42/21/5/63) là BỊA. Dùng time-to-close làm lookahead đo lường (nguồn pdf).
+    # Thứ tự cột sách: bull/Up · bear/Up · bull/Down · bear/Down → bull = Bull/Up, bear = Bear/Down.
+    "breakaway_gaps": {"lookahead_bull": 136, "lookahead_bear": 111, "source": "pdf",
+        "note": "M5 PDF ch23: avg time to close 136/61/168/111 — KHÔNG có days-to-ultimate (BỊA digitized)"},
+    "continuation_gaps": {"lookahead_bull": 98, "lookahead_bear": 91, "source": "pdf",
+        "note": "M5 PDF ch23: avg time to close 98/43/77/91 — KHÔNG có days-to-ultimate (BỊA digitized)"},
+    "exhaustion_gaps": {"lookahead_bull": 9, "lookahead_bear": 10, "source": "pdf",
+        "note": "M5 PDF ch23: avg time to close 9/7/14/10 — KHÔNG có days-to-ultimate (BỊA digitized)"},
+    "area_gaps": {"lookahead_bull": 3, "lookahead_bear": 3, "source": "pdf",
+        "note": "M5 PDF ch23: avg time to close 3d (cả 4 tổ hợp) — KHÔNG có days-to-ultimate (BỊA digitized)"},
     # M5 PDF 13/08 (docs/project/pdf_review/m5/family_triangles_20260813.md):
     # days to ultimate theo 4 tổ hợp Bull/UA · Bear/UA · Bull/UD · Bear/UD.
     # Quy ước: lookahead_bull = Bull/UA (dòng đầu bảng sách), bear = Bear/UD (dòng cuối).
@@ -112,18 +119,120 @@ _PDF_EXTRAS: Dict[str, Dict[str, Any]] = {
             "symmetrical thêm biến thể halfway point."
         ),
     },
+    "double_tops": {
+        "target_rule": "lowest_low − (highest_peak − lowest_low_between_tops) / 2  [CHIA ĐÔI height]",
+        "source_file": "docs/project/pdf_review/m5/family_doubles_20260813.md",
+        "note": (
+            "M5 PDF ch.17–20: measure rule CHIA ĐÔI height — digitized thiếu /2 → target tính gấp đôi thực tế "
+            "(lỗi critical). BE bull 8–14% / bear 2–11%; %target 68–79%."
+        ),
+    },
+    "bump_and_run_reversal": {
+        "target_rule": (
+            "Tops (ch.8): breakout − lead_in_height [lead-in height = HH→trendline đo PHẦN TƯ ĐẦU, "
+            "KHÔNG phải bump height] · Bottoms (ch.7): target = highest high trong pattern"
+        ),
+        "source_file": "docs/project/pdf_review/m5/family_bump_and_run_20260813.md",
+        "note": (
+            "M5 PDF ch.7–8: digitized dùng bump_peak−lead_in_start (SAI dimension — bump height >> lead-in height). "
+            "BE Tops 5/1%; %target Tops 78/90% (cao nhất nhóm bearish)."
+        ),
+    },
+    "wedges_ascending_descending": {
+        "target_rule": (
+            "Falling UA = HH trong wedge · Falling UD = breakout − height · "
+            "Rising UD = LL trong wedge · Rising UA = breakout + (HH − LL)  [BẤT XỨNG]"
+        ),
+        "source_file": "docs/project/pdf_review/m5/family_wedges_20260813.md",
+        "note": (
+            "M5 PDF ch.52–53: digitized dùng breakout±height đối xứng — SAI cho chiều reversal "
+            "(target reversal = cực trị mẫu hình). %target falling 70/60/30/36 · rising 58/33/46/40. "
+            "BE falling 11/11/15/6 · rising 8/14/24/15."
+        ),
+    },
+    "islands": {
+        "target_rule": (
+            "Reversals (ch.30): breakout ± formation height (HH−LL trong island) · "
+            "Islands Long (ch.31): breakout ± HALF formation height"
+        ),
+        "source_file": "docs/project/pdf_review/m5/family_islands_20260813.md",
+        "note": (
+            "M5 PDF ch.30–31: digitized dùng gap_height — SAI concept (PDF = formation height). "
+            "BE Reversals 18/10/17/5% · Long 11/4/5/2% (mốc 5%). %target Reversals 62/46/69/49 · Long 82/72/78/76. "
+            "Sample 917 + 920."
+        ),
+    },
+    "rounding_bottoms_tops": {
+        "target_rule": (
+            "RdB: right_saucer_lip + (right_saucer_lip − lowest_low) · "
+            "RdT-UA: formation_high + (formation_high − right_rim_low) · "
+            "RdT-UD: right_rim_low − (formation_high − right_rim_low)  [3 công thức KHÁC nhau]"
+        ),
+        "source_file": "docs/project/pdf_review/m5/family_rounding_20260813.md",
+        "note": (
+            "M5 PDF ch.39–40: digitized dùng generic breakout±height — SAI dimension (RdB base = right saucer lip, "
+            "RdT base = formation high). %target RdB 57/53 · RdT-UA 61/35 · RdT-UD CHỈ 15/24% "
+            "(measure rule gần vô dụng chiều UD). BE RdB 5/5 · RdT 9–16%."
+        ),
+    },
+    "rising_falling_three_methods": {
+        "target_rule": (
+            "breakout ± candle_height × multiplier%  [Rising 60/23/21/33 · "
+            "Falling KHÔNG CÓ — Statistics EXCLUDED (chỉ 64 mẫu)]"
+        ),
+        "source_file": "docs/project/pdf_review/m5/family_three_methods_20260813.md",
+        "note": (
+            "M5 PDF EC ch.73/39 (KHÔNG phải ECP): failure rate digitized 20/10 là BỊA — EC không publish. "
+            "Continuation rising 74/79% · falling 71/67%; overall rank 94/89 trên 103 (poor). "
+            "Trend-end median rising 7/4/11/13d. Digitized target first_bar_range SAI → candle_height × %."
+        ),
+    },
+    "measured_move_down_up": {
+        "target_rule": (
+            "corrective_phase_top/bottom ∓ first_leg (FULL) → đạt 35–56% · "
+            "dùng HALF first leg → đạt 83–93%  [PDF khuyến nghị half]"
+        ),
+        "source_file": "docs/project/pdf_review/m5/family_measured_moves_20260813.md",
+        "note": (
+            "M5 PDF ch.32–33: failure rate digitized 15/8 là BỊA — Bulkowski TỪ CHỐI metric này "
+            "(MMD/MMU không có breakout đơn). %target MMD 35/39 · MMU 45/56. First leg MMD 27/36% (61/45d) · "
+            "MMU 46/39% (87/30d); last leg NGẮN HƠN first 19–20% (ratio ~0.80). Sample 911 + 810."
+        ),
+    },
+    "gaps": {
+        "target_rule": "KHÔNG CÓ measure rule — Performance rank: Not applicable (event pattern)",
+        "source_file": "docs/project/pdf_review/m5/family_gaps_20260813.md",
+        "note": (
+            "M5 PDF ch.23: gaps là event pattern — failure rate / ultimate days / average move / target digitized "
+            "TOÀN BỘ BỊA. Metric duy nhất: Close-within-a-week (area 89–93% · breakaway 1–9% · "
+            "continuation 4–20% · exhaustion 61–78%) + avg time to close (area 3d · breakaway 61–168d · "
+            "continuation 43–98d · exhaustion 7–14d). Sample tổng 2.187."
+        ),
+    },
+    "spike_formation": {
+        "source": "not_in_bulkowski",
+        "source_file": "docs/project/pdf_review/m5/family_spike_20260813.md",
+        "note": (
+            "M5 13/08 (GLM-5.2, 3 kiểm chứng độc lập): KHÔNG có chương Spike trong ECP lẫn EC — toàn bộ "
+            "spike_formation_digitized.json FABRICATED. Số đang dùng là heuristic scanner, KHÔNG phải thống kê Bulkowski. "
+            "Thay thế có nguồn: Shooting Star/Takuri (EC) hoặc Pipe Bottoms/Tops (ECP)."
+        ),
+    },
 }
 
 # Ngưỡng thất bại (% kéo ngược bất lợi so mốc tham chiếu) — bảng 03 §2.3 + spec.
 _FAILURE_THRESHOLD_PCT = {
     "inside_day": 1.0,
-    "islands": 2.0,
-    "rising_falling_three_methods": 2.0,
+    # M5 13/08: islands threshold digitized 2.0 BỊA — PDF đo BE mốc 5% (ch.30/31) → 5.0
+    "islands": 5.0,
     "horn_bottoms_tops": 3.0,
     "pipe_bottoms": 3.0,
     "pipe_tops": 3.0,
+    # M5 13/08: spike digitized FABRICATED — 3.0 là heuristic scanner (KHÔNG có trong sách)
     "spike_formation": 3.0,
     "gaps": 2.0,  # fill gap = close quay lại sát breakout (K3-1: breakaway fill = failure)
+    # M5 13/08: rising_falling_three_methods threshold 2.0 digitized BỊA (EC không publish
+    # failure) → xóa entry, dùng mặc định 5.0.
     # còn lại mặc định 5.0 (gaps "varies_by_type" → M2 xử lý riêng)
 }
 
@@ -420,6 +529,13 @@ def _build_measurements() -> Dict[str, Dict[str, Any]]:
             "lookahead_bear": None,
             "source": "variant_only",
             "note": "digitized gộp 2 chiều (14d) — CẤM dùng family-level; dùng variant horn_bottoms=180 / horn_tops=67 (PDF_REVIEW)",
+        })
+    # spike: digitized FABRICATED (không có chương Spike trong ECP lẫn EC — M5 13/08, 3 kiểm chứng).
+    # Giữ số heuristic để scanner chạy nhưng đánh dấu nguồn not_in_bulkowski.
+    if "spike_formation" in out:
+        out["spike_formation"].update({
+            "source": "not_in_bulkowski",
+            "note": "spike_formation_digitized.json FABRICATED (M5 13/08) — số là heuristic scanner, KHÔNG phải Bulkowski",
         })
     return out
 

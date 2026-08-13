@@ -125,6 +125,7 @@
       "patterns": {
         "double_bottoms_adam_adam": {
           "status": "candidate_built_review_required",
+          "pdf_review": "docs/project/pdf_review/m5/family_doubles_20260813.md (ch.13-16, PDF p236-297 — GLM-5.2 đọc 13/08/2026)",
           "chapter_lane": "watchlist-reference candidate under available-series scope",
           "source_chapters": [13],
           "detector_module": "scanner.v2.double_patterns",
@@ -133,6 +134,7 @@
         },
         "double_bottoms_adam_eve": {
           "status": "next_source_grounded_variant",
+          "pdf_review": "docs/project/pdf_review/m5/family_doubles_20260813.md (ch.13-16, PDF p236-297 — GLM-5.2 đọc 13/08/2026)",
           "chapter_lane": "watchlist-reference candidate under available-series scope",
           "source_chapters": [14],
           "detector_module": "scanner.v2.double_patterns",
@@ -141,6 +143,7 @@
         },
         "double_bottoms_eve_adam": {
           "status": "pending",
+          "pdf_review": "docs/project/pdf_review/m5/family_doubles_20260813.md (ch.13-16, PDF p236-297 — GLM-5.2 đọc 13/08/2026)",
           "chapter_lane": "watchlist-reference candidate under available-series scope",
           "source_chapters": [15],
           "detector_module": "scanner.v2.double_patterns",
@@ -149,6 +152,7 @@
         },
         "double_bottoms_eve_eve": {
           "status": "pending",
+          "pdf_review": "docs/project/pdf_review/m5/family_doubles_20260813.md (ch.13-16, PDF p236-297 — GLM-5.2 đọc 13/08/2026)",
           "chapter_lane": "watchlist-reference candidate under available-series scope",
           "source_chapters": [16],
           "detector_module": "scanner.v2.double_patterns",
@@ -165,6 +169,7 @@
       "patterns": {
         "wedges_falling": {
           "status": "in_progress",
+          "pdf_review": "docs/project/pdf_review/m5/family_wedges_20260813.md (ch.52-53, PDF p817-850 — GLM-5.2 đọc 13/08/2026)",
           "chapter_lane": "watchlist-reference candidate under available-series scope",
           "source_chapters": [52],
           "detector_module": "scanner.v2.falling_wedges",
@@ -175,6 +180,7 @@
         },
         "wedges_rising": {
           "status": "in_progress",
+          "pdf_review": "docs/project/pdf_review/m5/family_wedges_20260813.md (ch.52-53, PDF p817-850 — GLM-5.2 đọc 13/08/2026)",
           "chapter_lane": "defensive/informational reference candidate under available-series scope",
           "source_chapters": [53],
           "detector_module": "scanner.v2.rising_wedges",
