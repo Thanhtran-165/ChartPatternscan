@@ -65,6 +65,7 @@ class InsideDayConfig:
     range_ratio_max: float = 0.99
     tight_range_ratio: float = 0.50
     very_tight_range_ratio: float = 0.30
+    mother_body_pct_min: float = 0.1  # M4-scanner (13/08): loại nến mẹ doji thuần (thân <0.1% giá)
     prior_trend_lookback_bars: int = 10
     prior_trend_min_abs_pct: float = 2.0
     max_events_per_symbol: int = 12
@@ -138,6 +139,15 @@ class InsideDayDetector:
                 continue
             if not (float(high) < float(prev_high) and float(low) > float(prev_low)):
                 continue
+            # M4-scanner (13/08): chống tín hiệu vô nghĩa — nến mẹ doji thuần
+            # (thân gần 0) tạo "dải bao trùm" ảo chỉ bằng bóng nến.
+            prev_open = _safe_float(prev.get("open"))
+            prev_close = _safe_float(prev.get("close"))
+            if prev_open is None or prev_close is None or prev_close == 0:
+                continue
+            mother_body_pct = abs(prev_close - prev_open) / prev_close * 100.0
+            if mother_body_pct < self.config.mother_body_pct_min:
+                continue
             prior_range = float(prev_high) - float(prev_low)
             inside_range = float(high) - float(low)
             if inside_range <= 0:
@@ -197,6 +207,7 @@ class InsideDayDetector:
                     "pattern_width_bars": 2,
                     "pattern_height_pct": round(float(inside_range_pct), 2),
                     "mother_range_pct": round(float(mother_range_pct), 2),
+                    "mother_body_pct": round(float(mother_body_pct), 4),
                     "inside_range_pct": round(float(inside_range_pct), 2),
                     "range_ratio": round(float(range_ratio), 4),
                     "consecutive_inside_count": int(consecutive_count),
@@ -384,6 +395,7 @@ EVENT_FIELDS = [
     "range_ratio",
     "inside_range_pct",
     "mother_range_pct",
+    "mother_body_pct",
     "inside_day_high",
     "inside_day_low",
     "mother_bar_high",
