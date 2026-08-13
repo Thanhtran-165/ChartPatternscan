@@ -62,6 +62,8 @@ import sqlite3  # noqa: E402
 WORKFLOW_ID = "realtime_scan_email_v1"
 DEFAULT_EMAIL_OUT_DIR = Path("artifacts/realtime_scan/latest/email")
 DEFAULT_PREFLIGHT_MATRIX = Path("artifacts/governance/final_chapters/governance/chapter_tradable_preflight_matrix.json")
+# Profile V3 (M3): metadata.patterns_stats = failure_busted_rate/tier/median_target_dist/n per pattern.
+DEFAULT_V3_PROFILE = Path(__file__).resolve().parents[2] / "market_stats" / "web" / "stock_pattern_profiles.json"
 ACTIONABLE = "actionable_long_cash_candidate_after_buy_confirmed"
 WATCHLIST = "watchlist_only_do_not_promote_until_fold_improves"
 RISK = "avoid_buy_or_exit_warning"
@@ -276,16 +278,42 @@ def _load_pattern_context(path: Path = DEFAULT_PREFLIGHT_MATRIX) -> dict[str, Ma
     return {str(row.get("pattern_id")): row for row in rows if isinstance(row, Mapping) and row.get("pattern_id")}
 
 
+def _load_v3_pattern_stats(path: Path | None = None) -> dict[str, Mapping[str, Any]]:
+    """patterns_stats từ profile V3 (M3) — failure_busted_rate/tier/median_target_dist/n per pattern.
+
+    Mặc định đọc market_stats/web; có thể trỏ staging (web_v3) qua env
+    REALTIME_SCAN_V3_PROFILE — dùng khi chạy mail mẫu trước khi chuyển V3."""
+    if path is None:
+        path = Path(os.environ.get("REALTIME_SCAN_V3_PROFILE") or DEFAULT_V3_PROFILE)
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    stats = (data.get("metadata") or {}).get("patterns_stats") or {}
+    return {str(k): v for k, v in stats.items() if isinstance(v, Mapping)}
+
+
 def _enrich_rows_with_pattern_context(rows: list[Mapping[str, Any]], context: Mapping[str, Mapping[str, Any]]) -> list[dict[str, Any]]:
+    v3 = _load_v3_pattern_stats()
     enriched: list[dict[str, Any]] = []
     for row in rows:
         out = dict(row)
         pattern_context = context.get(str(row.get("pattern_id"))) or {}
+        v3_stats = v3.get(str(row.get("pattern_id"))) or {}
         out["pattern_label"] = _pattern_label(row.get("pattern_id"))
         out["potential_profit_pct"] = pattern_context.get("median_mfe_pct")
         out["target_success_probability"] = pattern_context.get("target_hit_rate")
         out["clean_path_probability"] = pattern_context.get("target_first_before_adverse_5pct_rate")
         out["confidence_score"] = pattern_context.get("preflight_score")
+        # V3 (M3): thống kê chuẩn Bulkowski — failure_busted, nấc, mục tiêu, cỡ mẫu.
+        out["failure_busted_rate_pct"] = v3_stats.get("failure_busted_rate_pct")
+        out["weak_move_5pct_rate_pct"] = v3_stats.get("weak_move_5pct_rate_pct")
+        out["median_target_dist_pct"] = v3_stats.get("median_target_dist_pct")
+        out["pattern_n"] = v3_stats.get("n")
+        out["pattern_tier"] = v3_stats.get("tier")
+        out["pattern_tier_label"] = v3_stats.get("tier_label")
         enriched.append(out)
     return enriched
 
@@ -338,6 +366,14 @@ def _bool_column(df: pd.DataFrame, column: str) -> pd.Series:
     return df[column].map(_bool_like)
 
 
+def _failure_busted_column(watchlist: pd.DataFrame) -> pd.Series:
+    """failure_busted (V3) nếu có cột; fallback failure_5pct cũ khi artifacts chưa re-scan."""
+    busted = _bool_column(watchlist, "failure_busted")
+    if busted.notna().any():
+        return busted
+    return _bool_column(watchlist, "failure_5pct")
+
+
 def _numeric_column(df: pd.DataFrame, column: str) -> pd.Series:
     if column not in df.columns:
         return pd.Series([float("nan")] * len(df), index=df.index, dtype="float64")
@@ -348,7 +384,7 @@ def _event_level_buy_candidate_mask(watchlist: pd.DataFrame, *, max_mae_pct: flo
     if watchlist.empty or "after_buy_action" not in watchlist.columns:
         return pd.Series([False] * len(watchlist), index=watchlist.index)
     action_ok = watchlist["after_buy_action"].eq(ACTIONABLE)
-    failure = _bool_column(watchlist, "failure_5pct")
+    failure = _failure_busted_column(watchlist)
     target_hit = _bool_column(watchlist, "target_hit")
     mae = _numeric_column(watchlist, "mae_pct")
     # Missing forward fields are tolerated for fresh events. Explicit failure or
@@ -363,7 +399,7 @@ def _event_level_watchlist_mask(watchlist: pd.DataFrame, buy_mask: pd.Series) ->
     if watchlist.empty or "after_buy_action" not in watchlist.columns:
         return pd.Series([False] * len(watchlist), index=watchlist.index)
     action = watchlist["after_buy_action"]
-    failure = _bool_column(watchlist, "failure_5pct")
+    failure = _failure_busted_column(watchlist)
     return (action.eq(WATCHLIST) | action.eq(ACTIONABLE)) & ~buy_mask & ~failure.eq(True)
 
 
@@ -371,7 +407,7 @@ def _event_level_risk_mask(watchlist: pd.DataFrame) -> pd.Series:
     if watchlist.empty:
         return pd.Series([False] * len(watchlist), index=watchlist.index)
     action = watchlist.get("after_buy_action", pd.Series(index=watchlist.index, dtype=object))
-    failure = _bool_column(watchlist, "failure_5pct")
+    failure = _failure_busted_column(watchlist)
     mae = _numeric_column(watchlist, "mae_pct")
     return action.eq(RISK) | failure.eq(True) | mae.gt(5.0)
 
@@ -542,6 +578,35 @@ def _classify_setups(
     return out
 
 
+def _apply_v3_gates(df: pd.DataFrame, v3_stats: Mapping[str, Mapping[str, Any]]) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """3 rào mail V3 (08 §11, điều chỉnh theo K3-2 — failure hiển thị, không lọc cứng):
+    qualified = pattern Nấc 2+ (tier≥2) + n≥30 toàn thị trường + median_target_dist_pct≥5%
+    (loại inside_bar 2.3% khỏi top); draft = Nấc 1 (bản nháp — section riêng cuối mail).
+
+    Chỉ gate khi profile V3 thật (có field tier) — profile cũ/chưa build không có tier
+    thì giữ hành vi cũ (qualified hết) để mail không bị rỗng."""
+    if df.empty or "pattern_id" not in df.columns:
+        return df.head(0).copy(), df.head(0).copy()
+    v3_active = any(isinstance(s, Mapping) and s.get("tier") is not None for s in v3_stats.values())
+    if not v3_active:
+        return df.copy(), df.head(0).copy()
+    qualified, draft = [], []
+    for _, row in df.iterrows():
+        s = v3_stats.get(str(row.get("pattern_id"))) or {}
+        tier = int(s.get("tier") or 1)
+        n = int(s.get("n") or 0)
+        tgt = s.get("median_target_dist_pct")
+        if tier >= 2 and n >= 30 and (tgt is None or float(tgt) >= 5.0):
+            qualified.append(row)
+        else:
+            # Nấc 1 (bản nháp) + Nấc 2+ nhưng mẫu nhỏ hoặc mục tiêu thấp
+            # (VD inside_day 2.3%) → section phụ cuối mail, không biến mất.
+            draft.append(row)
+    q = pd.DataFrame(qualified, columns=df.columns) if qualified else df.head(0).copy()
+    d = pd.DataFrame(draft, columns=df.columns) if draft else df.head(0).copy()
+    return q, d
+
+
 def summarize_watchlist(
     watchlist: pd.DataFrame,
     *,
@@ -555,8 +620,9 @@ def summarize_watchlist(
     buy_mask = _event_level_buy_candidate_mask(watchlist)
     watchlist_mask = _event_level_watchlist_mask(watchlist, buy_mask)
     risk_mask = _event_level_risk_mask(watchlist)
-    buy_section_raw = _mask_section(watchlist, buy_mask, limit_each * 5)
-    watchlist_section_raw = _mask_section(watchlist, watchlist_mask, limit_each * 5)
+    v3_stats = _load_v3_pattern_stats()
+    buy_section_raw, buy_draft_raw = _apply_v3_gates(_mask_section(watchlist, buy_mask, limit_each * 5), v3_stats)
+    watchlist_section_raw, watch_draft_raw = _apply_v3_gates(_mask_section(watchlist, watchlist_mask, limit_each * 5), v3_stats)
     buy_section, buy_scope = _vn100_only(buy_section_raw)
     watchlist_section, watchlist_scope = _vn100_only(watchlist_section_raw)
     risk_section = _mask_section(watchlist, risk_mask, limit_each)
@@ -607,6 +673,7 @@ def summarize_watchlist(
             ).head(limit_each)
 
     context = _load_pattern_context()
+    draft_rows = pd.concat([buy_draft_raw, watch_draft_raw], ignore_index=True) if not (buy_draft_raw.empty and watch_draft_raw.empty) else pd.DataFrame()
     counts = {
         "buy_candidates": int(len(buy_section)),
         "watchlist": int(len(watchlist_section)),
@@ -614,12 +681,14 @@ def summarize_watchlist(
         "buy_setup": int(len(setup_section)),
         "buy_candidates_all_market_before_vn100_filter": int(buy_mask.sum()),
         "watchlist_all_market_before_vn100_filter": int(watchlist_mask.sum()),
+        "draft_patterns": int(len(draft_rows)),
     }
     sections = {
         "buy_candidates": _enrich_rows_with_pattern_context(buy_section.head(limit_each).to_dict("records"), context),
         "watchlist": _enrich_rows_with_pattern_context(watchlist_section.head(limit_each).to_dict("records"), context),
         "risk_context": _enrich_rows_with_pattern_context(risk_section.to_dict("records"), context),
         "buy_setup": _enrich_setup_rows(setup_section.to_dict("records")),
+        "draft_patterns": _enrich_rows_with_pattern_context(draft_rows.head(limit_each).to_dict("records"), context),
     }
     if filter_active:
         counts["buy_setup_new"] = int(len(setup_new_section))
@@ -693,6 +762,8 @@ def render_text_email(summary: Mapping[str, Any], *, include_risk_details: bool 
     lines = [
         "BUY Candidate Scan - VN100 Watchlist",
         "",
+        "CẢNH BÁO: Đây là quét hình học từ dữ liệu lịch sử, KHÔNG phải khuyến nghị mua bán. Mỗi mẫu hình có tỉ lệ thất bại thực tế kèm theo. Thống kê gồm cả mã đã ngừng giao dịch.",
+        "",
         "⚠️ LƯU Ý: hệ thống đang chuẩn hóa lại số liệu mẫu hình (nâng cấp V3) — các con số thống kê trong mail này là tham khảo tạm, chưa theo chuẩn cuối.",
         "",
         f"Generated at: {summary['generated_at']}",
@@ -751,6 +822,12 @@ def render_text_email(summary: Mapping[str, Any], *, include_risk_details: bool 
         lines.append(_row_text(row))
     if not summary["sections"]["watchlist"]:
         lines.append("- Không có watchlist mới.")
+    draft_rows = summary["sections"].get("draft_patterns", [])
+    if draft_rows:
+        lines.extend(["", f"3. Không đạt chuẩn tín hiệu ({len(draft_rows)} mã, chỉ tham khảo)"])
+        for row in draft_rows:
+            lines.append(_row_text(row))
+        lines.append("- Nhóm này gồm: bản nháp Nấc 1 chưa kiểm định, hoặc mẫu nhỏ dưới 30 lần toàn thị trường, hoặc mục tiêu giữa mẫu dưới 5% — không dùng làm tín hiệu, chỉ tham khảo.")
     if filter_active and stale_hidden:
         lines.extend(
             [
@@ -894,6 +971,13 @@ def render_html_email(summary: Mapping[str, Any], *, include_risk_details: bool 
         if filter_active and stale_hidden
         else ""
     )
+    draft_html = ""
+    if summary["sections"].get("draft_patterns"):
+        draft_html = (
+            '<h2>3. Không đạt chuẩn tín hiệu (chỉ tham khảo)</h2>\n'
+            f'{_html_rows(summary["sections"]["draft_patterns"])}'
+            '<p class="note">Nhóm này gồm: bản nháp Nấc 1 chưa kiểm định, hoặc mẫu nhỏ dưới 30 lần toàn thị trường, hoặc mục tiêu giữa mẫu dưới 5% — không dùng làm tín hiệu, chỉ tham khảo.</p>'
+        )
     cards_html = (
         f"""
     <div class="cards">
@@ -934,6 +1018,7 @@ def render_html_email(summary: Mapping[str, Any], *, include_risk_details: bool 
   <div class="wrap">
     <h1>BUY Candidate Scan - VN100 Watchlist</h1>
     <p class="muted">Generated at: {html.escape(str(summary["generated_at"]))}</p>
+    <div class="notice"><b>CẢNH BÁO:</b> Đây là quét hình học từ dữ liệu lịch sử, KHÔNG phải khuyến nghị mua bán. Mỗi mẫu hình có tỉ lệ thất bại thực tế kèm theo. Thống kê gồm cả mã đã ngừng giao dịch.</div>
     <div class="notice"><b>⚠️ Lưu ý:</b> hệ thống đang chuẩn hóa lại số liệu mẫu hình (nâng cấp V3) — các con số thống kê trong mail này là tham khảo tạm, chưa theo chuẩn cuối.</div>
     <div class="notice">Đây là danh sách ứng viên để mở chart kiểm tra, không phải khuyến nghị mua bán.</div>
     <p class="note">Phạm vi bắt buộc: hai nhóm BUY và Watchlist chỉ lấy VN100/VN30; nếu không có mã phù hợp thì để trống. Lợi nhuận tiềm năng và xác suất là thống kê lịch sử của mẫu hình, không phải cam kết cho từng mã.</p>
@@ -947,6 +1032,7 @@ def render_html_email(summary: Mapping[str, Any], *, include_risk_details: bool 
     {_html_rows(summary["sections"]["buy_candidates"])}
     <h2>2. Watchlist theo dõi thêm</h2>
     {_html_rows(summary["sections"]["watchlist"])}
+    {draft_html}
     <p class="muted">Checklist đọc thủ công: chart, thanh khoản, VNINDEX/regime, tin tức, vị trí giá, kế hoạch rủi ro.</p>
   </div>
 </body>
