@@ -79,7 +79,8 @@
       "family_rule": "Reuse only the shared statistical/publication core. Keep scanner geometry, target calibration, quality tiers, and example policy pattern-specific.",
       "patterns": {
         "triangles_ascending": {
-          "status": "publication_candidate",
+          "status": "publication_final",
+          "pdf_review": "docs/project/pdf_review/m5/family_triangles_20260813.md (ch.47, PDF p734-752 — GLM-5.2 đọc 13/08/2026)",
           "chapter_lane": "investment-reference candidate under available-series public-grade scope",
           "source_chapters": [47],
           "detector_module": "scanner.v2.ascending_triangles",
@@ -90,7 +91,8 @@
           "quality_gate": "premium visual validation scored_n >= 30, median >= 4, pass_rate >= 70"
         },
         "triangles_descending": {
-          "status": "branch_headline_candidate",
+          "status": "publication_final",
+          "pdf_review": "docs/project/pdf_review/m5/family_triangles_20260813.md (ch.48, PDF p753-770 — GLM-5.2 đọc 13/08/2026)",
           "chapter_lane": "defensive/informational reference candidate; headline scope must be branch-filtered, not aggregate",
           "source_chapters": [48],
           "detector_module": "scanner.v2.descending_triangles",
@@ -101,7 +103,8 @@
           "quality_gate": "premium visual validation pass; branch headline required because aggregate MFE/MAE is weak"
         },
         "triangles_symmetrical": {
-          "status": "branch_headline_candidate",
+          "status": "publication_final",
+          "pdf_review": "docs/project/pdf_review/m5/family_triangles_20260813.md (ch.49, PDF p771-787 — GLM-5.2 đọc 13/08/2026)",
           "chapter_lane": "watchlist-reference branch candidate; headline scope must be direction-filtered, not aggregate",
           "source_chapters": [49],
           "detector_module": "scanner.v2.symmetrical_triangles",

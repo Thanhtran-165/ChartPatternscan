@@ -64,6 +64,54 @@ _VARIANT_LOOKAHEAD: Dict[str, Dict[str, Any]] = {
     "continuation_gaps": {"lookahead_bull": 21, "lookahead_bear": None, "source": "digitized", "note": "digitized continuation_average_days = 21"},
     "exhaustion_gaps": {"lookahead_bull": 5, "lookahead_bear": None, "source": "digitized", "note": "digitized exhaustion_average_days = 5"},
     "area_gaps": {"lookahead_bull": 63, "lookahead_bear": None, "source": "digitized", "note": "area_gaps không có số riêng → lookahead_bars 63"},
+    # M5 PDF 13/08 (docs/project/pdf_review/m5/family_triangles_20260813.md):
+    # days to ultimate theo 4 tổ hợp Bull/UA · Bear/UA · Bull/UD · Bear/UD.
+    # Quy ước: lookahead_bull = Bull/UA (dòng đầu bảng sách), bear = Bear/UD (dòng cuối).
+    "triangles_ascending": {"lookahead_bull": 185, "lookahead_bear": 39, "source": "pdf",
+        "note": "M5 PDF ch47: Bull/UA 185 · Bear/UA 97 · Bull/UD 64 · Bear/UD 39 — pending_rescan (events hiện đo 126)"},
+    "triangles_descending": {"lookahead_bull": 178, "lookahead_bear": 32, "source": "pdf",
+        "note": "M5 PDF ch48: Bull/UA 178 · Bear/UA 86 · Bull/UD 50 · Bear/UD 32 — pending_rescan (events hiện đo 126)"},
+    "triangles_symmetrical": {"lookahead_bull": 124, "lookahead_bear": 30, "source": "pdf",
+        "note": "M5 PDF ch49: Bull/UA 124 · Bear/UA 77 · Bull/UD 45 · Bear/UD 30 — pending_rescan (events hiện đo 126)"},
+}
+
+# Số liệu PDF mới (M5 — đọc sách 13/08, docs/project/pdf_review/m5/) KHÔNG phải lookahead
+# ultimate (flags/pennants sách đo bằng trend-end method) — field phụ: sample,
+# break-even failure, target rule. Merge vào measurement output qua key "pdf_extras".
+_PDF_EXTRAS: Dict[str, Dict[str, Any]] = {
+    "flags": {
+        "sample": 523,
+        "be_failure_pct": 4,
+        "days_to_trend_high": 17,
+        "target_rule": "formation_end ± (trend_start − formation_start_low/high)",
+        "source_file": "docs/project/pdf_review/m5/family_flags_pennants_20260813.md",
+        "note": (
+            "Sách đo bằng TREND-END method (17d tới minor high/low) — KHÔNG phải days-to-ultimate "
+            "nên KHÔNG nạp lookahead. Digitized measure rule (breakout + flagpole height) SAI — "
+            "đã thay bằng công thức PDF. BE failure 4/3/2/0% (bull 4%). Sample digitized thiếu."
+        ),
+    },
+    "pennants": {
+        "sample": 462,
+        "be_failure_pct": 2,
+        "days_to_trend_high": 22,
+        "meet_target_pct": 63,
+        "target_rule": "formation_end ± (trend_start − formation_start_low/high)",
+        "source_file": "docs/project/pdf_review/m5/family_flags_pennants_20260813.md",
+        "note": (
+            "Trend-end method — giữ lookahead digitized 63. Digitized measure rule SAI (flagpole height) — "
+            "đã thay bằng công thức PDF. BE failure 2/2/4/0% (bull 2%); % meeting target 50–63%."
+        ),
+    },
+    "triangles": {
+        "sample": 3605,
+        "source_file": "docs/project/pdf_review/m5/family_triangles_20260813.md",
+        "note": (
+            "M5 PDF ch.47–49: sample asc 1.092 / desc 1.166 / sym 1.347. Lookahead nạp per-pattern "
+            "trong _VARIANT_LOOKAHEAD. Measure rule digitized KHỚP PDF (breakout ± height); "
+            "symmetrical thêm biến thể halfway point."
+        ),
+    },
 }
 
 # Ngưỡng thất bại (% kéo ngược bất lợi so mốc tham chiếu) — bảng 03 §2.3 + spec.
@@ -351,6 +399,9 @@ def _build_measurements() -> Dict[str, Dict[str, Any]]:
             "source": la["source"],
             "note": la["note"],
         }
+        extras = _PDF_EXTRAS.get(family)
+        if extras:
+            out[family]["pdf_extras"] = extras
     # dead_cat: event-driven, giữ detector cũ (63 qua pipes) tới M5
     if "dead_cat_bounce" in out:
         out["dead_cat_bounce"].update({
