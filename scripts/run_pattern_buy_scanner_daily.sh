@@ -6,12 +6,18 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 cd "${REPO_ROOT}"
 
-# M4 (13/08/2026): KHÔNG dùng .venv trong iCloud — launchd chạy bị
+# M4-1b (13/08/2026): KHÔNG dùng .venv trong iCloud — launchd chạy bị
 # "OSError: Resource deadlock avoided" (venv 136MB nằm trong iCloud Drive) và
-# .venv thiếu vnstock_data. Ưu tiên python3.14 homebrew hệ thống (đã kiểm có
-# vnstock_data + pandas). Ghi đè bằng PATTERN_BUY_PYTHON nếu cần.
+# .venv thiếu vnstock_data. Thứ tự ưu tiên:
+#   1) venv sponsor golden (~/dev/main-sonet-runtime/.venv-vnstock-sponsor311):
+#      có vnii → tier golden 500 req/phút (đã test refresh 100 mã RPM 300, 0 lỗi).
+#   2) python3.14 homebrew: chạy được nhưng tier free 60 req/phút.
+# Ghi đè bằng PATTERN_BUY_PYTHON nếu cần.
+SPONSOR_PY="${HOME}/dev/main-sonet-runtime/.venv-vnstock-sponsor311/bin/python"
 if [[ -n "${PATTERN_BUY_PYTHON:-}" ]]; then
   PY="${PATTERN_BUY_PYTHON}"
+elif [[ -x "${SPONSOR_PY}" ]]; then
+  PY="${SPONSOR_PY}"
 elif [[ -x "/opt/homebrew/bin/python3.14" ]]; then
   PY="/opt/homebrew/bin/python3.14"
 elif command -v python3.11 >/dev/null 2>&1; then
