@@ -20,6 +20,7 @@
       "patterns": {
         "bull_flags": {
           "status": "active",
+          "pdf_review": "docs/project/pdf_review/m5/family_flags_pennants_20260813.md (ch.21, trend-end method — GLM-5.2 đọc 13/08/2026)",
           "chapter_lane": "watchlist/investment-reference under available-series scope",
           "source_chapters": [21],
           "detector_module": "scanner.v2.bull_flags",
@@ -28,6 +29,7 @@
         },
         "bear_flags": {
           "status": "active",
+          "pdf_review": "docs/project/pdf_review/m5/family_flags_pennants_20260813.md (ch.21, trend-end method — GLM-5.2 đọc 13/08/2026)",
           "chapter_lane": "informational/defensive-reference under available-series scope",
           "source_chapters": [21],
           "detector_module": "scanner.v2.bull_flags",
@@ -44,6 +46,7 @@
       "patterns": {
         "bull_pennants": {
           "status": "publication_final",
+          "pdf_review": "docs/project/pdf_review/m5/family_flags_pennants_20260813.md (ch.34, trend-end method — GLM-5.2 đọc 13/08/2026)",
           "chapter_lane": "watchlist-reference under available-series scope",
           "source_chapters": [34],
           "detector_module": "scanner.v2.pennants",
@@ -54,6 +57,7 @@
         },
         "bear_pennants": {
           "status": "publication_final",
+          "pdf_review": "docs/project/pdf_review/m5/family_flags_pennants_20260813.md (ch.34, trend-end method — GLM-5.2 đọc 13/08/2026)",
           "chapter_lane": "defensive/informational-reference under available-series scope",
           "source_chapters": [34],
           "detector_module": "scanner.v2.pennants",
@@ -64,6 +68,7 @@
         },
         "high_tight_flags": {
           "status": "publication_final",
+          "pdf_review": "docs/project/pdf_review/m5/family_flags_pennants_20260813.md (ch.22 — GLM-5.2 đọc 13/08/2026)",
           "chapter_lane": "watchlist-reference under available-series scope",
           "source_chapters": [22],
           "detector_module": "scanner.v2.high_tight_flags",

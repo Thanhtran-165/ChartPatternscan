@@ -42,9 +42,37 @@ _PDF_OVERRIDES: Dict[str, Dict[str, Any]] = {
     "triple_tops": {"lookahead_bull": 60, "lookahead_bear": 42, "sample": 627},
     "three_falling_peaks": {"lookahead_bull": 36, "lookahead_bear": 34, "sample": 527},
     "three_rising_valleys": {"lookahead_bull": 125, "lookahead_bear": 94, "sample": 496},
+    # --- M5 13/08 (docs/project/pdf_review/m5/): lookahead digitized SAI 2–10 lần → số PDF.
+    # Quy ước: bull = Bull/Up (dòng đầu bảng sách), bear = Bear/Down (dòng cuối).
+    "double_bottoms": {"lookahead_bull": 136, "lookahead_bear": 77, "sample": 1383,
+        "note": "M5 PDF ch.13–16: bull/UA 136–170 · bear/UD 77–101 (digitized 76 SAI)"},
+    "double_tops": {"lookahead_bull": 43, "lookahead_bear": 32, "sample": 1413,
+        "note": "M5 PDF ch.17–20: bull/UD 43–51 · bear/UD 32–45 (digitized 71 SAI)"},
+    "bump_and_run_reversal": {"lookahead_bull": 68, "lookahead_bear": 39, "sample": 1309,
+        "note": "M5 PDF ch.8 Tops: ultimate low bull 68 / bear 39 (digitized 252 SAI 4-6 lần)"},
+    "wedges_ascending_descending": {"lookahead_bull": 116, "lookahead_bear": 32, "sample": 1163,
+        "note": "M5 PDF ch.52: Falling bull/UA 116 · bear/UD 32 (rising 127/60/38/38 — digitized 126 gần khớp)"},
+    "islands": {"lookahead_bull": 128, "lookahead_bear": 34, "sample": 1837,
+        "note": "M5 PDF ch.30 Reversals: bull/Up 128 · bear/Down 34 (Long 67/33/27/26 — digitized 14 SAI)"},
+    "rounding_bottoms_tops": {"lookahead_bull": 189, "lookahead_bear": 105, "sample": 1229,
+        "note": "M5 PDF ch.39 RdB: ultimate high bull 189 / bear 105 (RdT 161/77/45/25 — digitized 84/63 SAI)"},
+    "measured_move_down_up": {"lookahead_bull": 153, "lookahead_bear": 113, "sample": 1721,
+        "note": "M5 PDF ch.32: KHÔNG có ultimate — dùng pattern length MMD 153/113 (digitized 63 SAI)"},
+    "rising_falling_three_methods": {"lookahead_bull": 7, "lookahead_bear": 13, "sample": 166,
+        "note": "M5 PDF EC ch.73: KHÔNG có ultimate — dùng candle-end→trend-end median 7/11 (digitized 20 SAI)"},
+    "broadening_bottoms": {"lookahead_bull": 112, "lookahead_bear": 65, "sample": 237,
+        "note": "M5 PDF ch.1: ultimate high bull 112 / bear 65 (digitized 84 lệch)"},
+    "broadening_tops": {"lookahead_bull": 50, "lookahead_bear": 29, "sample": 493,
+        "note": "M5 PDF ch.4: ultimate low bull 50 / bear 29 (digitized 56 lệch)"},
+    "broadening_wedges": {"lookahead_bull": 131, "lookahead_bear": 23, "sample": 719,
+        "note": "M5 PDF ch.6 BWD: bull/Up 131 · bear/Down 23 (BWA 161/78/63/51)"},
+    "diamond_bottom": {"lookahead_bull": 119, "lookahead_bear": 72, "sample": 295,
+        "note": "M5 PDF ch.11: ultimate high bull 119 / bear 72 (digitized 77 gần bear, sai bull)"},
+    "diamond_top": {"lookahead_bull": 52, "lookahead_bear": 43, "sample": 375,
+        "note": "M5 PDF ch.12: ultimate low bull 52 / bear 43 (digitized 63 lệch nhẹ)"},
     # inside_day: PDF lệch ĐỊNH NGHĨA (body Harami vs range) → KHÔNG dùng số PDF.
     # dead_cat: event-driven, không có "days to ultimate" kiểu chart pattern.
-    # horn/rectangle/rounding tách theo pattern_key con (bảng _VARIANT_LOOKAHEAD).
+    # horn/rectangle tách theo pattern_key con (bảng _VARIANT_LOOKAHEAD).
 }
 
 # Lookahead theo pattern_key CON (những family gộp nhiều hướng có số khác nhau).
@@ -56,9 +84,10 @@ _VARIANT_LOOKAHEAD: Dict[str, Dict[str, Any]] = {
     # PDF_REVIEW_20260812: rect bottoms 177/81/41/33, tops 170/75/56/40
     "rectangle_bottoms": {"lookahead_bull": 177, "lookahead_bear": 81, "source": "pdf", "note": "PDF rect_bottoms 177/81"},
     "rectangle_tops": {"lookahead_bull": 170, "lookahead_bear": 75, "source": "pdf", "note": "PDF rect_tops 170/75"},
-    # digitized key biến thể: rounding average_days_bottom 84 / top 63
-    "rounding_bottoms": {"lookahead_bull": 84, "lookahead_bear": None, "source": "digitized", "note": "digitized average_days_bottom = 84"},
-    "rounding_tops": {"lookahead_bull": 63, "lookahead_bear": None, "source": "digitized", "note": "digitized average_days_top = 63"},
+    # M5 PDF 13/08 (family_rounding_20260813.md): digitized average_days_bottom/top 84/63 SAI
+    # (thực ra là "time to target" bịa). PDF: RdB ultimate high 189/105 · RdT-UA 161/77 · RdT-UD 45/25.
+    "rounding_bottoms": {"lookahead_bull": 189, "lookahead_bear": 105, "source": "pdf", "note": "M5 PDF ch.39 RdB: 189/105 (digitized 84 SAI)"},
+    "rounding_tops": {"lookahead_bull": 161, "lookahead_bear": 25, "source": "pdf", "note": "M5 PDF ch.40 RdT: UA 161/77 · UD 45/25 (digitized 63 SAI)"},
     # M5 PDF 13/08 (family_gaps_20260813.md): gaps KHÔNG có "days to ultimate" —
     # sách đo "Average time to close the gap" (thời gian gap bị lấp). Số digitized
     # (42/21/5/63) là BỊA. Dùng time-to-close làm lookahead đo lường (nguồn pdf).
@@ -562,12 +591,15 @@ def _family_lookahead(spec: Dict[str, Any], family: str) -> Dict[str, Any]:
     pdf = _PDF_OVERRIDES.get(family)
     if pdf:
         la = pdf.get("lookahead_bull")
+        note = pdf.get("note") or (
+            f"PDF_REVIEW_20260812 (bull market {la}d, bear {pdf.get('lookahead_bear')}d)"
+        )
         return {
             "lookahead_bars": la,
             "lookahead_bull": pdf.get("lookahead_bull"),
             "lookahead_bear": pdf.get("lookahead_bear"),
             "source": "pdf",
-            "note": f"PDF_REVIEW_20260812 (bull market {pdf.get('lookahead_bull')}d, bear {pdf.get('lookahead_bear')}d)",
+            "note": note,
         }
     # Ưu tiên ultimate_high (hướng tăng — đa số detector scan breakout lên)
     avg_uh = spec.get("avg_days_uh") or {}
