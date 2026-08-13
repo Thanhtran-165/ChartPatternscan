@@ -53,7 +53,7 @@ class DescendingTriangleConfig:
     low_flat_tol_pct: float = 3.0
     high_fall_min_pct: float = 3.0
     lower_slope_abs_max_deg: float = 2.5
-    upper_slope_max_neg_deg: float = -2.0
+    upper_slope_max_neg_deg: float = -10.0  # siết 13/08/2026: đỉnh phải dốc xuống ≥10° đúng chuẩn sách (loại đỉnh gần phẳng)
     height_min_pct: float = 5.0
     height_max_pct: float = 38.0
     compression_max_ratio: float = 0.85

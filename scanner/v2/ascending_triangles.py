@@ -53,7 +53,7 @@ class AscendingTriangleConfig:
     high_flat_tol_pct: float = 3.0
     low_rise_min_pct: float = 3.0
     upper_slope_abs_max_deg: float = 2.5
-    lower_slope_min_deg: float = 2.0
+    lower_slope_min_deg: float = 10.0  # siết 13/08/2026: đáy phải dốc ≥10° đúng chuẩn sách (loại đáy gần phẳng)
     height_min_pct: float = 5.0
     height_max_pct: float = 38.0
     compression_max_ratio: float = 0.85
