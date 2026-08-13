@@ -110,7 +110,8 @@ def fetch_ohlcv(db: sqlite3.Connection, symbol: str, start_date: str, end_date: 
     return df
 
 
-def plot_event(db: sqlite3.Connection, ev: dict, out_path: Path, before_cal: int, after_cal: int) -> str | None:
+def plot_event(db: sqlite3.Connection, ev: dict, out_path: Path, before_cal: int, after_cal: int,
+               weekly: bool = False) -> str | None:
     symbol = (ev.get("symbol") or "").strip()
     if not symbol:
         return "no_symbol"
@@ -124,6 +125,11 @@ def plot_event(db: sqlite3.Connection, ev: dict, out_path: Path, before_cal: int
     df = fetch_ohlcv(db, symbol, start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d"))
     if len(df) < 10:
         return f"insufficient_data({len(df)})"
+    if weekly:
+        # gộp nến ngày thành nến tuần (chỉ để vẽ — pipe/... là mẫu tuần)
+        df = df.resample("W-FRI").agg({
+            "Open": "first", "High": "max", "Low": "min", "Close": "last", "Volume": "sum",
+        }).dropna(subset=["Open", "High", "Low", "Close"])
 
     breakout_price = _num(ev.get("breakout_price"))
     target_price = _num(ev.get("target_price"))
@@ -194,6 +200,7 @@ def main() -> int:
                     help="cách chọn mẫu nghi án")
     ap.add_argument("--variant", default=None, help="lọc theo variant")
     ap.add_argument("--tier", default=None, help="lọc theo pattern_quality_tier")
+    ap.add_argument("--weekly", action="store_true", help="vẽ nến tuần (W-FRI) thay vì nến ngày")
     ap.add_argument("--out", default=None, help="thư mục xuất PNG")
     args = ap.parse_args()
 
@@ -225,7 +232,7 @@ def main() -> int:
     for ev in sample:
         det_id = (ev.get("detection_id") or "unknown").replace(":", "_").replace("/", "_")
         out_path = out_dir / f"{det_id}.png"
-        err = plot_event(db, ev, out_path, args.before_cal, args.after_cal)
+        err = plot_event(db, ev, out_path, args.before_cal, args.after_cal, weekly=args.weekly)
         if err is None:
             ok += 1
         else:
