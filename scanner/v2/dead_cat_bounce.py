@@ -75,8 +75,8 @@ class DeadCatConfig:
     event_decline_max_bars: int = 8
     bounce_min_pct: float = 15.0
     bounce_max_pct: float = 35.0
-    bounce_min_bars: int = 5
-    bounce_max_bars: int = 25
+    bounce_min_bars: int = 1   # siết 13/08/2026: sách ECP ch54 — bounce ngắn 1-7 ngày
+    bounce_max_bars: int = 7   # siết 13/08/2026: trước là 5-25, lệch sách (thước đo 6,6%)
     inverted_rise_min_pct: float = 5.0
     inverted_rise_max_pct: float = 20.0
     inverted_day2_required: bool = True
@@ -185,7 +185,7 @@ class DeadCatDetector:
             score = 38.0
             score += _score_band(decline_pct, good=32.0, weak=15.0, weight=0.18)
             score += _score_band(bounce_pct, good=22.0, weak=self.config.bounce_min_pct, weight=0.16)
-            score += _score_band(float(bounce_idx - event_low_idx), good=10.0, weak=float(self.config.bounce_max_bars), reverse=True, weight=0.10)
+            score += _score_band(float(bounce_idx - event_low_idx), good=3.0, weak=float(self.config.bounce_max_bars), reverse=True, weight=0.10)
             if gap:
                 score += 8.0
             if volume_ratio is not None and volume_ratio >= self.config.event_volume_ratio_preferred:

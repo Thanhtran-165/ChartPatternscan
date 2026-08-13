@@ -51,8 +51,8 @@ class HighTightFlagConfig:
     advance_lookback_bars: int = 45
     min_prior_advance_pct: float = 90.0
     min_prior_slope_deg: float = 18.0
-    consolidation_min_bars: int = 5
-    consolidation_max_bars: int = 25
+    consolidation_min_bars: int = 18  # siết 13/08/2026: sách ECP ch22 — nén 4-5 tuần (20-25 ngày); 18 khoan dung nghỉ lễ VN
+    consolidation_max_bars: int = 30  # siết 13/08/2026: trước là 5-25, lệch sách (thước đo 18,5%)
     pullback_min_pct: float = 3.0
     pullback_max_pct: float = 35.0
     consolidation_height_max_pct: float = 38.0
