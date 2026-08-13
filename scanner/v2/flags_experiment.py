@@ -56,6 +56,7 @@ class FlagDetectorConfig:
     pole_min_change_pct: float = 10.0
     pole_min_slope_deg: float = 8.0
     parallel_tol_deg: float = 4.0
+    max_body_excursion_pct: float = 4.0
     bull_avg_slope_min: float = -12.0
     bull_avg_slope_max: float = 4.0
     bear_avg_slope_min: float = -4.0
@@ -246,6 +247,20 @@ class FlagExperimentDetector:
 
         upper = Trendline(upper_points[0][0], upper_points[0][1], (upper_points[1][1] - upper_points[0][1]) / max(1, upper_points[1][0] - upper_points[0][0]))
         lower = Trendline(lower_points[0][0], lower_points[0][1], (lower_points[1][1] - lower_points[0][1]) / max(1, lower_points[1][0] - lower_points[0][0]))
+        # flag phải GỌN: không bar nào trong thân cờ vượt quá ngưỡng ra ngoài 2 đường
+        # (chống "cờ phình" — pivot HIGH/LOW không phải cực trị tuyệt đối của vùng)
+        body_check_start = max(upper.idx0, lower.idx0)
+        body_check_end = idxs[-1]
+        max_excursion_pct = 0.0
+        for _k in range(body_check_start, body_check_end + 1):
+            _uval = upper.value_at(_k)
+            _lval = lower.value_at(_k)
+            if _uval > 0:
+                max_excursion_pct = max(max_excursion_pct, (float(df.iloc[_k]["high"]) - _uval) / _uval * 100.0)
+            if _lval > 0:
+                max_excursion_pct = max(max_excursion_pct, (_lval - float(df.iloc[_k]["low"])) / _lval * 100.0)
+        if max_excursion_pct > self.max_body_excursion_pct:
+            return None
         upper_deg = _slope_degrees(upper_points[0][0], upper_points[0][1], upper_points[1][0], upper_points[1][1])
         lower_deg = _slope_degrees(lower_points[0][0], lower_points[0][1], lower_points[1][0], lower_points[1][1])
         slope_gap = abs(upper_deg - lower_deg)
