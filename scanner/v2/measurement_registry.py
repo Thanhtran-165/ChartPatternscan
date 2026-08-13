@@ -70,6 +70,11 @@ _PDF_OVERRIDES: Dict[str, Dict[str, Any]] = {
         "note": "M5 PDF ch.11: ultimate high bull 119 / bear 72 (digitized 77 gần bear, sai bull)"},
     "diamond_top": {"lookahead_bull": 52, "lookahead_bear": 43, "sample": 375,
         "note": "M5 PDF ch.12: ultimate low bull 52 / bear 43 (digitized 63 lệch nhẹ)"},
+    # Harami (EC candlestick book ch.43-46, family_harami_20260813.md): KHÔNG có
+    # "days to ultimate" — sách đo "candle end → trend end" median 6-9 ngày.
+    # Dùng 10 (bao phủ trend end + buffer) như đề xuất file family_harami.
+    "harami": {"lookahead_bull": 10, "lookahead_bear": 10, "sample": 20000,
+        "note": "M5 PDF EC ch.43-46: KHÔNG ultimate — candle-end→trend-end median 6-9d → dùng 10 (digitized inside_day 10 gần khớp nhưng khác metric)"},
     # inside_day: PDF lệch ĐỊNH NGHĨA (body Harami vs range) → KHÔNG dùng số PDF.
     # dead_cat: event-driven, không có "days to ultimate" kiểu chart pattern.
     # horn/rectangle tách theo pattern_key con (bảng _VARIANT_LOOKAHEAD).
@@ -377,6 +382,25 @@ _PDF_EXTRAS: Dict[str, Dict[str, Any]] = {
             "Thay thế có nguồn: Shooting Star/Takuri (EC) hoặc Pipe Bottoms/Tops (ECP)."
         ),
     },
+    "harami": {
+        "sample": "20,000 mỗi chương × 4 chương (capped — EC ch.43-46)",
+        "reversal_rate": "bearish 53C/50R · bullish 53R/51R · cross bear 57C/56C · cross bull 55C/56C (gần random)",
+        "meet_target_pct": "bearish 63/58/64/64 · bullish 69/66/59/61 · cross bear 69/67/68/66 · cross bull 74/73/68/70",
+        "avg_move": "≈6-10% cả 4 chương (nhỏ — harami beat S&P nhưng move tuyệt đối thấp)",
+        "days": "candle-end→breakout median 3-4d · candle-end→trend-end median 6-9d",
+        "overall_rank": "bearish 72/103 (poor) · bullish 38/103 · cross bear 80/103 (poor) · cross bull 50/103",
+        "target_rule": (
+            "breakout ± ((HH − LL) của cả 2 nến × multiplier 58-74% theo chương) — "
+            "EC KHÔNG publish failure rate cho candlestick (failure digitized inside_day là BỊA nếu áp cho harami)"
+        ),
+        "detection_rule": "harami thường = BODY containment (cho phép đỉnh HOẶC đáy bằng, không cả hai) · harami cross = RANGE containment + doji",
+        "source_file": "docs/project/pdf_review/m5/family_harami_20260813.md",
+        "note": (
+            "M5 PDF EC ch.43-46 (13/08, offset +24 đã kiểm chứng): tách khỏi inside_day (range-based). "
+            "Reversal rate 47-57% gần random → pattern yếu về dự báo chiều; sách khuyên trade theo "
+            "primary trend + opening gap confirmation. Multiplier detector dùng cột bull market."
+        ),
+    },
 }
 
 # Ngưỡng thất bại (% kéo ngược bất lợi so mốc tham chiếu) — bảng 03 §2.3 + spec.
@@ -400,6 +424,7 @@ _CAP_PER_FAMILY = {
     "pipe_bottoms": 18,
     "pipe_tops": 18,
     "inside_day": 12,
+    "harami": 12,  # khớp HaramiConfig.max_events_per_symbol (harami.py)
     "scallops_ascending": 14,
     "scallops_descending": 14,
     "bump_and_run_reversal": 10,
@@ -442,6 +467,9 @@ _FAILURE_REFERENCE = {
     "dead_cat_bounce": "event_low",
     "spike_formation": "spike_extreme",
     "rising_falling_three_methods": "first_bar_range",  # K3-1: giá quay lại trong range bar đầu (03 §2.3)
+    # Harami: EC không publish failure rate — mốc tham chiếu tự nhiên là đáy nến mẹ
+    # (giá phá đáy nến mẹ = pattern hỏng, đối xứng inside_day dùng low_of_inside_day).
+    "harami": "mother_bar_low",
     # thiếu spec → M5 bổ sung
 }
 
@@ -458,6 +486,7 @@ _TIMEFRAME_DEFAULT = "daily"
 # ---------------------------------------------------------------------------
 _PATTERN_KEY_TO_FAMILY: Dict[str, str] = {
     "inside_day": "inside_day",
+    "harami": "harami",  # M5-2c (13/08): detector mới — tách khỏi inside_day (body vs range)
     "rising_three_methods": "rising_falling_three_methods",
     "falling_three_methods": "rising_falling_three_methods",
     "horn_bottoms": "horn_bottoms_tops",
