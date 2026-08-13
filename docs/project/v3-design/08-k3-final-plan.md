@@ -30,8 +30,17 @@ Sách đối chiếu số PDF weekly (sample 1.152). Scanner daily giữ nguyên
 ## PHẦN B — Review + cải tiến sâu scanner (Tầng 2)
 
 ### 5. failure_busted — CÔNG THỨC CHỐT
-Với breakout lên: `failure_busted = True` nếu tồn tại bar trong `post_breakout_path.csv` có **close ≤ fail_level** XẢY RA TRƯỚC bar đầu tiên chạm target; breakout xuống đảo ngược (close ≥ fail_level). Dùng **close, không dùng wick** (tránh nhiễu râu nến — khớp chữ "closes below" trong sách). `fail_level = reference_level × (1 ∓ threshold/100)`; reference_level per pattern lấy từ spec (đáy pattern / neckline / handle low / flag high). Event thiếu path (short_path) → `failure_busted = null`, loại khỏi mẫu tính rate. Ngưỡng theo bảng 03 §2.3: inside_bar 1% · three_methods/islands 2% · horn/pipe/spike 3% · còn lại 5% (thiếu → 5% + flag). `failure_5pct` cũ đổi tên `weak_move_5pct`. Mốc: **M2**. Nghiệm thu: bull_flags ≈ 5.5%±3%, cup ≈ 5%, inside_bar ≈ 15%; chênh >2× → audit tay 10 event random.
-*Lý do: path rows đã có sẵn, close-based khớp định nghĩa sách, null-rỗng tránh nhiễu rate.*
+> ⚠️ **VÁ 13/08/2026 (H3 — phản biện V4 Pro review):** Đoạn dưới là bản KẾ HOẠCH viết trước M2, chốt "dùng close, không dùng wick".
+> **Quyết định cuối đã ký: dùng WICK (low/high)** — theo **03 §2.2** (chuẩn MỚI hơn, K3-2 ký khi nghiệm thu M2, agent_f1f52d0b 12/08): `(up: low ≤ breakout_level_failure) / (down: high ≥ ...)`, xảy ra TRƯỚC khi chạm target.
+> **Đo đối chứng wick vs close (13/08, scripts/h3_wick_vs_close_comparison.py, DB market_cache = đúng pipeline, tái tạo khớp 100% recompute≠csv=0):**
+> | Pattern | wick (đang chạy) | close (nếu đổi) | % events đổi trạng thái |
+> |---|---|---|---|
+> | cup_with_handle | 43,8% | 38,6% | 356/6888 = 5,2% |
+> | inside_day | 25,6% | 16,7% | 1296/14545 = 8,9% |
+> Ảnh hưởng có thật (5–9% số events đổi trạng thái) nhưng đã được lượng hóa; giữ wick vì là chuẩn đã ký, không curve-fit lại baseline VN (03 §2.5 mục 4 CẤM chỉnh ngưỡng/khung đo để ép số).
+
+Với breakout lên: `failure_busted = True` nếu tồn tại bar trong `post_breakout_path.csv` có **low ≤ fail_level** (theo 03 §2.2 — wick, đã sửa so với bản thảo close bên trên) XẢY RA TRƯỚC bar đầu tiên chạm target; breakout xuống đảo ngược (high ≥ fail_level). `fail_level = reference_level × (1 ∓ threshold/100)`; reference_level per pattern lấy từ spec (đáy pattern / neckline / handle low / flag high). Event thiếu path (short_path) → `failure_busted = null`, loại khỏi mẫu tính rate. Ngưỡng theo bảng 03 §2.3: inside_bar 1% · three_methods/islands 2% · horn/pipe/spike 3% · còn lại 5% (thiếu → 5% + flag). `failure_5pct` cũ đổi tên `weak_move_5pct`. Mốc: **M2** (đã xong, baseline VN đóng băng 12/08 — 09-m2 §3).
+*Lý do: wick theo chuẩn đã ký 03 §2.2 (K3-2); close-based là bản thảo cũ, bỏ.*
 
 ### 6. Cap: GIỮ cap hiện tại (12/14/18/10) + flag `hit_cap = (n ≥ cap)`
 `frequency_score` mới = `min(100, round(events_per_year / 2 × 100))` với `events_per_year = n / số năm dữ liệu của mã`; khi `hit_cap=true` → nhân 0.5 + nhãn "≈cap (tần suất thật cao hơn)". KHÔNG tăng cap trong V3 (bump 10→20 để V3.1).

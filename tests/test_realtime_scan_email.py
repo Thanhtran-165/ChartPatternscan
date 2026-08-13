@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 from scanner.send_realtime_scan_email import (
     ACTIONABLE,
@@ -12,7 +13,9 @@ from scanner.send_realtime_scan_email import (
 )
 
 
-def test_realtime_scan_email_groups_candidate_watchlist_and_risk() -> None:
+def test_realtime_scan_email_groups_candidate_watchlist_and_risk(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Cô lập khỏi profile V3 thật (web_v3 đã tồn tại trên máy) — test grouping thuần.
+    monkeypatch.setattr("scanner.send_realtime_scan_email._load_v3_pattern_stats", lambda: {})
     watchlist = pd.DataFrame(
         [
             {

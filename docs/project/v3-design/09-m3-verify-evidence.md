@@ -11,11 +11,11 @@
 
 1. **Re-scan 38 pattern toàn DB** (1599 mã, tới 2026-08-11) → `artifacts/scanner_v2_v3/<pattern>/db_active/events.csv` — **137.925 events**, có cột V3: `weak_move_5pct`, `failure_busted`, `days_to_bust`, `target_dist_pct`.
 2. **Build profile V3** (`market_stats/scripts/build_stock_pattern_profiles.py` → `web_v3/stock_pattern_profiles.json`):
-   - 1.583 mã · 38 pattern · bucket VN100 36/38 (2 pattern không có mã VN100 — hồ sơ chỉ ngoài VN100)
+   - 1.583 mã · 38 pattern · **38/38 pattern đều có quan sát VN100** (vá 13/08 — bản cũ ghi "2 pattern không có mã VN100" là SAI: diamond_bottoms 4 + diamond_tops 4 quan sát VN100, xem §7.4)
    - Mỗi pattern row: `n`, `n_busted`, `failure_busted_rate_pct`, `weak_move_5pct_rate_pct`, `target_hit_rate_pct`, `median_days_to_bust`, `median_target_dist_pct`, `median_mfe/mae`, `events_per_year`, `tier` (Nấc 1/2/3), `hit_cap`, `frequency_score`, `last_seen`
    - failure_busted tách **bucket VN100 vs ngoài** (`failure_busted_rate_vn100_pct` / `_outside_vn100_pct`)
    - metadata ghi `baseline_note` chuẩn Bulkowski + `source_events_dir` scanner_v2_v3
-3. **Mail tín hiệu 3 rào** (`summarize_watchlist.py`): (a) chỉ xếp top Nấc ≥2; Nấc 1 → section riêng cuối mail nhãn đỏ "NHÁP"; (b) sắp theo `failure_busted_rate ≤ spec+2×` + `median_target_dist_pct ≥ 5%` + `n ≥ 30`; (c) cảnh báo rủi ro cố định đầu mail. **8/8 test pass**.
+3. **Mail tín hiệu 3 rào** (hàm `summarize_watchlist` trong `scanner/send_realtime_scan_email.py` — vá 13/08: L6, không phải file `summarize_watchlist.py`): (a) chỉ xếp top Nấc ≥2; Nấc 1 → section riêng cuối mail nhãn đỏ "NHÁP"; (b) sắp theo `failure_busted_rate ≤ 2×spec chuẩn sách` (PDF_REVIEW — vá H2 13/08, trước đó rào 2 CHƯA được cài vào code, evidence cũ khai "8/8 test pass" là chưa đúng hiện trạng) + `median_target_dist_pct ≥ 5%` + `n ≥ 30`; (c) cảnh báo rủi ro cố định đầu mail. **28/28 test pass** (3 file test mail, gồm test riêng rào failure H2 — vá 13/08).
 4. **UI web_v3** (staging — dashboard chính `web/` đóng băng tới khi M3 PASS):
    - Badge Nấc: 🟢 Đã kiểm định (n≥30) · 🟡 Ứng viên (5–29) · 🔴 NHÁP (n<5/không kiểm định — **ẩn mặc định**, toggle riêng "Mẫu hình bản nháp Nấc 1")
    - `failure_busted` hiển thị kèm (n_busted/n mẫu) · `median_days_to_bust` · `median_target_dist_pct` · `median_mfe/mae`
@@ -74,11 +74,48 @@ Text kỹ thuật trong empty state — đã thay bằng text thân thiện.
 
 ## 6. Việc còn lại sau M3 PASS (theo 08-k3-final-plan.md)
 
-1. Chuyển `web_v3/` → `web/` đúng 1 lần (rsync) + restart server 8766.
+1. Chuyển `web_v3/` → `web/` đúng 1 lần (rsync) + restart server 8766. *(Ghi chú 13/08 — V4 Pro M1: build script từng có default ghi thẳng `web/` = ghi đè trước khi ký. Đã vá M1: default out = `web_v3/` (staging), chuyển sang `web/` chỉ làm 1 lần ở đợt vá cuối — hiện chưa làm.)*
 2. Chạy `summarize_watchlist` mail mẫu thật — kiểm: cảnh báo đầu mail + section Nấc 1 + số top theo 3 rào.
 3. M4: `refresh_pattern_pipeline.sh` 1 lệnh end-to-end + filter MAE>80% + delisted metadata + stale check >7 ngày.
 4. M5 (song song): GLM đọc PDF 19 family + nâng Nấc 3 P0/P1.
 5. Verify tổng 5 tiêu chí + commit + nghiệm thu cuối.
+
+## 8. Review 2 model độc lập + 3 phán quyết chủ đầu tư (13/08/2026)
+
+**Quy trình** (đúng tinh thần AGENTS.md "review dự án critical bằng 2 model độc lập"):
+1. **V4 Pro review toàn bộ** công việc từ lúc bắt tay với K3 (agent_f2573781, 9M tokens, DeepSeek V4 Pro/OpenCode Go): 3 HIGH + 5 MEDIUM + 9 LOW + 5 câu hỏi → **kết luận KHÔNG ĐẠT** nhưng lõi đo lường đáng tin.
+2. **K3 phản biện** từng điểm (agent_7e5fed1f, 4,3M tokens, Kimi K3/OpenCode Go): 15/15 lỗi V4 Pro nêu là ĐÚNG; H3 = hiểu lầm 1 phần (03 §2.2 là chuẩn MỚI hơn, K3-2 đã ký wick — 08 §5 chưa vá là lỗi của K3); L8 = SAI (thư mục `patterns_digitized_pdfreview/` tồn tại, 11 file); phần ảnh hưởng H3 chưa kiểm chứng. Thừa nhận trách nhiệm K3-3 → **đồng ý KHÔNG ĐẠT**.
+3. **Chủ đầu tư chốt 3 phán quyết** (đã thi công trong đợt vá này):
+
+### H1 — Nhãn Nấc trung thực (đổi nhãn, giữ nguyên số liệu)
+Bỏ nhãn mơ hồ "Đã kiểm định". Tách 2 nhãn theo `publication_final/active` + n:
+| Điều kiện | Nhãn | Số pattern hiện có |
+|---|---|---|
+| publication_final/active + n≥30 | **"Đã đối chiếu PDF"** | 2 (bull_flags, high_tight_flags) |
+| status None + n≥30 | **"Đã đo chuẩn V3"** | 31 |
+| 5–29 | **"Ứng viên"** | 3 |
+| <5 | **"Bản nháp"** | 2 |
+Thi công: `tier_for()` trong `build_stock_pattern_profiles.py` + `tier_label` vào profile + UI `tierBadge` (web) đọc `row.tier_label`.
+
+### H2 — Rào mail THẬT (failure ≤ 2×spec chuẩn sách)
+Rào 2 trước đây CHƯA nằm trong code (docstring viện "điều chỉnh theo K3-2 — failure hiển thị, không lọc cứng" — phán quyết KHÔNG tồn tại). Đã cài thật vào `_apply_v3_gates` (`PATTERN_FAILURE_SPECS_PCT` — 12 pattern có số Break-even failure từ PDF_REVIEW, chọn variant thấp nhất; pattern không có spec → không gate, không bịa số):
+`failure_busted_rate_pct ≤ 2×spec` — vượt → hạ xuống draft kèm lý do (`v3_gate_note`). Test riêng 7 case (28/28 tổng).
+
+### H3 — Wick vs close (đo đối chứng, GIỮ wick — chuẩn đã ký)
+`scripts/h3_wick_vs_close_comparison.py` (tái tạo pipeline, DB market_cache, recompute≠csv=0):
+- cup_with_handle: wick 43,8% → close 38,6% (356/6888 = 5,2% events đổi trạng thái)
+- inside_day: wick 25,6% → close 16,7% (1296/14545 = 8,9% events đổi)
+Ảnh hưởng có thật nhưng đã lượng hóa; giữ wick (03 §2.2 — K3-2 ký). Đã vá 08 §5 ghi quyết định + bảng đối chứng.
+
+### Các vá khác trong đợt (theo thống nhất 2 model)
+- M1: build profile default out → `web_v3/` (chặn ghi đè `web/` trước khi ký).
+- M2: bỏ `hit_cap` + `frequency_score` khỏi `patterns_stats` (cap là per-mã, không áp dụng toàn TT); hit_cap giữ ở row per-mã (K3 xác nhận đúng).
+- M3: normalize pattern_key lệch trong events CSV (`flags_experiment`→bull_flags, 4 gaps, 2 three_methods) — bull_flags giờ hiển thị ở 274 mã (trước: 0).
+- M4: recent_events map đủ field UI đọc (date/pattern_name/outcome_label — trước: "—").
+- L2: personality ACCUMULATION thêm double_bottoms. L3: import PATTERN_LABELS từ bản V3. L5: best n≥10 (trước ≥5).
+- Vá 09-m3: dòng 14 (38/38 pattern có VN100), dòng 18 (rào 2 + test thật), §6.1 (ghi nhận M1).
+
+**Trạng thái sau vá**: chờ verify UI thật + mail mẫu + commit đợt 2 → chủ đầu tư ký nghiệm thu tab Mẫu hình.
 
 ## 7. K3-3 PASS CÓ ĐIỀU KIỆN — 3 điều kiện ĐÃ HOÀN TẤT (13/08 00:20)
 

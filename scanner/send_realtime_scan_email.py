@@ -578,10 +578,35 @@ def _classify_setups(
     return out
 
 
+# Spec "Break-even failure" (BE% — tỷ lệ fail ở mốc 5%) theo Bulkowski gốc,
+# nguồn: docs/project/pdf_review/PDF_REVIEW_20260812.md (§2 chi tiết + §3 bảng tóm tắt).
+# Cách chọn spec: variant THẤP NHẤT (tốt nhất) trong các thị trường/hướng breakout
+# (vd pipe_bottoms 5% bull / 4% bear → spec 4.0) — đại diện chuẩn pattern đáng đạt.
+# Pattern KHÔNG có spec ở đây → KHÔNG gate failure (không bịa số; gồm inside_day
+# lệch định nghĩa Harami, dead_cat_bounce không có BE, broadening/flags/gaps... chưa trích).
+# Rào mail (phán quyết chủ đầu tư 13/08/2026 — H2): failure_busted_rate_pct ≤ 2×spec.
+PATTERN_FAILURE_SPECS_PCT: dict[str, float] = {
+    "pipe_bottoms": 4.0,          # PDF 5% (bull) / 4% (bear)
+    "pipe_tops": 2.0,             # PDF 11% / 2%
+    "horn_bottoms": 7.0,          # PDF 9% / 7%
+    "horn_tops": 2.0,             # PDF 7% / 2%
+    "cup_with_handle": 5.0,       # PDF 5% / 7%
+    "scallops_ascending": 10.0,   # PDF 10 / 16 / 27 / 14
+    "scallops_descending": 8.0,   # PDF 22 / 20 / 15 / 8
+    "rectangle_bottoms": 4.0,     # PDF 10 / 11 / 16 / 4
+    "rectangle_tops": 9.0,        # PDF 9 / 16 / 11 / 9
+    "three_falling_peaks": 4.0,   # PDF 12% / 4%
+    "three_rising_valleys": 5.0,  # PDF 5% / 9%
+    "high_tight_flags": 0.0,      # PDF 0% / 0% (sách chưa thấy busted)
+}
+
+
 def _apply_v3_gates(df: pd.DataFrame, v3_stats: Mapping[str, Mapping[str, Any]]) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """3 rào mail V3 (08 §11, điều chỉnh theo K3-2 — failure hiển thị, không lọc cứng):
+    """Rào mail V3 (08 §11 + phán quyết chủ đầu tư 13/08/2026 H1/H2):
     qualified = pattern Nấc 2+ (tier≥2) + n≥30 toàn thị trường + median_target_dist_pct≥5%
-    (loại inside_bar 2.3% khỏi top); draft = Nấc 1 (bản nháp — section riêng cuối mail).
+    (loại inside_bar 2.3% khỏi top) + failure_busted_rate_pct ≤ 2×spec chuẩn sách
+    (PATTERN_FAILURE_SPECS_PCT — loại pattern thực đo VN tệ hơn 2 lần chuẩn Bulkowski);
+    draft = Nấc 1 (bản nháp) + các pattern bị rào (section riêng cuối mail, không biến mất).
 
     Chỉ gate khi profile V3 thật (có field tier) — profile cũ/chưa build không có tier
     thì giữ hành vi cũ (qualified hết) để mail không bị rỗng."""
@@ -596,14 +621,25 @@ def _apply_v3_gates(df: pd.DataFrame, v3_stats: Mapping[str, Mapping[str, Any]])
         tier = int(s.get("tier") or 1)
         n = int(s.get("n") or 0)
         tgt = s.get("median_target_dist_pct")
-        if tier >= 2 and n >= 30 and (tgt is None or float(tgt) >= 5.0):
+        fail = s.get("failure_busted_rate_pct")
+        spec = PATTERN_FAILURE_SPECS_PCT.get(str(row.get("pattern_id")))
+        failure_gated = spec is not None and fail is not None and float(fail) > 2.0 * spec
+        if failure_gated:
+            # Rào H2: thực đo VN tệ hơn 2× chuẩn sách → không lên mail chính,
+            # hạ xuống draft kèm lý do (pattern chưa đạt chuẩn để giới thiệu).
+            row["v3_gate_note"] = (
+                f"failure {float(fail):.1f}% > 2×spec ({spec:.1f}%) — chưa đạt chuẩn sách"
+            )
+            draft.append(row)
+        elif tier >= 2 and n >= 30 and (tgt is None or float(tgt) >= 5.0):
             qualified.append(row)
         else:
             # Nấc 1 (bản nháp) + Nấc 2+ nhưng mẫu nhỏ hoặc mục tiêu thấp
             # (VD inside_day 2.3%) → section phụ cuối mail, không biến mất.
             draft.append(row)
     q = pd.DataFrame(qualified, columns=df.columns) if qualified else df.head(0).copy()
-    d = pd.DataFrame(draft, columns=df.columns) if draft else df.head(0).copy()
+    # Không ép columns=df.columns cho draft: giữ cột phụ v3_gate_note (lý do bị rào H2).
+    d = pd.DataFrame(draft) if draft else df.head(0).copy()
     return q, d
 
 
@@ -827,7 +863,7 @@ def render_text_email(summary: Mapping[str, Any], *, include_risk_details: bool 
         lines.extend(["", f"3. Không đạt chuẩn tín hiệu ({len(draft_rows)} mã, chỉ tham khảo)"])
         for row in draft_rows:
             lines.append(_row_text(row))
-        lines.append("- Nhóm này gồm: bản nháp Nấc 1 chưa kiểm định, hoặc mẫu nhỏ dưới 30 lần toàn thị trường, hoặc mục tiêu giữa mẫu dưới 5% — không dùng làm tín hiệu, chỉ tham khảo.")
+        lines.append("- Nhóm này gồm: bản nháp Nấc 1 chưa kiểm định, hoặc mẫu nhỏ dưới 30 lần toàn thị trường, hoặc mục tiêu giữa mẫu dưới 5%, hoặc tỉ lệ vỡ mẫu vượt 2 lần chuẩn sách — không dùng làm tín hiệu, chỉ tham khảo.")
     if filter_active and stale_hidden:
         lines.extend(
             [
@@ -976,7 +1012,7 @@ def render_html_email(summary: Mapping[str, Any], *, include_risk_details: bool 
         draft_html = (
             '<h2>3. Không đạt chuẩn tín hiệu (chỉ tham khảo)</h2>\n'
             f'{_html_rows(summary["sections"]["draft_patterns"])}'
-            '<p class="note">Nhóm này gồm: bản nháp Nấc 1 chưa kiểm định, hoặc mẫu nhỏ dưới 30 lần toàn thị trường, hoặc mục tiêu giữa mẫu dưới 5% — không dùng làm tín hiệu, chỉ tham khảo.</p>'
+            '<p class="note">Nhóm này gồm: bản nháp Nấc 1 chưa kiểm định, hoặc mẫu nhỏ dưới 30 lần toàn thị trường, hoặc mục tiêu giữa mẫu dưới 5%, hoặc tỉ lệ vỡ mẫu vượt 2 lần chuẩn sách — không dùng làm tín hiệu, chỉ tham khảo.</p>'
         )
     cards_html = (
         f"""
