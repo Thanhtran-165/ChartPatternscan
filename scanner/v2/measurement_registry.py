@@ -144,6 +144,22 @@ _PDF_EXTRAS: Dict[str, Dict[str, Any]] = {
             "đã thay bằng công thức PDF. BE failure 2/2/4/0% (bull 2%); % meeting target 50–63%."
         ),
     },
+    "high_tight_flags": {
+        "sample": 307,
+        "be_failure_pct": "0% / 0% (cả 2 thị trường — xuất sắc)",
+        "avg_move": "rise bull 69% / bear 42%",
+        "meet_target_pct": "90% / 91%",
+        "days": "ultimate high 39 / 25 (đã nạp lookahead _PDF_OVERRIDES)",
+        "target_rule": (
+            "sách không trích measure rule riêng trong 2 file review hiện có — "
+            "detector dùng half-prior-move (xem manifest quality_gate HTF)"
+        ),
+        "source_file": "docs/project/pdf_review/PDF_REVIEW_20260812.md (ch.22 p373-397) + family_flags_pennants_20260813.md",
+        "note": (
+            "M5 13/08: digitized flags_digitized.json ghi HTF rise 47% / failure 5% — SAI (PDF 69%/42%, BE 0%). "
+            "HTF cần spec riêng; số đã tách khỏi flags chung."
+        ),
+    },
     "triangles": {
         "sample": 3605,
         "source_file": "docs/project/pdf_review/m5/family_triangles_20260813.md",
@@ -535,6 +551,16 @@ _PATTERN_KEY_TO_FAMILY: Dict[str, str] = {
     "double_tops_ee": "double_tops",
     "double_bottoms": "double_bottoms",
     "double_tops": "double_tops",
+    # M5-2d (13/08): alias tên variant trong pattern_family_manifest.json (adam_adam...) —
+    # detector runtime chỉ dùng "double_bottoms"/"double_tops" nhưng manifest dùng tên dài.
+    "double_bottoms_adam_adam": "double_bottoms",
+    "double_bottoms_adam_eve": "double_bottoms",
+    "double_bottoms_eve_adam": "double_bottoms",
+    "double_bottoms_eve_eve": "double_bottoms",
+    "double_tops_adam_adam": "double_tops",
+    "double_tops_adam_eve": "double_tops",
+    "double_tops_eve_adam": "double_tops",
+    "double_tops_eve_eve": "double_tops",
     "head_and_shoulders_bottoms": "head_and_shoulders_bottom",
     "head_and_shoulders_bottoms_complex": "head_and_shoulders_bottom",
     "head_and_shoulders_tops": "head_and_shoulders_top",
