@@ -53,8 +53,8 @@ class RectangleConfig:
     width_max_bars: int = 130
     prior_trend_lookback_bars: int = 55
     prior_trend_min_pct: float = 5.0
-    high_flat_tol_pct: float = 3.2
-    low_flat_tol_pct: float = 3.2
+    high_flat_tol_pct: float = 3.0  # siết 13/08/2026: spread <=3% (thước đo, trước 3.2)
+    low_flat_tol_pct: float = 3.0  # siết 13/08/2026: spread <=3% (thước đo, trước 3.2)
     height_min_pct: float = 5.0
     height_max_pct: float = 36.0
     min_high_touches: int = 2

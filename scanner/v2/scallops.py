@@ -73,11 +73,12 @@ class ScallopConfig:
     height_max_pct: float = 55.0
     lip_shift_min_pct: float = 2.5
     lip_shift_near_equal_pct: float = 1.5
+    lip_shift_max_pct: float = 5.0  # siết 13/08/2026: 2 môi xấp xỉ |shift|<=5% (thước đo; trước không giới hạn trên)
     left_share_min_pct: float = 25.0
     left_share_max_pct: float = 78.0
     arc_excursion_min_pct: float = 35.0
     min_directional_ratio: float = 0.46
-    smooth_turn_max_turns: int = 9
+    smooth_turn_max_turns: int = 8  # siết 13/08/2026: đường đi mượt <=8 lần đảo chiều (thước đo, trước 9)
     prior_trend_lookback_bars: int = 80
     confirmation_search_bars: int = 45
     confirmation_threshold: float = 0.004
@@ -244,6 +245,8 @@ class ScallopDetector:
         if turn_count > self.config.smooth_turn_max_turns:
             return None
         lip_shift_pct = (end_price - start_price) / start_price * 100.0
+        if abs(lip_shift_pct) > self.config.lip_shift_max_pct:
+            return None
         prior = _prior_trend_pct(df, i0, self.config.prior_trend_lookback_bars)
         return {
             "sequence_tag": sequence,

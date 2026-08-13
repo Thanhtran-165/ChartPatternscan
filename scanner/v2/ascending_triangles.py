@@ -296,6 +296,8 @@ class AscendingTriangleDetector:
             lower_price0=float(lower.price0),
             lower_slope_per_bar=float(lower.slope_per_bar),
         )
+        if int(source_features.get("upper_touch_count") or 0) < 2 or int(source_features.get("lower_touch_count") or 0) < 2:
+            return None  # siết 13/08/2026: đủ chạm >=2 mỗi biên (thước đo)
         return {
             "formation_start_idx": int(formation_start),
             "formation_end_idx": int(formation_end),

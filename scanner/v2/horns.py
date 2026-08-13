@@ -72,10 +72,10 @@ class HornConfig:
     confirmation_threshold: float = 0.003
     min_spike_pct: float = 4.0
     max_spike_pct: float = 70.0
-    max_spike_similarity_pct: float = 12.0
+    max_spike_similarity_pct: float = 5.0  # siết 13/08/2026: 2 spike chênh <=5% (thước đo, trước 12)
     min_center_clearance_pct: float = 2.4
     prior_visibility_lookback_bars: int = 52
-    min_prior_visibility_percentile: float = 0.62
+    min_prior_visibility_percentile: float = 0.70  # siết 13/08/2026: spike nổi bật percentile>=70 (thước đo, trước 0.62)
     prior_trend_lookback_bars: int = 45
     prior_trend_min_abs_pct: float = 3.0
     breakout_cooldown_bars: int = 35
@@ -125,14 +125,14 @@ def _spike_visibility_ok(
     left = max(1, idx - config.prior_visibility_lookback_bars)
     prior = df.iloc[left:idx]
     if len(prior) < 8:
-        return True, None
+        return False, None  # siết 13/08/2026: không đủ lịch sử so = không nổi bật (thước đo 100%)
     if pattern_key == HORN_BOTTOMS:
         sizes = (prior["high"] - prior["low"]) / prior["high"].clip(lower=1e-9) * 100.0
     else:
         sizes = (prior["high"] - prior["low"]) / prior["low"].clip(lower=1e-9) * 100.0
     series = pd.to_numeric(sizes, errors="coerce").dropna()
     if series.empty:
-        return True, None
+        return False, None  # siết 13/08/2026: không đủ lịch sử so = không nổi bật (thước đo 100%)
     percentile = float((series <= spike_pct).mean())
     return percentile >= float(config.min_prior_visibility_percentile), round(percentile * 100.0, 2)
 

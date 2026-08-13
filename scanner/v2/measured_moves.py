@@ -58,10 +58,10 @@ class MeasuredMoveConfig:
     first_leg_max_pct: float = 95.0
     correction_min_bars: int = 5
     correction_max_bars: int = 70
-    retrace_min_pct: float = 30.0
+    retrace_min_pct: float = 40.0  # siết 13/08/2026: retrace 40-60% (sách ECP ch29, trước 30)
     retrace_ideal_min_pct: float = 38.0
     retrace_ideal_max_pct: float = 62.0
-    retrace_max_pct: float = 80.0
+    retrace_max_pct: float = 60.0  # siết 13/08/2026: trước 80, lệch sách
     leg_linearity_min_r2: float = 0.62
     correction_sawtooth_max_turns: int = 6
     confirmation_search_bars: int = 18

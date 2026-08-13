@@ -201,6 +201,12 @@ class ThreePeaksValleysDetector:
         if target_dist_pct <= 0 or target_dist_pct > 90:
             return None
 
+        # siết 13/08/2026: đáy/đỉnh trung gian nằm ngang trong ±2% (sách ECP ch42/43 — thước đo 81%)
+        if self.pattern_key == THREE_FALLING_PEAKS and window[3].price > window[1].price * 1.02:
+            return None
+        if self.pattern_key == THREE_RISING_VALLEYS and window[3].price < window[1].price * 0.98:
+            return None
+
         score = 50.0
         score += _score_band(abs(float(prior)), good=16.0, weak=self.config.prior_trend_min_pct, weight=0.12)
         score += _score_band(height_pct, good=16.0, weak=self.config.height_min_pct, weight=0.12)

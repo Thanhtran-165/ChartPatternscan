@@ -55,11 +55,11 @@ class BumpAndRunConfig:
     bump_min_bars_after_lead: int = 8
     bump_max_bars_after_lead: int = 95
     lead_in_min_pct: float = 5.0
-    lead_in_max_pct: float = 90.0
+    lead_in_max_pct: float = 10.0  # siết 13/08/2026: lead-in đi ngang |change|<=10% (sách, trước 90)
     lead_in_min_r2: float = 0.32
     bump_min_height_pct: float = 9.0
     bump_max_height_pct: float = 95.0
-    bump_slope_ratio_min: float = 1.75
+    bump_slope_ratio_min: float = 2.0  # siết 13/08/2026: bump >= 2x lead-in (sách, trước 1.75)
     confirmation_search_bars: int = 70
     confirmation_threshold: float = 0.004
     pivot_min_spacing: int = 8

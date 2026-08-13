@@ -68,7 +68,7 @@ CRITERIA: dict[str, list[tuple[str, str, str]]] = {
         ("volume xác nhận", "volume_confirmed == True", "quality"),
     ],
     "pennants": [
-        ("2 đường hội tụ ngược chiều (upper<=-2°, lower>=2°) (*)", "(upper_slope_deg <= -2) & (lower_slope_deg >= 2)", "shape"),
+        ("2 đường hội tụ đúng hướng sách: bull đỉnh<=-2°&đáy>=2°, bear cả 2 đường>=2° (*)", "((variant == 'bull_pennant') & (upper_slope_deg <= -2) & (lower_slope_deg >= 2)) | ((variant == 'bear_pennant') & (upper_slope_deg >= 2) & (lower_slope_deg >= 2))", "shape"),
         ("có cột cờ trước (|pole_move_pct|>=10%) (*)", "pole_move_pct.abs() >= 10", "shape"),
         ("độ dài 9-11 ngày theo sách (<=11) (*)", "pattern_width_bars <= 11", "shape"),
         ("pennant nhỏ so với cột cờ (<=35%) (*)", "pennant_to_pole_pct <= 35", "quality"),

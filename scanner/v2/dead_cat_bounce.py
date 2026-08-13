@@ -70,7 +70,7 @@ DEFAULT_OUT_DIR = Path("artifacts/scanner_v2/dead_cat_bounce_family")
 
 @dataclass(frozen=True)
 class DeadCatConfig:
-    event_decline_min_pct: float = 15.0
+    event_decline_min_pct: float = 20.0  # siết 13/08/2026: sụt giảm mạnh >=20% (thước đo, trước 15)
     event_decline_max_pct: float = 75.0
     event_decline_max_bars: int = 8
     bounce_min_pct: float = 15.0
@@ -171,7 +171,7 @@ class DeadCatDetector:
             bounce_idx = b0 + bounce_rel
             bounce_high = float(highs.iloc[bounce_rel])
             bounce_pct = (bounce_high - event_low) / event_low * 100.0
-            if bounce_pct < self.config.bounce_min_pct or bounce_pct > self.config.bounce_max_pct:
+            if bounce_pct < self.config.bounce_min_pct or bounce_pct > self.config.bounce_max_pct or bounce_pct > decline_pct:  # siết 13/08/2026: bounce không vượt đợt giảm
                 continue
             if any(abs(bounce_idx - prev) <= self.config.breakout_cooldown_bars for prev in used):
                 continue

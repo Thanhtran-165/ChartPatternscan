@@ -56,6 +56,7 @@ class HighTightFlagConfig:
     pullback_min_pct: float = 3.0
     pullback_max_pct: float = 35.0
     consolidation_height_max_pct: float = 38.0
+    compression_max_ratio: float = 0.35  # siết 13/08/2026: nén hẹp <=0.35 so với cột cờ (thước đo)
     breakout_search_bars: int = 12
     breakout_threshold: float = 0.0075
     breakout_volume_confirm_ratio: float = 1.2
@@ -168,6 +169,8 @@ class HighTightFlagDetector:
             if not (self.config.pullback_min_pct <= pullback_pct <= self.config.pullback_max_pct):
                 continue
             if body_height_pct > self.config.consolidation_height_max_pct:
+                continue
+            if body_height_pct / max(advance_pct, 1.0) > self.config.compression_max_ratio:
                 continue
             if body_high > peak_price * 1.25:
                 continue

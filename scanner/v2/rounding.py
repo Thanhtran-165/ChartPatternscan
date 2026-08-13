@@ -72,7 +72,7 @@ class RoundingConfig:
     confirmation_threshold: float = 0.003
     min_height_pct: float = 10.0
     max_height_pct: float = 90.0
-    max_lip_mismatch_pct: float = 28.0
+    max_lip_mismatch_pct: float = 5.0  # siết 13/08/2026: 2 môi chênh <=5% (thước đo, trước 28)
     min_center_position: float = 0.30
     max_center_position: float = 0.72
     min_bottom_zone_fraction: float = 0.10

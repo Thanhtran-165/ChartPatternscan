@@ -50,7 +50,7 @@ DEFAULT_OUT_DIR = Path("artifacts/scanner_v2/pennants")
 @dataclass(frozen=True)
 class PennantDetectorConfig:
     width_min_bars: int = 2
-    width_max_bars: int = 15
+    width_max_bars: int = 11  # siết 13/08/2026: sách ECP 9-11 ngày (trước 15)
     pole_lookback_bars: int = 40
     pole_min_change_pct: float = 10.0
     pole_min_slope_deg: float = 8.0
@@ -197,6 +197,12 @@ class PennantDetector:
         if direction == "up" and not (self.config.bull_avg_slope_min <= avg_slope <= self.config.bull_avg_slope_max):
             return None
         if direction == "down" and not (self.config.bear_avg_slope_min <= avg_slope <= self.config.bear_avg_slope_max):
+            return None
+
+        # siết 13/08/2026: đúng chuẩn sách — bull: đỉnh dốc xuống >=2° & đáy dốc lên >=2°; bear: 2 đường dốc lên >=2°
+        if direction == "up" and (upper_deg > -2.0 or lower_deg < 2.0):
+            return None
+        if direction == "down" and (upper_deg < 2.0 or lower_deg < 2.0):
             return None
 
         mid_idx = (idxs[1] + idxs[2]) // 2

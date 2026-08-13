@@ -62,11 +62,11 @@ class CupWithHandleConfig:
     cup_width_max_bars: int = 325
     prior_trend_lookback_bars: int = 180
     prior_trend_min_pct: float = 30.0
-    rim_similarity_tol_pct: float = 9.0
+    rim_similarity_tol_pct: float = 5.0  # siết 13/08/2026: 2 môi chênh <=5% (thước đo, trước 9)
     cup_depth_min_pct: float = 10.0
     cup_depth_max_pct: float = 55.0
-    bottom_pos_min_pct: float = 25.0
-    bottom_pos_max_pct: float = 75.0
+    bottom_pos_min_pct: float = 30.0  # siết 13/08/2026: đáy giữa cup 30-70% (thước đo, trước 25)
+    bottom_pos_max_pct: float = 70.0  # siết 13/08/2026: trước 75
     roundness_band_pct: float = 35.0
     roundness_min_bars: int = 5
     handle_min_bars: int = 5
@@ -81,7 +81,7 @@ class CupWithHandleConfig:
     max_events_per_symbol: int = 6
     max_pair_candidates_per_symbol: int = 16000
     inverted_enabled: bool = True
-    inverted_rim_similarity_tol_pct: float = 6.0
+    inverted_rim_similarity_tol_pct: float = 5.0  # siết 13/08/2026: thước đo <=5% (trước 6)
     inverted_handle_retrace_min_pct: float = 18.0
     inverted_handle_retrace_max_pct: float = 70.0
 
