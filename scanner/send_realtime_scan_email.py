@@ -295,13 +295,50 @@ def _load_v3_pattern_stats(path: Path | None = None) -> dict[str, Mapping[str, A
     return {str(k): v for k, v in stats.items() if isinstance(v, Mapping)}
 
 
+MANIFEST_PATH = Path(__file__).resolve().parents[1] / "scanner" / "v2" / "pattern_family_manifest.json"
+BOOK_STATUSES = {"publication_final", "active"}
+
+
+def _load_manifest_status() -> dict[str, str]:
+    """pattern_id -> status từ pattern_family_manifest.json (M2 — V4 Pro 13/08).
+
+    Pattern sách (bear_flags/bull_pennants/bear_pennants...) chưa có events V3 →
+    không có trong patterns_stats → mail hạ nhầm xuống 'Bản nháp — chưa kiểm định'.
+    Fallback manifest để nhãn trung thực: pattern đã đối chiếu PDF thì gắn đúng
+    nhãn 'Đã đối chiếu PDF', chỉ thiếu số đo V3 (n=0 → không qualified)."""
+    if not MANIFEST_PATH.is_file():
+        return {}
+    try:
+        d = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    out: dict[str, str] = {}
+    for finfo in (d.get("families") or {}).values():
+        for pkey, pinfo in (finfo.get("patterns") or {}).items():
+            out[str(pkey)] = pinfo.get("status", "unknown")
+    return out
+
+
+def _v3_or_manifest_stats(v3_stats: Mapping[str, Mapping[str, Any]], pattern_id: Any,
+                          manifest: Mapping[str, str]) -> dict[str, Any]:
+    """Thống kê V3 cho 1 pattern; pattern sách chưa đo V3 → nhãn theo manifest (M2)."""
+    s = dict(v3_stats.get(str(pattern_id)) or {})
+    if s.get("tier") is not None:
+        return s
+    if manifest.get(str(pattern_id)) in BOOK_STATUSES:
+        return {"tier": 3, "tier_label": "Đã đối chiếu PDF",
+                "tier_note": "chuẩn sách Bulkowski — chưa có events V3 để đo", "n": 0}
+    return s
+
+
 def _enrich_rows_with_pattern_context(rows: list[Mapping[str, Any]], context: Mapping[str, Mapping[str, Any]]) -> list[dict[str, Any]]:
     v3 = _load_v3_pattern_stats()
+    manifest = _load_manifest_status()
     enriched: list[dict[str, Any]] = []
     for row in rows:
         out = dict(row)
         pattern_context = context.get(str(row.get("pattern_id"))) or {}
-        v3_stats = v3.get(str(row.get("pattern_id"))) or {}
+        v3_stats = _v3_or_manifest_stats(v3, row.get("pattern_id"), manifest)
         out["pattern_label"] = _pattern_label(row.get("pattern_id"))
         out["potential_profit_pct"] = pattern_context.get("median_mfe_pct")
         out["target_success_probability"] = pattern_context.get("target_hit_rate")
@@ -598,6 +635,10 @@ PATTERN_FAILURE_SPECS_PCT: dict[str, float] = {
     "three_falling_peaks": 4.0,   # PDF 12% / 4%
     "three_rising_valleys": 5.0,  # PDF 5% / 9%
     "high_tight_flags": 0.0,      # PDF 0% / 0% (sách chưa thấy busted)
+    "head_and_shoulders_bottoms": 4.0,  # PDF 4% / 8%
+    "head_and_shoulders_tops": 1.0,     # PDF 4% / 1%
+    "triple_bottoms": 4.0,              # PDF 4% / 8%
+    "triple_tops": 5.0,                 # PDF 10% / 5%
 }
 
 
@@ -616,8 +657,9 @@ def _apply_v3_gates(df: pd.DataFrame, v3_stats: Mapping[str, Mapping[str, Any]])
     if not v3_active:
         return df.copy(), df.head(0).copy()
     qualified, draft = [], []
+    manifest = _load_manifest_status()
     for _, row in df.iterrows():
-        s = v3_stats.get(str(row.get("pattern_id"))) or {}
+        s = _v3_or_manifest_stats(v3_stats, row.get("pattern_id"), manifest)
         tier = int(s.get("tier") or 1)
         n = int(s.get("n") or 0)
         tgt = s.get("median_target_dist_pct")

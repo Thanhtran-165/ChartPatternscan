@@ -49,3 +49,6 @@ chart_patterns_detailed_statistics.json
 logs/
 .tmp/
 tmp/
+
+# Runtime data (DB 1.2GB nằm ở ~/dev/market_stats_v2/market_cache — bản chạy)
+market_cache/
