@@ -119,15 +119,44 @@ _PDF_EXTRAS: Dict[str, Dict[str, Any]] = {
             "symmetrical thêm biến thể halfway point."
         ),
     },
+    "double_bottoms": {
+        "sample": 1383,
+        "be_failure_pct": "bull 4–5% / bear 4–8% (4 biến thể)",
+        "avg_move": "rise bull 35–40% / bear 23–33%",
+        "meet_target_pct": "47–67% (AA 66 bull / 48 bear)",
+        "days": "ultimate high bull 136–170 / bear 77–101",
+        "throwback_pct": "46–64%",
+        "best_variant": "EE (rise bull 40%, BE 4%)",
+        "target_rule": "highest_high_between_bottoms + (highest_high_between_bottoms − lowest_low_lower_bottom)",
+        "source_file": "docs/project/pdf_review/m5/family_doubles_20260813.md",
+        "note": (
+            "M5 PDF ch.13–16: measure rule KHỚP digitized (KHÔNG chia đôi — chỉ DT mới chia). "
+            "Digitized avg rise SAI (~½ PDF) và best/worst variant ĐẢO NGƯỢC (EE là best, không phải worst)."
+        ),
+    },
     "double_tops": {
+        "sample": 1413,
+        "be_failure_pct": "bull 8–14% / bear 2–11%",
+        "avg_move": "decline bull 15–19% / bear 19–25%",
+        "meet_target_pct": "68–79%",
+        "days": "ultimate low bull 43–51 / bear 32–45",
+        "pullback_pct": "48–64%",
+        "best_variant": "EE (decline bear 25%, BE 2%)",
         "target_rule": "lowest_low − (highest_peak − lowest_low_between_tops) / 2  [CHIA ĐÔI height]",
         "source_file": "docs/project/pdf_review/m5/family_doubles_20260813.md",
         "note": (
             "M5 PDF ch.17–20: measure rule CHIA ĐÔI height — digitized thiếu /2 → target tính gấp đôi thực tế "
-            "(lỗi critical). BE bull 8–14% / bear 2–11%; %target 68–79%."
+            "(lỗi critical). Best/worst variant digitized ĐẢO NGƯỢC (EE là best)."
         ),
     },
     "bump_and_run_reversal": {
+        "sample": "Tops 777 + Bottoms 532 = 1309",
+        "be_failure_pct": "Tops bull 5% / bear 1% · Bottoms bull 2% / bear 1%",
+        "avg_move": "Tops −19% / −27% · Bottoms +38% / +31%",
+        "meet_target_pct": "Tops 78% / 90% · Bottoms 68% / 64%",
+        "days": "Tops ultimate low 68 / 39 · Bottoms ultimate high 186 / 109",
+        "pullback_pct": "Tops 62% / 65% · Bottoms throwback 59% / 73%",
+        "performance_rank": "Tops bull 3/21 · bear 4/21 (top performer)",
         "target_rule": (
             "Tops (ch.8): breakout − lead_in_height [lead-in height = HH→trendline đo PHẦN TƯ ĐẦU, "
             "KHÔNG phải bump height] · Bottoms (ch.7): target = highest high trong pattern"
@@ -135,10 +164,87 @@ _PDF_EXTRAS: Dict[str, Dict[str, Any]] = {
         "source_file": "docs/project/pdf_review/m5/family_bump_and_run_20260813.md",
         "note": (
             "M5 PDF ch.7–8: digitized dùng bump_peak−lead_in_start (SAI dimension — bump height >> lead-in height). "
-            "BE Tops 5/1%; %target Tops 78/90% (cao nhất nhóm bearish)."
+            "Digitized failure 10/5 SAI (PDF 5/1); throwback 45% SAI (PDF pullback 62/65%); rank 12 SAI (PDF 3-4)."
+        ),
+    },
+    "broadening_bottoms": {
+        "sample": 237,
+        "be_failure_pct": "Up bull 10% / bear 9% · Down bull 16% / bear 9%",
+        "avg_move": "rise Up bull 27% / bear 21% · decline Down 15% / 18%",
+        "meet_target_pct": "Up 59% / 53% · Down 44% / 31%",
+        "days": "ultimate high Up bull 112 / bear 65",
+        "throwback_pct": "Up 41% / 44%",
+        "failure_at_10pct": "Up bull 25% / bear 29% (digitized ghi 6 → SAI)",
+        "target_rule": "Up: highest_high + (highest_high − lowest_low) · Down: đối xứng",
+        "source_file": "docs/project/pdf_review/m5/family_broadening_btw_20260813.md",
+        "note": (
+            "M5 PDF ch.1: measure rule KHỚP digitized. Digitized failure@10% SAI lớn (6 vs 25/29); "
+            "thiếu sample 237, %target, toàn bộ hướng Down."
+        ),
+    },
+    "broadening_tops": {
+        "sample": 493,
+        "be_failure_pct": "Down bull 18% / bear 3% · Up bull 15% / bear 11%",
+        "avg_move": "decline Down bull 15% / bear 20% · rise Up 29% / 24%",
+        "meet_target_pct": "Down 37% / 32% (thấp) · Up 62% / 61%",
+        "days": "ultimate low Down bull 50 / bear 29",
+        "pullback_pct": "Down 48% / 62%",
+        "target_rule": "Down: lowest_low − (highest_high − lowest_low) · Up: đối xứng",
+        "source_file": "docs/project/pdf_review/m5/family_broadening_btw_20260813.md",
+        "note": (
+            "M5 PDF ch.4: measure rule KHỚP. Digitized pullback 37% SAI (PDF 48/62); thiếu sample 493, "
+            "%target, hướng Up."
+        ),
+    },
+    "broadening_wedges": {
+        "sample": "Asc 255 + Desc 464 = 719",
+        "be_failure_pct": "Asc Up 2%/0% · Down 11%/14% | Desc Up 6%/11% · Down 9%/2%",
+        "avg_move": "Asc Up +38/+18 · Down −17/−21 | Desc Up +33/+24 · Down −20/−25",
+        "meet_target_pct": "Asc Up 69/60 · Down 58/86 | Desc Up 79/58 · Down 36/32",
+        "days": "Asc Up 161/78 · Down 63/51 | Desc Up 131/66 · Down 40/23",
+        "throwback_pct": "Asc 50/70 · Desc 53/61",
+        "target_rule": "Up: highest_high + (HH − LL) · Down: lowest_low − (HH − LL)",
+        "source_file": "docs/project/pdf_review/m5/family_broadening_btw_20260813.md",
+        "note": (
+            "M5 PDF ch.5–6: digitized broadening_wedges THIẾU HOÀN TOÀN performance stats — nạp đầy đủ từ PDF."
+        ),
+    },
+    "diamond_bottom": {
+        "sample": 295,
+        "be_failure_pct": "Up bull 4% / bear 3% · Down bull 10% / bear 0% (n=20 nhỏ)",
+        "avg_move": "rise Up 36% / 36% · decline Down 21% / 44%* (n=20 — Bulkowski bảo bỏ qua)",
+        "meet_target_pct": "Up 81% / 60% · Down 63% / 80%",
+        "days": "Up ultimate high 119 / 72 · Down ultimate low 35 / 28",
+        "throwback_pct": "Up 53% / 60% · Down pullback 71% / 40%",
+        "failure_at_10pct": "Up bull 12% / bear 16% (digitized ghi 2 → SAI lớn)",
+        "performance_rank": "Up bull 8/23 · bear 2/19 (xuất sắc)",
+        "target_rule": "Up: highest_high + (HH − LL) · Down: lowest_low − (HH − LL)",
+        "source_file": "docs/project/pdf_review/m5/family_diamonds_20260813.md",
+        "note": (
+            "M5 PDF ch.11: digitized failure@10% = 2 SAI (PDF 12/16); avg rise bear 25% SAI (PDF 36%); "
+            "thiếu sample, %target (81/60 — top performer), hướng Down."
+        ),
+    },
+    "diamond_top": {
+        "sample": 375,
+        "be_failure_pct": "Down bull 6% / bear 4% · Up bull 10% / bear 0% (n=28)",
+        "avg_move": "decline Down 21% / 24% · rise Up 27% / 33%",
+        "meet_target_pct": "Down 76% / 59% · Up 69% / 79%",
+        "days": "Down ultimate low 52 / 43 · Up ultimate high 81 / 66",
+        "pullback_pct": "Down 57% / 57% · Up throwback 59% / 54%",
+        "target_rule": "Down: lowest_low − (HH − LL) · Up: highest_high + (HH − LL)",
+        "source_file": "docs/project/pdf_review/m5/family_diamonds_20260813.md",
+        "note": (
+            "M5 PDF ch.12: digitized avg decline bull 15% SAI (PDF 21%); thiếu sample 375, %target, hướng Up."
         ),
     },
     "wedges_ascending_descending": {
+        "sample": "Falling 542 + Rising 621 = 1163",
+        "be_failure_pct": "Falling 11/11/15/6% · Rising 8/14/24/15% (bull-UA/bear-UA/bull-UD/bear-UD)",
+        "avg_move": "Falling +32/+26/−15/−24 · Rising +28/+17/−14/−20",
+        "meet_target_pct": "Falling 70/60/30/36 · Rising 58/33/46/40",
+        "days": "Falling 116/77/43/32 · Rising 127/60/38/38",
+        "throwback_pct": "Falling 56/61/69/72 · Rising 73/66/63/63",
         "target_rule": (
             "Falling UA = HH trong wedge · Falling UD = breakout − height · "
             "Rising UD = LL trong wedge · Rising UA = breakout + (HH − LL)  [BẤT XỨNG]"
@@ -146,11 +252,16 @@ _PDF_EXTRAS: Dict[str, Dict[str, Any]] = {
         "source_file": "docs/project/pdf_review/m5/family_wedges_20260813.md",
         "note": (
             "M5 PDF ch.52–53: digitized dùng breakout±height đối xứng — SAI cho chiều reversal "
-            "(target reversal = cực trị mẫu hình). %target falling 70/60/30/36 · rising 58/33/46/40. "
-            "BE falling 11/11/15/6 · rising 8/14/24/15."
+            "(target reversal = cực trị mẫu hình). Digitized avg rise falling 20% SAI (PDF 32/26)."
         ),
     },
     "islands": {
+        "sample": "Reversals 917 + Long 920",
+        "be_failure_pct": "Reversals 18/10/17/5% · Long 11/4/5/2%",
+        "avg_move": "Reversals +23/+21/−17/−23 · Long +31/+25/−22/−26",
+        "meet_target_pct": "Reversals 62/46/69/49 · Long 82/72/78/76",
+        "days": "Reversals 128/53/53/34 · Long 67/33/27/26",
+        "throwback_pct": "Reversals 70/75/65/59 · Long 67/74/54/54",
         "target_rule": (
             "Reversals (ch.30): breakout ± formation height (HH−LL trong island) · "
             "Islands Long (ch.31): breakout ± HALF formation height"
@@ -158,11 +269,18 @@ _PDF_EXTRAS: Dict[str, Dict[str, Any]] = {
         "source_file": "docs/project/pdf_review/m5/family_islands_20260813.md",
         "note": (
             "M5 PDF ch.30–31: digitized dùng gap_height — SAI concept (PDF = formation height). "
-            "BE Reversals 18/10/17/5% · Long 11/4/5/2% (mốc 5%). %target Reversals 62/46/69/49 · Long 82/72/78/76. "
-            "Sample 917 + 920."
+            "Digitized avg move 10% SAI (PDF 21-26%); days 14 SAI (PDF 26-128); throwback 30% SAI (PDF 54-75%); "
+            "median_move/time_to_completion/gap_size_effect/duration_effect BỊA."
         ),
     },
     "rounding_bottoms_tops": {
+        "sample": "RdB 453 + RdT 776 = 1229",
+        "be_failure_pct": "RdB 5/5% · RdT UA 9/16% · RdT UD 12/9%",
+        "avg_move": "RdB +43/+31 · RdT UA +37/+19 · RdT UD −19/−23",
+        "meet_target_pct": "RdB 57/53 · RdT-UA 61/35 · RdT-UD 24/15 (gần vô dụng)",
+        "days": "RdB 189/105 · RdT UA 161/77 · RdT UD 45/25",
+        "throwback_pct": "RdB 40/43 · RdT UA 53/52 · RdT UD pullback 48/57",
+        "performance_rank": "RdB bull 5/23 · bear 6/19 (top)",
         "target_rule": (
             "RdB: right_saucer_lip + (right_saucer_lip − lowest_low) · "
             "RdT-UA: formation_high + (formation_high − right_rim_low) · "
@@ -170,12 +288,18 @@ _PDF_EXTRAS: Dict[str, Dict[str, Any]] = {
         ),
         "source_file": "docs/project/pdf_review/m5/family_rounding_20260813.md",
         "note": (
-            "M5 PDF ch.39–40: digitized dùng generic breakout±height — SAI dimension (RdB base = right saucer lip, "
-            "RdT base = formation high). %target RdB 57/53 · RdT-UA 61/35 · RdT-UD CHỈ 15/24% "
-            "(measure rule gần vô dụng chiều UD). BE RdB 5/5 · RdT 9–16%."
+            "M5 PDF ch.39–40: digitized dùng generic breakout±height — SAI dimension. "
+            "Digitized avg rise RdB 25% SAI (PDF 43/31); failure RdT 6% SAI (PDF 9–16); "
+            "RdT-UD %target CHỈ 15-24% → cảnh báo measure rule yếu chiều này."
         ),
     },
     "rising_falling_three_methods": {
+        "sample": "Rising 102 + Falling 64 (Statistics EXCLUDED)",
+        "continuation_pct": "Rising bull 74% / bear 79% · Falling bull 71% / bear 67%",
+        "avg_move": "Rising continuation +6.86% / +3.93% (UA) — rất nhỏ",
+        "meet_target_pct": "Rising 60/23/21/33% (bull-UA/bear-UA/bull-UD/bear-UD)",
+        "days": "Rising candle-end→trend-end median 7/4/11/13 · →breakout 3/2/8/8",
+        "overall_rank": "Rising 94/103 · Falling 89/103 (poor) · frequency 88/91 trên 103",
         "target_rule": (
             "breakout ± candle_height × multiplier%  [Rising 60/23/21/33 · "
             "Falling KHÔNG CÓ — Statistics EXCLUDED (chỉ 64 mẫu)]"
@@ -183,30 +307,36 @@ _PDF_EXTRAS: Dict[str, Dict[str, Any]] = {
         "source_file": "docs/project/pdf_review/m5/family_three_methods_20260813.md",
         "note": (
             "M5 PDF EC ch.73/39 (KHÔNG phải ECP): failure rate digitized 20/10 là BỊA — EC không publish. "
-            "Continuation rising 74/79% · falling 71/67%; overall rank 94/89 trên 103 (poor). "
-            "Trend-end median rising 7/4/11/13d. Digitized target first_bar_range SAI → candle_height × %."
+            "Falling: toàn bộ performance BỊA (PDF exclude). Digitized target first_bar_range SAI → candle_height × %."
         ),
     },
     "measured_move_down_up": {
+        "sample": "MMD 911 + MMU 810 = 1721",
+        "avg_move": "MMD legs: first −27/−36 (61/45d) · retrace 48/44 (30/22d) · last −25/−36 (62/46d) | "
+                   "MMU legs: first +46/+39 (87/30d) · retrace 47/50 (32/22d) · last +32/+35 (60/33d)",
+        "meet_target_pct": "MMD 35/39 · MMU 45/56 (full first leg) — half first leg đạt 83–93%",
+        "meet_time_target_pct": "MMD 53/49 · MMU 38/56",
+        "days": "độ dài MMD 153/113 · MMU 180/85",
+        "last_vs_first_leg": "last NGẮN HƠN first 19–20% (ratio ~0.80) — digitized 0.85–1.15 SAI",
         "target_rule": (
             "corrective_phase_top/bottom ∓ first_leg (FULL) → đạt 35–56% · "
             "dùng HALF first leg → đạt 83–93%  [PDF khuyến nghị half]"
         ),
         "source_file": "docs/project/pdf_review/m5/family_measured_moves_20260813.md",
         "note": (
-            "M5 PDF ch.32–33: failure rate digitized 15/8 là BỊA — Bulkowski TỪ CHỐI metric này "
-            "(MMD/MMU không có breakout đơn). %target MMD 35/39 · MMU 45/56. First leg MMD 27/36% (61/45d) · "
-            "MMU 46/39% (87/30d); last leg NGẮN HƠN first 19–20% (ratio ~0.80). Sample 911 + 810."
+            "M5 PDF ch.32–33: failure rate digitized 15/8 là BỊA — Bulkowski TỪ CHỐI metric này. "
+            "success_rate 72 SAI (PDF 35-56). ultimate method SAI SEMANTIC (không có ultimate cho MM)."
         ),
     },
     "gaps": {
+        "sample": "Area 484 + Breakaway 737 + Continuation 495 + Exhaustion 471 = 2187",
+        "close_within_week_pct": "area 89–93% · breakaway 1–9% · continuation 4–20% · exhaustion 61–78%",
+        "avg_time_to_close": "area 3d · breakaway 61–168d · continuation 43–98d · exhaustion 7–14d",
         "target_rule": "KHÔNG CÓ measure rule — Performance rank: Not applicable (event pattern)",
         "source_file": "docs/project/pdf_review/m5/family_gaps_20260813.md",
         "note": (
             "M5 PDF ch.23: gaps là event pattern — failure rate / ultimate days / average move / target digitized "
-            "TOÀN BỘ BỊA. Metric duy nhất: Close-within-a-week (area 89–93% · breakaway 1–9% · "
-            "continuation 4–20% · exhaustion 61–78%) + avg time to close (area 3d · breakaway 61–168d · "
-            "continuation 43–98d · exhaustion 7–14d). Sample tổng 2.187."
+            "TOÀN BỘ BỊA. Metric duy nhất: Close-within-a-week + avg time to close."
         ),
     },
     "spike_formation": {
