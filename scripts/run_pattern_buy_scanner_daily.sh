@@ -6,10 +6,14 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 cd "${REPO_ROOT}"
 
+# M4 (13/08/2026): KHÔNG dùng .venv trong iCloud — launchd chạy bị
+# "OSError: Resource deadlock avoided" (venv 136MB nằm trong iCloud Drive) và
+# .venv thiếu vnstock_data. Ưu tiên python3.14 homebrew hệ thống (đã kiểm có
+# vnstock_data + pandas). Ghi đè bằng PATTERN_BUY_PYTHON nếu cần.
 if [[ -n "${PATTERN_BUY_PYTHON:-}" ]]; then
   PY="${PATTERN_BUY_PYTHON}"
-elif [[ -x "${REPO_ROOT}/.venv/bin/python" ]]; then
-  PY="${REPO_ROOT}/.venv/bin/python"
+elif [[ -x "/opt/homebrew/bin/python3.14" ]]; then
+  PY="/opt/homebrew/bin/python3.14"
 elif command -v python3.11 >/dev/null 2>&1; then
   PY="python3.11"
 else
@@ -82,6 +86,11 @@ for (symbol,) in rows:
 PY
 )
   echo "Refresh scope: VN100/VN30 (${#refresh_symbol_args[@]} args, $(( ${#refresh_symbol_args[@]} / 2 )) symbols)"
+  # M4 (13/08/2026): nếu python chết hoặc DB membership lỗi → mảng rỗng.
+  # Cảnh báo thay vì để mail quét âm thầm trên dữ liệu cũ không refresh.
+  if [[ ${#refresh_symbol_args[@]} -eq 0 ]]; then
+    echo "CẢNH BÁO: không lấy được danh sách VN100/VN30 (DB membership thiếu hoặc python lỗi) — sẽ quét trên dữ liệu cũ, không refresh."
+  fi
 elif [[ "${REFRESH_SCOPE}" != "all" ]]; then
   echo "Unsupported PATTERN_BUY_REFRESH_SCOPE=${REFRESH_SCOPE}; use vn100 or all."
   exit 2
@@ -104,8 +113,12 @@ cmd=(
   --refresh-max-errors "${REFRESH_MAX_ERRORS}"
   --refresh-timeout-seconds "${REFRESH_TIMEOUT_SECONDS}"
   --refresh-command-timeout-seconds "${REFRESH_COMMAND_TIMEOUT_SECONDS}"
-  "${refresh_symbol_args[@]}"
 )
+# M4 (13/08/2026): /bin/bash 3.2 + set -u — expand mảng rỗng trực tiếp gây
+# "unbound variable" (lỗi job 17:00 11-12/08). Chỉ append khi có phần tử.
+if [[ ${#refresh_symbol_args[@]} -gt 0 ]]; then
+  cmd+=( "${refresh_symbol_args[@]}" )
+fi
 
 if [[ "${PATTERN_BUY_REFRESH_FORCE:-0}" =~ ^(1|true|yes|on)$ ]]; then
   cmd+=(--refresh-force)
