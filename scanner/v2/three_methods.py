@@ -200,7 +200,9 @@ class ThreeMethodsDetector:
             threshold = first_low * (1.0 - self.config.breakout_threshold_pct)
             if breakout_price >= threshold:
                 return None
-            target_price = breakout_price - (first_high - first_low) * 0.21
+            # EC ch39 Falling Three Methods LOẠI mục Statistics (chỉ 64 mẫu) → KHÔNG có multiplier sách.
+            # Giữ full height làm fallback; KHÔNG đối chiếu hit-rate falling với sách (GLM-5.3 review L1).
+            target_price = breakout_price - (first_high - first_low)
         if target_price <= 0:
             return None
         volume_contracts, first_vol, middle_vol, last_vol = _volume_score(df, idx)
@@ -313,7 +315,8 @@ class ThreeMethodsDetector:
             else:
                 if breakout_price >= first_low * (1.0 - self.config.breakout_threshold_pct):
                     continue
-                target_price = breakout_price - height * 0.21
+                # EC ch39 Falling Three Methods LOẠI mục Statistics → không có multiplier sách; giữ full height (GLM-5.3 review L1).
+                target_price = breakout_price - height
             if target_price <= 0:
                 continue
             breakout_idx = int(idx + 4)

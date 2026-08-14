@@ -157,10 +157,10 @@ _PDF_EXTRAS: Dict[str, Dict[str, Any]] = {
         "meet_target_pct": "90% / 91%",
         "days": "ultimate high 39 / 25 (đã nạp lookahead _PDF_OVERRIDES)",
         "target_rule": (
-            "sách không trích measure rule riêng trong 2 file review hiện có — "
-            "detector dùng half-prior-move (xem manifest quality_gate HTF)"
+            "ECP ch22 Table 22.8: 'Measure the rise leading to the flag and project half of it upward, "
+            "using the flag low price' — detector ĐÃ dùng half-prior-move (cập nhật 14/08 theo GLM-5.3 review L2)"
         ),
-        "source_file": "docs/project/pdf_review/PDF_REVIEW_20260812.md (ch.22 p373-397) + family_flags_pennants_20260813.md",
+        "source_file": "docs/project/pdf_review/PDF_REVIEW_20260812.md (ch.22 p373-384) + family_flags_pennants_20260813.md",
         "note": (
             "M5 13/08: digitized flags_digitized.json ghi HTF rise 47% / failure 5% — SAI (PDF 69%/42%, BE 0%). "
             "HTF cần spec riêng; số đã tách khỏi flags chung."
