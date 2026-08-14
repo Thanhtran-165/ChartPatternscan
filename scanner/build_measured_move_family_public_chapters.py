@@ -506,6 +506,9 @@ def _spec(pattern_id: str, meta: Mapping[str, Any]) -> dict[str, Any]:
             "Full 1,0x nên đọc như mốc nguồn, không phải kỳ vọng mặc định.",
         ],
         "target_paragraph": meta["source_measure_rule_note"],
+        "measure_rule_variant_notes": [
+            "Sách gốc (ECP ch33, bảng 33.5) khuyên dùng nửa độ dài nhịp đầu tiên cho phương án bảo thủ — đạt 85% tới 99,6% tùy hướng. Bản in này dùng độ dài đầy đủ của nhịp đầu theo measure rule chính của bảng; mốc nửa nhịp giữ vai trò phương án thận trọng.",
+        ],
         "quick_conclusion_rows": [
             ["Mẫu này dùng để đọc gì?", "Khả năng xuất hiện nhịp thứ hai sau một nhịp đầu rõ."],
             ["Mốc đọc chính?", "0,5x độ dài nhịp đầu."],

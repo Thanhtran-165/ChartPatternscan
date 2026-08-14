@@ -282,6 +282,9 @@ def _spec() -> dict[str, Any]:
             "Mẫu có thể đúng hình thái nhưng vẫn khó dùng nếu giá kéo ngược sâu trước khi đi tiếp.",
         ],
         "target_paragraph": "Mục tiêu cơ sở của chương là 0,5x nhịp tăng trước mẫu. Đây là mốc bám nguồn gốc của High-and-Tight Flags; 0,75x và 1,0x chỉ dùng để kiểm tra sức chạy mở rộng.",
+        "measure_rule_variant_notes": [
+            "Sách gốc (ECP ch22, bảng 22.8) quy định mục tiêu bằng nửa nhịp tăng dẫn vào mẫu, chiếu lên từ đáy cờ: 'Measure the rise leading to the flag and project half of it upward, using the flag low price'. Bản in này dùng đúng cách ghi đó.",
+        ],
         "statistics_paragraphs": [
             "Kết quả chính được đọc trên nhóm tốt nhất và nhóm chuẩn. Mẫu có độ dày đủ lớn để xuất bản một chương mô tả, nhưng không nên được đọc như chiến lược tự động.",
             "Điểm mạnh của mẫu là tiền đề tăng rất mạnh; điểm yếu là đường đi sau phá vỡ có thể kéo ngược sâu. Vì vậy, target-first quan trọng hơn hit rate đơn thuần.",

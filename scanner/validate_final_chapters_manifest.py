@@ -57,6 +57,7 @@ APPROVED_FINAL_FLOWS = {
     "rounding_family": CANONICAL_PUBLICATION_FLOW,
     "inside_day_family": CANONICAL_PUBLICATION_FLOW,
     "three_methods_family": CANONICAL_PUBLICATION_FLOW,
+    "harami_family": CANONICAL_PUBLICATION_FLOW,
 }
 
 

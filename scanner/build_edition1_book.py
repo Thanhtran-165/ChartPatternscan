@@ -37,6 +37,9 @@ EDITION_PDF = OUT_DIR / "bulkowski_vietnam_edition_1.pdf"
 EDITION_MANIFEST = OUT_DIR / "bulkowski_vietnam_edition_1_manifest.json"
 FRONT_MATTER_PDF = OUT_DIR / "edition_1_front_matter.pdf"
 COVER_PDF = OUT_DIR / "edition_1_cover.pdf"
+EDITION_ID = "bulkowski_vietnam_edition_1"
+EDITION_LABEL = "Ấn bản 1"
+EDITION_ORDINAL = "thứ nhất"
 ASSETS_DIR = ROOT / "assets"
 DEFAULT_BOOK_LOGO = ASSETS_DIR / "book_logo.png"
 INCLUDE_INTERNAL_RANKING_IN_PUBLIC_BOOK = False
@@ -378,7 +381,7 @@ def _build_cover_pdf(output: Path, chapter_count: int, family_count: int) -> Non
     pdf.roundRect(3.1 * cm, 2.25 * cm, width - 5.2 * cm, 2.05 * cm, 6, stroke=0, fill=1)
     pdf.setFillColor(ink)
     pdf.setFont(font_bold, 11)
-    pdf.drawString(3.55 * cm, 3.52 * cm, "Ấn bản 1")
+    pdf.drawString(3.55 * cm, 3.52 * cm, EDITION_LABEL)
     pdf.setFont(font_regular, 8.8)
     pdf.setFillColor(muted)
     pdf.drawString(3.55 * cm, 3.0 * cm, f"{chapter_count} chương mẫu hình | {family_count} nhóm mẫu hình | bản đọc liền mạch")
@@ -522,7 +525,7 @@ def _build_front_matter(items: list[BookItem], output: Path) -> int:
         story.append(_p(paragraph, styles["Body"]))
     info_rows = [
         ["Tên sách", "Bulkowski Việt Nam - Atlas mẫu hình giá trên thị trường chứng khoán Việt Nam"],
-        ["Ấn bản", "Ấn bản thứ nhất"],
+        ["Ấn bản", f"Ấn bản {EDITION_ORDINAL}"],
         ["Ngày tạo", datetime.now().strftime("%Y-%m-%d")],
         ["Số chương", f"{sum(1 for item in items if item.kind == 'chapter')} chương mẫu hình"],
         ["Phạm vi", "Mẫu hình giá trên cổ phiếu Việt Nam trong phạm vi dữ liệu lịch sử đã thu thập."],
@@ -729,7 +732,7 @@ def _restamp_book_footers(input_pdf: Path, output_pdf: Path, front_count: int, i
         writer.add_outline_item(item.title, max(0, item.start_page - 1))
     writer.add_metadata(
         {
-            "/Title": "Bulkowski Việt Nam - Edition 1",
+            "/Title": f"Bulkowski Việt Nam - Edition {EDITION_ID.rsplit('_', 1)[-1]}",
             "/Author": "Bloger Chim Cut",
             "/Creator": "Bulkowski Việt Nam canonical publication book builder",
             "/Subject": "Atlas mẫu hình giá trên thị trường chứng khoán Việt Nam",
@@ -773,13 +776,13 @@ def build_edition() -> dict[str, Any]:
         )
     writer.add_metadata(
         {
-            "/Title": "Bulkowski Việt Nam - Edition 1",
+            "/Title": f"Bulkowski Việt Nam - Edition {EDITION_ID.rsplit('_', 1)[-1]}",
             "/Author": "Bulkowski Việt Nam",
             "/Subject": "Atlas mẫu hình giá Việt Nam",
         }
     )
-    raw_pdf = OUT_DIR / "bulkowski_vietnam_edition_1_publication_draft.raw.pdf"
-    redacted_pdf = OUT_DIR / "bulkowski_vietnam_edition_1_publication_draft.redacted.pdf"
+    raw_pdf = OUT_DIR / f"{EDITION_ID}_publication_draft.raw.pdf"
+    redacted_pdf = OUT_DIR / f"{EDITION_ID}_publication_draft.redacted.pdf"
     with raw_pdf.open("wb") as fh:
         writer.write(fh)
     _redact_footer_band(raw_pdf, redacted_pdf)
@@ -788,7 +791,7 @@ def build_edition() -> dict[str, Any]:
     redacted_pdf.unlink(missing_ok=True)
 
     manifest = {
-        "edition_id": "bulkowski_vietnam_edition_1",
+        "edition_id": EDITION_ID,
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "pdf": str(EDITION_PDF.relative_to(ROOT)),
         "front_matter_pdf": str(FRONT_MATTER_PDF.relative_to(ROOT)),

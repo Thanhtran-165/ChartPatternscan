@@ -450,6 +450,13 @@ def _spec(pattern_id: str, meta: Mapping[str, Any]) -> dict[str, Any]:
             "Không dùng một ví dụ có hai cú xuyên rất đẹp để thay thế thống kê toàn mẫu.",
         ],
         "target_paragraph": "Mục tiêu nguồn lấy chiều cao pipe rồi chiếu theo hướng phá vỡ; chương giữ 0,5x làm mốc cơ sở thận trọng và 1,0x làm mốc nguồn đầy đủ.",
+        "measure_rule_variant_notes": (
+            [
+                "Sách gốc (ECP ch35) công bố tỷ lệ đạt mục tiêu của Pipe Bottoms nhưng không công bố công thức tính mốc. Cách lấy biên pattern trong bản in này là suy diễn đối xứng với Pipe Tops (chương 36 có công thức nguyên văn) — ghi nhận là inferred, không phải trích nguyên văn sách.",
+            ]
+            if is_bottom
+            else []
+        ),
         "quick_conclusion_rows": [
             ["Mẫu này dùng để đọc gì?", "Khả năng đảo chiều hoặc tiếp diễn sau hai cú xuyên giá liền nhau trên nến tuần."],
             ["Mốc đọc chính?", "0,5x chiều cao pipe."],

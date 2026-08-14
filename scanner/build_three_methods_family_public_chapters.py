@@ -209,6 +209,15 @@ def _spec(pattern_id: str, meta: Mapping[str, Any]) -> dict[str, Any]:
             "Tỷ lệ đạt mục tiêu cần đọc cùng target-first-before-adverse vì giá có thể chạm mốc sau khi đã kéo ngược sâu.",
         ],
         "target_paragraph": "Mục tiêu được đo theo biên độ nến đầu tiên: 0,5x là mốc cơ sở thận trọng cho mẫu tiếp diễn ngắn, 1,0x là mốc đầy đủ để so sánh toàn bộ chapter.",
+        "measure_rule_variant_notes": (
+            [
+                "Sách gốc (EC ch73, bảng 73.3) ghi multiplier theo từng tổ hợp thị trường và hướng phá vỡ: 60/23/21/33%. Bản in này dùng cặp thị trường tăng — 60% cho hướng lên và 21% cho hướng xuống — chiếu vào giá phá vỡ.",
+            ]
+            if rising
+            else [
+                "Sách gốc (EC ch39) không công bố thống kê mục tiêu cho Falling Three Methods: mẫu sách chỉ có 64 trường hợp nên mục Statistics bị loại bỏ hoàn toàn. Mốc trong chương này là chiều cao đầy đủ theo quy ước nội tại, không có số sách để đối chiếu.",
+            ]
+        ),
         "quick_conclusion_rows": [
             ["Mẫu này dùng để đọc gì?", f"Nhịp tiếp diễn {trend_word} sau một pha nghỉ ba nến."],
             ["Mốc đọc chính?", "0,5x biên độ nến đầu tiên."],

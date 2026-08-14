@@ -371,6 +371,9 @@ def _spec() -> dict[str, Any]:
             ("Kết quả", "Đạt mục tiêu: {target_hit}; thất bại 5%: {failure_5pct}.", "Ví dụ minh họa, không phải tín hiệu giao dịch."),
         ],
         "target_paragraph": "Mục tiêu giá của tam giác cân nên đọc theo thang 0,5x, 0,75x và 1,0x chiều cao tam giác. Sau calibration, full-height 1,0x chưa đủ mạnh để làm headline; vì vậy 0,5x chỉ được ghi là mốc thận trọng cho nhánh chính, còn 1,0x giữ vai trò kiểm độ nhạy.",
+        "measure_rule_variant_notes": [
+            "Sách gốc ghi mục tiêu tam giác cân theo hai cách: bảng 49.8 (trang 761) cộng chiều cao vào đỉnh cao nhất, nhưng ví dụ số ở cùng trang cộng vào giá phá vỡ (9,13 + 1,37 = 10,50). Bản in này dùng cách ghi của ví dụ số — mốc tính từ giá phá vỡ.",
+        ],
         "skip_condition_specs": [
             ("Mẫu kéo quá dài", "pattern_width_bars", "q75_bars", None, "Tam giác quá dài dễ chuyển thành vùng tích lũy rộng hơn là một nhịp nén rõ."),
             ("Chiều cao quá lớn", "pattern_height_pct", "q75", None, "Biên độ quá rộng làm mục tiêu hình học trở nên tham vọng."),

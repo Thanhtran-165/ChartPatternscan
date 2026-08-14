@@ -28,6 +28,7 @@ CANONICAL_PUBLICATION_MODULES = {
 # PDFs. They remain allowed because their outputs are outside final_chapters.
 ALLOWED_NON_CHAPTER_RENDERERS = {
     Path("scanner/build_edition1_book.py"),
+    Path("scanner/build_realtime_scan_pdf_report.py"),
     Path("scanner/build_book_level_finalization_pack.py"),
     Path("scanner/build_book_v2.py"),
     Path("scanner/research_support_analysis.py"),

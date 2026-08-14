@@ -1287,6 +1287,14 @@ def build_pattern_story(
     story.append(_p(_public_paragraph(spec.get("target_paragraph", "Mục tiêu giá nên được đọc theo thang 0,46x, 0,5x, 0,75x và 1,0x thay vì một mốc duy nhất.")), _STYLES["Body"]))
     story.append(_table(_target_rows(payload, spec), [1.55 * cm, 2.8 * cm, 1.75 * cm, 2.35 * cm, 1.8 * cm, 6.0 * cm]))
     story.append(_p(_reader_bridge(payload, spec, "target"), _STYLES["Body"]))
+    measure_rule_variant_notes = _public_items(list(spec.get("measure_rule_variant_notes") or []))
+    if measure_rule_variant_notes:
+        story.append(
+            _callout(
+                "Biến thể cách ghi trong sách gốc",
+                measure_rule_variant_notes,
+            )
+        )
     story.append(Paragraph("Hành vi sau phá vỡ", _STYLES["H2"]))
     for paragraph in editorial.get("post_breakout", []) or []:
         story.append(_p(_public_paragraph(paragraph), _STYLES["Body"]))

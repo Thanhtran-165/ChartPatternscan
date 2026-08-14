@@ -493,6 +493,13 @@ def _editorial_sections(pattern_id: str, meta: Mapping[str, Any], stats: Mapping
 
 
 def _build_spec(pattern_id: str, meta: Mapping[str, Any], stats: Mapping[str, Any]) -> dict[str, Any]:
+    variant_notes = (
+        [
+            "Sách gốc mô tả mục tiêu broadening bằng hai cách ghi: phần văn chương chiếu chiều cao từ đỉnh cao nhất hoặc đáy thấp nhất của mẫu, còn bảng measure rule ghi mốc theo đỉnh đáy phụ gần nhất. Trên dữ liệu Việt Nam, hai cách ghi này hội tụ về cùng vùng mục tiêu.",
+        ]
+        if pattern_id in ("broadening_bottoms", "broadening_tops")
+        else []
+    )
     return {
         "title": meta["title"],
         "subtitle": meta["subtitle"],
@@ -541,6 +548,7 @@ def _build_spec(pattern_id: str, meta: Mapping[str, Any], stats: Mapping[str, An
             "Đường giá sau phá vỡ thiếu dữ liệu hoặc thanh khoản quá yếu.",
         ],
         "target_paragraph": "Chương đọc mục tiêu theo ba mốc 0,5x, 0,75x và 1,0x. Mốc 0,5x là ngưỡng thận trọng để xem mẫu có đi tiếp đủ xa hay không; mốc 1,0x là ngưỡng đầy đủ hơn và không nên đọc một mình.",
+        "measure_rule_variant_notes": variant_notes,
         "skip_condition_specs": [
             ["Độ mở rộng yếu", "expansion_ratio", "q25", None, "Nếu hai biên chỉ mở rất nhẹ, mẫu dễ lẫn với kênh giá hoặc dao động nhiễu."],
             ["Kéo ngược sâu", "mae_pct", "q75", None, "MAE lớn làm giảm giá trị tham khảo dù cuối cùng có thể chạm mục tiêu."],

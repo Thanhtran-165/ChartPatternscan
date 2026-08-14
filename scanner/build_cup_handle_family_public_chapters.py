@@ -49,6 +49,9 @@ PATTERNS: dict[str, dict[str, Any]] = {
         "legacy_target_multiple": 1.0,
         "target_unit_label": "chiều cao cốc",
         "source_measure_rule_note": "Mốc nguồn đo chiều cao từ đáy cốc tới môi phải; mốc 0,5x được giữ vì chính phần nguồn ghi half-height là mốc thực dụng hơn full-height.",
+        "measure_rule_variant_notes": [
+            "Sách gốc (ECP ch9, bảng 9.8) khuyên dùng nửa chiều cao cốc làm mốc thực tế hơn — đạt 76% trong thị trường tăng và 55% trong thị trường giảm. Bản in này dùng chiều cao đầy đủ đúng measure rule chính của bảng, và đọc mốc nửa chiều cao như phương án bảo thủ.",
+        ],
         "public_classification_sentence": "Trong phạm vi dữ liệu hiện có, cốc tay cầm phù hợp nhất để dùng như hồ sơ theo dõi sau phá vỡ lên.",
         "direction_word": "tăng",
         "breakout_phrase": "giá đóng cửa phá lên",
@@ -506,6 +509,7 @@ def _spec(pattern_id: str, meta: Mapping[str, Any]) -> dict[str, Any]:
             "Mẫu đẹp về hình học vẫn có thể yếu nếu phá vỡ bị kéo ngược nhanh.",
         ],
         "target_paragraph": meta["source_measure_rule_note"],
+        "measure_rule_variant_notes": meta.get("measure_rule_variant_notes", []),
         "quick_conclusion_rows": quick,
         "caveat_bullets": [
             "Không tuyên bố đây là nghiên cứu toàn thị trường đúng từng ngày lịch sử.",
