@@ -93,6 +93,12 @@ _VARIANT_LOOKAHEAD: Dict[str, Dict[str, Any]] = {
     # (thực ra là "time to target" bịa). PDF: RdB ultimate high 189/105 · RdT-UA 161/77 · RdT-UD 45/25.
     "rounding_bottoms": {"lookahead_bull": 189, "lookahead_bear": 105, "source": "pdf", "note": "M5 PDF ch.39 RdB: 189/105 (digitized 84 SAI)"},
     "rounding_tops": {"lookahead_bull": 161, "lookahead_bear": 25, "source": "pdf", "note": "M5 PDF ch.40 RdT: UA 161/77 · UD 45/25 (digitized 63 SAI)"},
+    # M5 PDF 14/08 (bar_bottoms_measure_rule_deepdive_20260814.md): family-level
+    # "bump_and_run_reversal" 68/39 là số TOPS (ch.8) — SAI cho Bottoms (ch.7).
+    "bump_and_run_reversal_bottoms": {"lookahead_bull": 186, "lookahead_bear": 109, "source": "pdf",
+        "note": "M5 PDF ch.7 Bottoms: ultimate high bull 186 / bear 109 (trước dùng nhầm 68/39 của Tops)"},
+    "bump_and_run_reversal_tops": {"lookahead_bull": 68, "lookahead_bear": 39, "source": "pdf",
+        "note": "M5 PDF ch.8 Tops: ultimate low bull 68 / bear 39 (tách khỏi family-level cho tường minh)"},
     # M5 PDF 13/08 (family_gaps_20260813.md): gaps KHÔNG có "days to ultimate" —
     # sách đo "Average time to close the gap" (thời gian gap bị lấp). Số digitized
     # (42/21/5/63) là BỊA. Dùng time-to-close làm lookahead đo lường (nguồn pdf).
