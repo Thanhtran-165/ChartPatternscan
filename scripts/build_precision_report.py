@@ -36,6 +36,14 @@ CRITERIA: dict[str, list[tuple[str, str, str]]] = {
         ("mẹ không phải doji", "mother_body_pct >= 0.1", "shape"),
         ("volume co lại", "volume_contracts == True", "quality"),
     ],
+    # --- Harami (mẹ bọc con) ---
+    "harami": [
+        ("nến con nằm trọn thân nến mẹ (body-based)", "(child_body_top <= mother_body_top) & (child_body_bottom >= mother_body_bottom)", "shape"),
+        ("tops/bottoms bằng nhau nhưng không cả hai (sách)", "~((child_body_top == mother_body_top) & (child_body_bottom == mother_body_bottom))", "shape"),
+        ("mẹ thân đủ dài, không doji (>=0.1%)", "mother_body_pct >= 0.1", "shape"),
+        ("màu nến con ngược nến mẹ (sách chỉ công nhận đảo chiều)", "variant != 'neutral_harami'", "shape"),
+        ("xu hướng trước đủ mạnh (|prior|>=2%) (*)", "prior_trend_pct.abs() >= 2", "quality"),
+    ],
     # --- Tam giác ---
     "triangles_ascending": [
         ("đỉnh gần phẳng (|upper|<=5°)", "upper_slope_deg.abs() <= 5", "shape"),

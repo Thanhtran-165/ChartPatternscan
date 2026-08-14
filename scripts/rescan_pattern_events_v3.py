@@ -23,11 +23,12 @@ from scanner.v2 import (  # noqa: E402
     cup_with_handle, flags_experiment, high_tight_flags, pennants, pipes, gaps,
     inside_days, rectangles, dead_cat_bounce, horns, rounding, broadening_patterns,
     double_patterns, measured_moves, scallops, three_methods, three_peaks_valleys,
-    bump_and_run, diamonds, falling_wedges, rising_wedges,
+    bump_and_run, diamonds, falling_wedges, rising_wedges, harami,
 )
 
 # runner: (tên pattern, hàm scan(frame) -> list rows)
 RUNNERS = {
+    "harami": lambda f: harami.scan_symbol(f)[0],
     "inside_day": lambda f: inside_days.scan_symbol(f)[0],
     "bull_flags": lambda f: flags_experiment.scan_symbol(f)[0],
     "high_tight_flags": lambda f: high_tight_flags.scan_symbol(f)[0],

@@ -196,6 +196,8 @@ class HaramiDetector:
             if any(abs(breakout_idx - used_idx) <= self.config.breakout_cooldown_bars for used_idx in used):
                 continue
             variant = _variant_for(mother, child, self.config)
+            if variant == "neutral_harami":
+                continue  # siết 14/08/2026: sách chỉ công nhận harami đảo chiều màu nến — loại cùng chiều
             # Measure rule EC ch.43-46: target = breakout ± ((HH − LL) của cả 2 nến ×
             # multiplier theo chương). (Trước đây tạm dùng nguyên chiều cao nến mẹ — SAI
             # theo sách, đã hiệu chỉnh 13/08 theo family_harami_20260813.md.)
