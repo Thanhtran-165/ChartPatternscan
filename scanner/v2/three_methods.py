@@ -194,12 +194,13 @@ class ThreeMethodsDetector:
             threshold = first_high * (1.0 + self.config.breakout_threshold_pct)
             if breakout_price <= threshold:
                 return None
-            target_price = breakout_price + (first_high - first_low)
+            # Sửa 14/08/2026 theo EC ch73 p637: height × multiplier% (up 60%, down 21% — ví dụ sách).
+            target_price = breakout_price + (first_high - first_low) * 0.60
         else:
             threshold = first_low * (1.0 - self.config.breakout_threshold_pct)
             if breakout_price >= threshold:
                 return None
-            target_price = breakout_price - (first_high - first_low)
+            target_price = breakout_price - (first_high - first_low) * 0.21
         if target_price <= 0:
             return None
         volume_contracts, first_vol, middle_vol, last_vol = _volume_score(df, idx)
@@ -307,11 +308,12 @@ class ThreeMethodsDetector:
             if self.direction == "up":
                 if breakout_price <= first_high * (1.0 + self.config.breakout_threshold_pct):
                     continue
-                target_price = breakout_price + height
+                # Sửa 14/08/2026 theo EC ch73 p637: height × multiplier% (up 60%, down 21% — ví dụ sách).
+                target_price = breakout_price + height * 0.60
             else:
                 if breakout_price >= first_low * (1.0 - self.config.breakout_threshold_pct):
                     continue
-                target_price = breakout_price - height
+                target_price = breakout_price - height * 0.21
             if target_price <= 0:
                 continue
             breakout_idx = int(idx + 4)

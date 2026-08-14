@@ -228,7 +228,9 @@ class CupWithHandleDetector:
             breakout_idx, breakout_price, volume_ratio, clearance_pct = self._breakout_up(df, handle_end + 1, level)
             if breakout_idx is None or breakout_price is None:
                 continue
-            target_price = float(right.price) + depth_abs
+            # Sửa 14/08/2026 theo ECP ch9 Table 9.8: height = right cup lip − lowest low;
+            # target = right cup lip + height. (rim_avg chỉ dùng cho các bộ lọc hình học, không cho target.)
+            target_price = float(right.price) + (float(right.price) - bottom_low)
             return self._record(
                 df,
                 variant="cup_with_handle",

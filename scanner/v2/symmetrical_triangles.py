@@ -277,8 +277,12 @@ class SymmetricalTriangleDetector:
         lower_end = lower.value_at(formation_end)
         if upper_start <= lower_start or upper_end <= lower_end:
             return None
-        height_abs = upper_start - lower_start
-        height_pct = height_abs / max(upper_start, 1e-9) * 100.0
+        # Sửa 14/08/2026 theo ECP ch49 Table 49.8: height = HH − LL (cao nhất − thấp nhất toàn formation),
+        # không phải khoảng cách 2 đường trendline tại đầu formation.
+        hh = float(df.iloc[formation_start : formation_end + 1]["high"].max())
+        ll = float(df.iloc[formation_start : formation_end + 1]["low"].min())
+        height_abs = hh - ll
+        height_pct = height_abs / max(hh, 1e-9) * 100.0
         if height_pct < self.config.height_min_pct or height_pct > self.config.height_max_pct:
             return None
         first_gap = upper_start - lower_start
@@ -294,7 +298,8 @@ class SymmetricalTriangleDetector:
         if breakout_idx is None or breakout_price is None:
             return None
 
-        target_price = float(breakout_price) + height_abs if breakout_direction == "up" else float(breakout_price) - height_abs
+        # Sửa 14/08/2026 theo ECP ch49 Table 49.8: UA cộng height vào HH, UD trừ height khỏi LL.
+        target_price = hh + height_abs if breakout_direction == "up" else ll - height_abs
         breakout_clearance_pct = float(clearance_pct or 0.0)
         quality_score = 62.0
         quality_score += min(10.0, high_fall_pct)

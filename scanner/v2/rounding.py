@@ -163,7 +163,6 @@ class RoundingDetector:
             extreme = float(df.iloc[low_idx]["low"])
             direction = "up"
             breakout_level = right_lip
-            target_sign = 1.0
             shape_label = "rounded_bowl"
             seq = "U"
         else:
@@ -181,7 +180,6 @@ class RoundingDetector:
             extreme = float(df.iloc[high_idx]["high"])
             direction = "down"
             breakout_level = right_lip
-            target_sign = -1.0
             shape_label = "inverted_rounded_bowl"
             seq = "INV_U"
 
@@ -201,7 +199,8 @@ class RoundingDetector:
         lip_mismatch_pct = abs(right_lip - left_lip) / lip_avg * 100.0
         if lip_mismatch_pct > self.config.max_lip_mismatch_pct:
             return None
-        height_abs = (lip_avg - extreme) if direction == "up" else (extreme - lip_avg)
+        # Sửa 14/08/2026 theo ECP ch39/40: height đo từ RIGHT lip (không phải trung bình 2 lip).
+        height_abs = (right_lip - extreme) if direction == "up" else (extreme - right_lip)
         if height_abs <= 0:
             return None
         height_pct = height_abs / max(abs(breakout_level), 1e-9) * 100.0
@@ -225,7 +224,9 @@ class RoundingDetector:
         if confirmation is None:
             return None
         breakout_idx, breakout_price = confirmation
-        target_price = breakout_price + target_sign * height_abs
+        # Sửa 14/08/2026 theo ECP ch39 Table 39.9 (Rd bottoms: right saucer lip + height) và
+        # ch40 Table 40.9 (Rd tops UD: right rim low − height).
+        target_price = right_lip + height_abs if direction == "up" else right_lip - height_abs
         if target_price <= 0:
             return None
         target_dist_pct = abs(target_price - breakout_price) / max(breakout_price, 1e-9) * 100.0

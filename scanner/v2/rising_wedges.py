@@ -166,7 +166,11 @@ class RisingWedgeDetector:
         if breakout_idx is None or breakout_price is None:
             return None
 
-        target_price = float(breakout_price) - height_abs
+        # Sửa 14/08/2026 theo ECP ch53 Table 53.8: UD target = lowest low (đáy wedge).
+        # Nếu LL đã ≥ giá breakout (hiếm) thì fallback chiều cao formation (HH−LL) trừ vào breakout.
+        hh = float(df.iloc[formation_start : formation_end + 1]["high"].max())
+        ll = float(df.iloc[formation_start : formation_end + 1]["low"].min())
+        target_price = ll if ll < float(breakout_price) else float(breakout_price) - (hh - ll)
         quality_score = 62.0
         quality_score += min(8.0, high_rise_pct)
         quality_score += min(12.0, low_rise_pct)
