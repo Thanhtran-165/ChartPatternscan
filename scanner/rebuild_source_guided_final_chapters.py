@@ -71,6 +71,7 @@ LIGHTWEIGHT_SECTION_REPAIR_ID = "edition11_lightweight_ai_section_repair_v1"
 LIGHTWEIGHT_SECTION_REPAIR_ATTEMPTS = 3
 
 EVENT_SOURCES: dict[str, tuple[Path, dict[str, str]]] = {
+    "harami": (Path("artifacts/scanner_v2/harami_family/harami/db_active/events.csv"), {}),
     "bull_flags": (Path("artifacts/scanner_v2/bull_flags_db_source_parity/db_active/events.csv"), {}),
     "bear_flags": (Path("artifacts/scanner_v2/bear_flags_db_source_parity/db_active/events.csv"), {}),
     "bull_pennants": (Path("artifacts/scanner_v2/pennants/events.csv"), {"variant": "bull_pennant"}),

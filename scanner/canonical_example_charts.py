@@ -347,15 +347,26 @@ def _select_examples(events: pd.DataFrame, existing: Mapping[str, Any] | None, p
 
     success_visual = visual_source.iloc[:0]
     success_all = source.iloc[:0]
+
+    def _clean_success(frame: pd.DataFrame) -> pd.DataFrame:
+        # Ví dụ "textbook success" phải là câu chuyện sạch: đạt mục tiêu trước kéo
+        # ngược VÀ không từng thất bại 5% — deep-pdf audit bắt cặp
+        # target_hit=true + failure_5pct=true (bug Harami edition 2: VTP 2019-04-12).
+        if "failure_5pct" in frame.columns:
+            cleaned = frame[~frame["failure_5pct"]]
+            if not cleaned.empty:
+                return cleaned
+        return frame
+
     if "target_hit" in visual_source.columns:
-        success_visual = visual_source[visual_source["target_hit"]]
-        if "target_first_before_adverse_5pct" in visual_source.columns:
+        success_visual = _clean_success(visual_source[visual_source["target_hit"]])
+        if "target_first_before_adverse_5pct" in success_visual.columns:
             first = success_visual[success_visual["target_first_before_adverse_5pct"]]
             if not first.empty:
                 success_visual = first
     if "target_hit" in source.columns:
-        success_all = source[source["target_hit"]]
-        if "target_first_before_adverse_5pct" in source.columns:
+        success_all = _clean_success(source[source["target_hit"]])
+        if "target_first_before_adverse_5pct" in success_all.columns:
             first = success_all[success_all["target_first_before_adverse_5pct"]]
             if not first.empty:
                 success_all = first

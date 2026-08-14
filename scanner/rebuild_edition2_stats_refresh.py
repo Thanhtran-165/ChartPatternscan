@@ -43,6 +43,7 @@ from scanner.rebuild_source_guided_final_chapters import (  # noqa: E402
     DEFAULT_DEEPSEEK_MODEL,
     _load_charts,
     _load_events,
+    _load_publication_spec,
     _read_json,
     _run_lightweight_refinement,
     _slug_from_entry,
@@ -89,18 +90,8 @@ FRESH_PAYLOADS: dict[str, str] = {
     "double_tops_adam_eve": "artifacts/scanner_v2/double_pattern_variant_public_chapters/double_tops_adam_eve/double_tops_adam_eve_public_chapter_payload.json",
     "double_tops_eve_adam": "artifacts/scanner_v2/double_pattern_variant_public_chapters/double_tops_eve_adam/double_tops_eve_adam_public_chapter_payload.json",
     "double_tops_eve_eve": "artifacts/scanner_v2/double_pattern_variant_public_chapters/double_tops_eve_eve/double_tops_eve_eve_public_chapter_payload.json",
+    "harami": "artifacts/scanner_v2/harami_family_public_chapters/harami/harami_public_chapter_payload.json",
 }
-
-
-def _load_spec(entry: Mapping[str, Any], payload: Mapping[str, Any]) -> dict[str, Any]:
-    spec_value = str(entry.get("publication_spec") or "").strip()
-    spec_path = Path(spec_value) if spec_value else Path(str(payload.get("publication_spec_path") or ""))
-    if spec_path.exists():
-        spec = dict(_read_json(spec_path))
-    else:
-        spec = {}
-    spec.setdefault("title", payload.get("pattern_name") or entry.get("pattern_id"))
-    return spec
 
 
 def refresh_one(
@@ -168,7 +159,7 @@ def refresh_one(
     old_dossier = Path(old_dossier_value) if old_dossier_value and Path(old_dossier_value).exists() else None
     style_dir.mkdir(parents=True, exist_ok=True)
     dossier_path = style_dir / "source_style_dossier.md"
-    if old_dossier is not None:
+    if old_dossier is not None and old_dossier.resolve() != dossier_path.resolve():
         shutil.copy2(old_dossier, dossier_path)
     else:
         dossier_path.write_text(
@@ -179,7 +170,8 @@ def refresh_one(
 
     previous_candidate = ai_dir / "refined_source" / "approved_ai_sections.json"
     previous_candidate.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(old_refined, previous_candidate)
+    if old_refined.resolve() != previous_candidate.resolve():
+        shutil.copy2(old_refined, previous_candidate)
 
     chapter_meta = {
         "pattern_id": pattern_id,
@@ -228,7 +220,7 @@ def refresh_one(
     if "schematic" not in charts and "schematic" in source_charts:
         charts["schematic"] = source_charts["schematic"]
 
-    spec = _load_spec(entry, payload)
+    spec = _load_publication_spec(entry, payload)
     result = build_canonical_publication_chapter(
         payload=payload,
         source_notes=source_notes,

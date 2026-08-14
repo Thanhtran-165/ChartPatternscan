@@ -318,9 +318,14 @@ def _select_examples(events: pd.DataFrame) -> dict[str, pd.Series]:
         if column in source.columns:
             source[column] = source[column].map(_truthy)
     success = source[(source["target_hit"]) & (source["target_first_before_adverse_5pct"])].copy()
+    # Ví dụ "textbook success" phải là câu chuyện sạch: đạt mục tiêu trước kéo ngược
+    # VÀ không từng thất bại 5% — auditer bắt cặp target_hit=true + failure_5pct=true
+    # (bug chương Harami edition 2: VTP 2019-04-12 dính cả hai cờ).
+    success_clean = success[~success["failure_5pct"]].copy() if "failure_5pct" in success.columns else success
     failure = source[source["failure_5pct"]].copy()
     med = float(pd.to_numeric(source["mfe_pct"], errors="coerce").median())
-    textbook = (success if not success.empty else source).sort_values(["_market_rank", "publication_quality_score", "mfe_pct"], ascending=[True, False, False]).iloc[0]
+    textbook_pool = success_clean if not success_clean.empty else (success if not success.empty else source)
+    textbook = textbook_pool.sort_values(["_market_rank", "publication_quality_score", "mfe_pct"], ascending=[True, False, False]).iloc[0]
     neutral = source[source["detection_id"].astype(str) != str(textbook.get("detection_id"))].copy()
     neutral["median_distance"] = (pd.to_numeric(neutral["mfe_pct"], errors="coerce") - med).abs()
     middle = neutral.sort_values(["_market_rank", "median_distance", "publication_quality_score"], ascending=[True, True, False]).iloc[0] if not neutral.empty else textbook
