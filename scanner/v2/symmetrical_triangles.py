@@ -298,8 +298,9 @@ class SymmetricalTriangleDetector:
         if breakout_idx is None or breakout_price is None:
             return None
 
-        # Sửa 14/08/2026 theo ECP ch49 Table 49.8: UA cộng height vào HH, UD trừ height khỏi LL.
-        target_price = hh + height_abs if breakout_direction == "up" else ll - height_abs
+        # Sửa 14/08/2026 theo ECP ch49: ví dụ số p761 (9.13 + 1.37 = 10.50) dùng BREAKOUT PRICE ± height
+        # (height = HH − LL). Bảng 49.8 ghi "highest high" nhưng ví dụ số cụ thể là nguồn quyết định.
+        target_price = float(breakout_price) + height_abs if breakout_direction == "up" else float(breakout_price) - height_abs
         breakout_clearance_pct = float(clearance_pct or 0.0)
         quality_score = 62.0
         quality_score += min(10.0, high_fall_pct)
