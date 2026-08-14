@@ -308,7 +308,12 @@ class PipeDetector:
             return None
         breakout_idx, direction, breakout_price = candidate
         height_abs = float(metrics["high_boundary_price"]) - float(metrics["low_boundary_price"])
-        target_price = breakout_price + height_abs if direction == "up" else breakout_price - height_abs
+        # Anchor target theo sách (batch 3, 14/08): tops = ECP ch36 NGUYÊN VĂN p582
+        # "Subtract the result from the breakout price (the lowest low)" (70/68%);
+        # bottoms = ch35 KHÔNG công bố công thức (Table 35.9 chỉ có confirmation) —
+        # SUY DIỄN đối xứng theo quy ước anchor-biên của cả họ weekly-spikes ("inferred, not verbatim").
+        anchor = float(metrics["breakout_level"])
+        target_price = anchor + height_abs if direction == "up" else anchor - height_abs
         if target_price <= 0:
             return None
         target_dist_pct = abs(target_price - breakout_price) / breakout_price * 100.0

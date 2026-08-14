@@ -423,6 +423,64 @@ _PDF_EXTRAS: Dict[str, Dict[str, Any]] = {
             "primary trend + opening gap confirmation. Multiplier detector dùng cột bull market."
         ),
     },
+    # Batch 3 (14/08, GLM-5.3 tự trích PDF offset +23): pipes + horns — số liệu ECP ch.28/29/35/36.
+    "pipe_tops": {
+        "sample": 830,
+        "be_failure_pct": "bull 11% / bear 2%",
+        "meet_target_pct": "bull 70% / bear 68%",
+        "avg_move": "decline bull 20% / bear 27%",
+        "days": "ultimate low bull 75 / bear 54",
+        "target_rule": (
+            "ECP ch36 NGUYÊN VĂN p582: 'Compute the formation height by subtracting the lowest low "
+            "from the highest high in the pipe. Subtract the result from the breakout price "
+            "(the lowest low) to get a target.' — anchor = breakout_level (lowest low); "
+            "detector đã đổi anchor theo nguyên văn này (batch 3, 14/08)"
+        ),
+        "source_file": "docs/project/pdf_review/m5/family_htf_pipes_horns_supplement_20260814.md",
+        "note": (
+            "WEEKLY. Width VN 5-10 tuần (median ~6-7) vs sách 'two adjacent spikes' (2 tuần liền kề) — "
+            "divergence bản địa hóa có chủ đích, KHÔNG đổi width trong batch 3 (cần pilot riêng). "
+            "Bảng benchmark cũ thiếu %target 70/68 — đã nạp."
+        ),
+    },
+    "pipe_bottoms": {
+        "sample": 1152,
+        "be_failure_pct": "bull 5% / bear 4%",
+        "meet_target_pct": "bull 83% / bear 72%",
+        "avg_move": "rise bull 45% / bear 32%",
+        "days": "ultimate high bull 194 / bear 133",
+        "target_rule": (
+            "SUY DIỄN đối xứng — ch35 KHÔNG công bố công thức (Table 35.9 p570 chỉ 4 dòng, không có "
+            "Measure rule; toàn chương không mô tả cách tính target). Anchor = breakout_level "
+            "(highest high) theo (i) pipe tops p582 'breakout price (the lowest low)', "
+            "(ii) horn bottoms p470 'add to the highest high', (iii) Table 35.9 confirmation "
+            "'close above the highest high'. INFERRED, NOT VERBATIM."
+        ),
+        "source_file": "docs/project/pdf_review/m5/family_htf_pipes_horns_supplement_20260814.md",
+        "note": (
+            "WEEKLY — mọi số công bố (BE 5/4, rise 45/32, %target 83/72) là weekly; daily pipes "
+            "BE 18%/gain 33% bị Bulkowski loại bỏ (p559-560). Scanner chạy weekly W-FRI (pipes.py "
+            "_to_weekly_ohlcv) — KHỚP sách; bảng cũ ghi 'daily' là SAI, đã sửa _TIMEFRAME."
+        ),
+    },
+    "horn_bottoms_tops": {
+        "sample": "Tops 323 (266+57) + Bottoms 404 (286+118)",
+        "be_failure_pct": "Tops bull 7% / bear 2% · Bottoms bull 9% / bear 7%",
+        "meet_target_pct": "Tops bull 70% / bear 60% · Bottoms bull 76% / bear 61%",
+        "days": "Tops ultimate low bull 67 / bear 64 · Bottoms ultimate high bull 180 / bear 90",
+        "target_rule": (
+            "Tops (ECP ch29 NGUYÊN VĂN p483): 'Subtract the result from the lowest low to get the "
+            "target price' (70%/60%) · Bottoms (ch28 NGUYÊN VĂN p470): 'Add the difference to the "
+            "highest high to get the target price' (76%/61%) — anchor-biên nhất quán cả họ; "
+            "detector đã đổi anchor theo nguyên văn (batch 3, 14/08)"
+        ),
+        "source_file": "docs/project/pdf_review/m5/family_htf_pipes_horns_supplement_20260814.md",
+        "note": (
+            "WEEKLY, spikes cách 1 tuần ('separated by a week') — hình học 3 tuần của detector KHỚP sách. "
+            "Bảng benchmark cũ ghi horn_tops 'sách KHÔNG có %target' + book_chapter ch28 — SAI cả hai, "
+            "đã nạp 70/60 + ECP ch29."
+        ),
+    },
 }
 
 # Ngưỡng thất bại (% kéo ngược bất lợi so mốc tham chiếu) — bảng 03 §2.3 + spec.
@@ -497,8 +555,11 @@ _FAILURE_REFERENCE = {
 
 # Timeframe theo từng family (sách weekly vs scanner daily — K3 plan §4).
 _TIMEFRAME = {
-    "pipe_bottoms": "daily (scanner) / weekly (sách — không so trực tiếp)",
-    "pipe_tops": "daily",
+    # Batch 3 (14/08): pipes + horns scan WEEKLY (resample W-FRI — pipes.py _to_weekly_ohlcv,
+    # horns.py weekly) — bản cũ ghi "daily" là SAI so với code đang chạy.
+    "pipe_bottoms": "weekly (resample W-FRI — khớp sách)",
+    "pipe_tops": "weekly (resample W-FRI — khớp sách)",
+    "horn_bottoms_tops": "weekly (resample W-FRI — khớp sách)",
     "dead_cat_bounce": "daily (event-driven)",
 }
 _TIMEFRAME_DEFAULT = "daily"

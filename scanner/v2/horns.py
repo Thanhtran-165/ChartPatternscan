@@ -273,7 +273,12 @@ class HornDetector:
             return None
         breakout_idx, direction, breakout_price = candidate
         height_abs = float(metrics["high_boundary_price"]) - float(metrics["low_boundary_price"])
-        target_price = breakout_price + height_abs if direction == "up" else breakout_price - height_abs
+        # Anchor target theo sách (batch 3, 14/08): tops = ECP ch29 NGUYÊN VĂN p483
+        # "Subtract the result from the lowest low" (70/60%); bottoms = ch28 NGUYÊN VĂN
+        # p470 "Add the difference to the highest high" (76/61%). breakout_level đã đúng
+        # biên theo hướng (bottoms = high boundary, tops = low boundary).
+        anchor = float(metrics["breakout_level"])
+        target_price = anchor + height_abs if direction == "up" else anchor - height_abs
         if target_price <= 0:
             return None
         target_dist_pct = abs(target_price - breakout_price) / breakout_price * 100.0

@@ -1,0 +1,1046 @@
+{
+ "generated_at": "2026-08-14T02:41:51Z",
+ "session_meta": {
+  "session_me": "sess_0fb10a3f-28e7-42c6-8bdd-6aca4b147362",
+  "model": "glm-5.2",
+  "provider": "OpenCode Go",
+  "role": "subagent verify doc lap (chi phan tich, khong sua code/pipeline)"
+ },
+ "sources": {
+  "nguon1_vn": "artifacts/book_level/edition2_prep/edition2_stats_39_families.json (39 family, 122.943 tin hieu)",
+  "nguon2_book": [
+   "docs/project/pdf_review/PDF_REVIEW_20260812.md (12 pattern uu tien)",
+   "docs/project/pdf_review/m5/ (14 family_*.md + SUMMARY_M5 + verify_11_digitized)"
+  ]
+ },
+ "method_note": "Delta target = VN target_hit_rate_pct - sach %meeting_price_target (bull/bear). VN khong tach bull/bear -> so ca 2. Khi sach KHONG co %target, dung BE% (failure_5pct) lam proxy. Phan loai: LECH-DO-DO = delta lon HOAC co dau hieu cach do khac (measure rule/dinh nghia/timeframe/event); KHOP = delta <=15pp VA khong co dau hieu cach do; THIEU-SO-SACH = sach khong cong bo metric. Co y thuc de LECH-VN = 0 (chua loai tru duoc nguyen nhan cach đo -> khong ket luan 'VN khac sach').",
+ "classification_counts": {
+  "LỆCH-DO-ĐO": 22,
+  "KHỚP": 11,
+  "THIẾU-SỐ-SÁCH": 5,
+  "NOT-IN-BOOK": 1
+ },
+ "rows": [
+  {
+   "family": "inside_day",
+   "book_chapter": "EC ch43-46 (Harami)",
+   "book_target_pct_bull_bear": null,
+   "book_be_pct_bull_bear": null,
+   "book_days_bull_bear": [
+    7,
+    8
+   ],
+   "vn_hit_pct": 59.05,
+   "vn_median_days": 1.0,
+   "vn_fail5_pct": 62.14,
+   "delta_target_vs_bull": null,
+   "delta_target_vs_bear": null,
+   "delta_days_vs_bull": -6.0,
+   "delta_days_vs_bear": -7.0,
+   "classification": "NOT-IN-BOOK",
+   "note_measure": "EC không có chương Inside Day — scanner-native (range-strict). Book analog = harami đã tách family riêng (EC ch43-46, body-based + multiplier) — benchmark 63/69 chuyển cho family harami.",
+   "_sach_str": "target% — · BE% — · days — [NOT-IN-BOOK: EC không có chương Inside Day]",
+   "_vn_str": "hit 59.05% · days 1.0 · fail5 62.14%",
+   "_delta_str": "(NOT-IN-BOOK — không benchmark); Δdays -6.0/-7.0d (vs harami, chỉ tham khảo)"
+  },
+  {
+   "family": "harami",
+   "book_chapter": "EC ch43-46",
+   "book_target_pct_bull_bear": [
+    63,
+    69
+   ],
+   "book_be_pct_bull_bear": null,
+   "book_days_bull_bear": [
+    7,
+    8
+   ],
+   "vn_hit_pct": 59.42,
+   "vn_median_days": 2.0,
+   "vn_fail5_pct": 51.92,
+   "delta_target_vs_bull": -3.6,
+   "delta_target_vs_bear": -9.6,
+   "delta_days_vs_bull": -5.0,
+   "delta_days_vs_bear": -6.0,
+   "classification": "KHỚP",
+   "note_measure": "Harami thuong khop tot; harami cross (doji) lech 10-16pp. VN days_to_target ~2 vs sach candle-end-to-trend-end 6-9 (semantic khac?).",
+   "_sach_str": "target% 63/69 · BE% — · days 7/8 [EC ch43-46]",
+   "_vn_str": "hit 59.42% · days 2.0 · fail5 51.92%",
+   "_delta_str": "Δtarget -3.6/-9.6pp (vs bull/bear); Δdays -5.0/-6.0d"
+  },
+  {
+   "family": "triangles_ascending",
+   "book_chapter": "ECP ch47",
+   "book_target_pct_bull_bear": [
+    75,
+    63
+   ],
+   "book_be_pct_bull_bear": [
+    13,
+    12
+   ],
+   "book_days_bull_bear": [
+    185,
+    97
+   ],
+   "vn_hit_pct": 77.03,
+   "vn_median_days": 19.0,
+   "vn_fail5_pct": 11.29,
+   "delta_target_vs_bull": 2.0,
+   "delta_target_vs_bear": 14.0,
+   "delta_days_vs_bull": -166.0,
+   "delta_days_vs_bear": -78.0,
+   "classification": "KHỚP",
+   "note_measure": "VN days_to_target 19 vs sach ultimate-high 185/97: 2 metric khac (target-hit vs 20% reversal). Target + BE khop tot.",
+   "_sach_str": "target% 75/63 · BE% 13/12 · days 185/97 [ECP ch47]",
+   "_vn_str": "hit 77.03% · days 19.0 · fail5 11.29%",
+   "_delta_str": "Δtarget +2.0/+14.0pp (vs bull/bear); Δdays -166.0/-78.0d"
+  },
+  {
+   "family": "triangles_descending",
+   "book_chapter": "ECP ch48",
+   "book_target_pct_bull_bear": [
+    54,
+    50
+   ],
+   "book_be_pct_bull_bear": [
+    16,
+    11
+   ],
+   "book_days_bull_bear": [
+    50,
+    32
+   ],
+   "vn_hit_pct": 57.2,
+   "vn_median_days": 33.0,
+   "vn_fail5_pct": 17.14,
+   "delta_target_vs_bull": 3.2,
+   "delta_target_vs_bear": 7.2,
+   "delta_days_vs_bull": -17.0,
+   "delta_days_vs_bear": 1.0,
+   "classification": "KHỚP",
+   "note_measure": "Target UD + BE khop tot. Days VN 33 gan sach UD bear 32.",
+   "_sach_str": "target% 54/50 · BE% 16/11 · days 50/32 [ECP ch48]",
+   "_vn_str": "hit 57.20% · days 33.0 · fail5 17.14%",
+   "_delta_str": "Δtarget +3.2/+7.2pp (vs bull/bear); Δdays -17.0/+1.0d"
+  },
+  {
+   "family": "triangles_symmetrical",
+   "book_chapter": "ECP ch49",
+   "book_target_pct_bull_bear": [
+    57,
+    48
+   ],
+   "book_be_pct_bull_bear": [
+    9,
+    9
+   ],
+   "book_days_bull_bear": [
+    77,
+    30
+   ],
+   "vn_hit_pct": 28.61,
+   "vn_median_days": 54.0,
+   "vn_fail5_pct": 16.01,
+   "delta_target_vs_bull": -28.4,
+   "delta_target_vs_bear": -19.4,
+   "delta_days_vs_bull": -23.0,
+   "delta_days_vs_bear": 24.0,
+   "classification": "LỆCH-DO-ĐO",
+   "note_measure": "VN 28.61 thap hon ca sach UD (42-48%). Direction ambiguous + measure rule (HH-LL height) can verify cho symmetrical.",
+   "_sach_str": "target% 57/48 · BE% 9/9 · days 77/30 [ECP ch49]",
+   "_vn_str": "hit 28.61% · days 54.0 · fail5 16.01%",
+   "_delta_str": "Δtarget -28.4/-19.4pp (vs bull/bear); Δdays -23.0/+24.0d"
+  },
+  {
+   "family": "bull_flags",
+   "book_chapter": "ECP ch21",
+   "book_target_pct_bull_bear": [
+    47,
+    47
+   ],
+   "book_be_pct_bull_bear": [
+    4,
+    2
+   ],
+   "book_days_bull_bear": [
+    17,
+    17
+   ],
+   "vn_hit_pct": 12.84,
+   "vn_median_days": 13.0,
+   "vn_fail5_pct": 43.43,
+   "delta_target_vs_bull": -34.2,
+   "delta_target_vs_bear": -34.2,
+   "delta_days_vs_bull": -4.0,
+   "delta_days_vs_bear": -4.0,
+   "classification": "LỆCH-DO-ĐO",
+   "note_measure": "MEASURE RULE SAI: sach = trend_height (trend_start - formation_start); VN/digitized = flagpole_addition. BE VN 43% vs sach 2.25% -> lech cuc lon.",
+   "_sach_str": "target% 47/47 · BE% 4/2 · days 17/17 [ECP ch21]",
+   "_vn_str": "hit 12.84% · days 13.0 · fail5 43.43%",
+   "_delta_str": "Δtarget -34.2/-34.2pp (vs bull/bear); Δdays -4.0/-4.0d"
+  },
+  {
+   "family": "pennants",
+   "book_chapter": "ECP ch34",
+   "book_target_pct_bull_bear": [
+    60,
+    51
+   ],
+   "book_be_pct_bull_bear": [
+    2,
+    4
+   ],
+   "book_days_bull_bear": [
+    22,
+    16
+   ],
+   "vn_hit_pct": 13.55,
+   "vn_median_days": 11.0,
+   "vn_fail5_pct": 38.59,
+   "delta_target_vs_bull": -46.5,
+   "delta_target_vs_bear": -37.5,
+   "delta_days_vs_bull": -11.0,
+   "delta_days_vs_bear": -5.0,
+   "classification": "LỆCH-DO-ĐO",
+   "note_measure": "MEASURE RULE SAI (nhu flags). VN 13.55 vs sach UA 60/63%. BE VN 38.59 vs sach 2%. Lech cuc lon.",
+   "_sach_str": "target% 60/51 · BE% 2/4 · days 22/16 [ECP ch34]",
+   "_vn_str": "hit 13.55% · days 11.0 · fail5 38.59%",
+   "_delta_str": "Δtarget -46.5/-37.5pp (vs bull/bear); Δdays -11.0/-5.0d"
+  },
+  {
+   "family": "high_tight_flags",
+   "book_chapter": "ECP ch22",
+   "book_target_pct_bull_bear": [
+    90,
+    91
+   ],
+   "book_be_pct_bull_bear": [
+    0,
+    0
+   ],
+   "book_days_bull_bear": [
+    39,
+    25
+   ],
+   "vn_hit_pct": 20.53,
+   "vn_median_days": 17.0,
+   "vn_fail5_pct": 23.56,
+   "delta_target_vs_bull": -69.5,
+   "delta_target_vs_bear": -70.5,
+   "delta_days_vs_bull": -22.0,
+   "delta_days_vs_bear": -8.0,
+   "classification": "LỆCH-DO-ĐO",
+   "note_measure": "Sach: HTF top performer (BE 0%, target 90%, rise 69%). VN 20.53 target / 23.56 fail -> gan nhu nguoc lai. Nghi dinh nghia HTF cua VN qua loose (flagpole 100%+ ?).",
+   "_sach_str": "target% 90/91 · BE% 0/0 · days 39/25 [ECP ch22]",
+   "_vn_str": "hit 20.53% · days 17.0 · fail5 23.56%",
+   "_delta_str": "Δtarget -69.5/-70.5pp (vs bull/bear); Δdays -22.0/-8.0d"
+  },
+  {
+   "family": "double_bottoms",
+   "book_chapter": "ECP ch13-16",
+   "book_target_pct_bull_bear": [
+    66,
+    48
+   ],
+   "book_be_pct_bull_bear": [
+    5,
+    6
+   ],
+   "book_days_bull_bear": [
+    136,
+    128
+   ],
+   "vn_hit_pct": 70.42,
+   "vn_median_days": 21.0,
+   "vn_fail5_pct": 14.22,
+   "delta_target_vs_bull": 4.4,
+   "delta_target_vs_bear": 22.4,
+   "delta_days_vs_bull": -115.0,
+   "delta_days_vs_bear": -107.0,
+   "classification": "KHỚP",
+   "note_measure": "Measure rule sach = HH + (HH-LL), KHONG chia 2 (khac DT). VN pattern_height gan tuong duong. Target khop tot (bull).",
+   "_sach_str": "target% 66/48 · BE% 5/6 · days 136/128 [ECP ch13-16]",
+   "_vn_str": "hit 70.42% · days 21.0 · fail5 14.22%",
+   "_delta_str": "Δtarget +4.4/+22.4pp (vs bull/bear); Δdays -115.0/-107.0d"
+  },
+  {
+   "family": "double_tops",
+   "book_chapter": "ECP ch17-20",
+   "book_target_pct_bull_bear": [
+    72,
+    73
+   ],
+   "book_be_pct_bull_bear": [
+    11,
+    5
+   ],
+   "book_days_bull_bear": [
+    47,
+    39
+   ],
+   "vn_hit_pct": 28.0,
+   "vn_median_days": 13.0,
+   "vn_fail5_pct": 41.38,
+   "delta_target_vs_bull": -44.0,
+   "delta_target_vs_bear": -45.0,
+   "delta_days_vs_bull": -34.0,
+   "delta_days_vs_bear": -26.0,
+   "classification": "LỆCH-DO-ĐO",
+   "note_measure": "MEASURE RULE SAI NGHIEM TRONG: sach DT chia height/2; VN/digitized KHONG chia /2 -> target tinh xa gap doi -> hit rate thap (28%).",
+   "_sach_str": "target% 72/73 · BE% 11/5 · days 47/39 [ECP ch17-20]",
+   "_vn_str": "hit 28.00% · days 13.0 · fail5 41.38%",
+   "_delta_str": "Δtarget -44.0/-45.0pp (vs bull/bear); Δdays -34.0/-26.0d"
+  },
+  {
+   "family": "rectangle_bottoms",
+   "book_chapter": "ECP ch33",
+   "book_target_pct_bull_bear": null,
+   "book_be_pct_bull_bear": [
+    10,
+    11
+   ],
+   "book_days_bull_bear": [
+    177,
+    81
+   ],
+   "vn_hit_pct": 78.31,
+   "vn_median_days": 13.0,
+   "vn_fail5_pct": 15.96,
+   "delta_target_vs_bull": null,
+   "delta_target_vs_bear": null,
+   "delta_days_vs_bull": -164.0,
+   "delta_days_vs_bear": -68.0,
+   "classification": "KHỚP",
+   "note_measure": "Sach KHONG co %target (PDF_REVIEW). BE VN 15.96 nam trong khoang sach 10-16%.",
+   "_sach_str": "target% — · BE% 10/11 · days 177/81 [ECP ch33]",
+   "_vn_str": "hit 78.31% · days 13.0 · fail5 15.96%",
+   "_delta_str": "(sách KHÔNG có %target); Δdays -164.0/-68.0d"
+  },
+  {
+   "family": "rectangle_tops",
+   "book_chapter": "ECP ch34",
+   "book_target_pct_bull_bear": null,
+   "book_be_pct_bull_bear": [
+    9,
+    16
+   ],
+   "book_days_bull_bear": [
+    170,
+    75
+   ],
+   "vn_hit_pct": 77.34,
+   "vn_median_days": 12.0,
+   "vn_fail5_pct": 15.99,
+   "delta_target_vs_bull": null,
+   "delta_target_vs_bear": null,
+   "delta_days_vs_bull": -158.0,
+   "delta_days_vs_bear": -63.0,
+   "classification": "KHỚP",
+   "note_measure": "Sach KHONG co %target. BE VN 15.99 nam trong khoang sach 9-16%.",
+   "_sach_str": "target% — · BE% 9/16 · days 170/75 [ECP ch34]",
+   "_vn_str": "hit 77.34% · days 12.0 · fail5 15.99%",
+   "_delta_str": "(sách KHÔNG có %target); Δdays -158.0/-63.0d"
+  },
+  {
+   "family": "diamond_bottoms",
+   "book_chapter": "ECP ch11",
+   "book_target_pct_bull_bear": [
+    81,
+    60
+   ],
+   "book_be_pct_bull_bear": [
+    4,
+    3
+   ],
+   "book_days_bull_bear": [
+    119,
+    72
+   ],
+   "vn_hit_pct": 41.67,
+   "vn_median_days": 10.0,
+   "vn_fail5_pct": 16.67,
+   "delta_target_vs_bull": -39.3,
+   "delta_target_vs_bear": -18.3,
+   "delta_days_vs_bull": -109.0,
+   "delta_days_vs_bear": -62.0,
+   "classification": "LỆCH-DO-ĐO",
+   "note_measure": "Sample VN rat nho (n=60) -> nhieu. Sach DBot top performer (target 81%). VN 41.67 lech, can verify measure + lay them sample.",
+   "_sach_str": "target% 81/60 · BE% 4/3 · days 119/72 [ECP ch11]",
+   "_vn_str": "hit 41.67% · days 10.0 · fail5 16.67%",
+   "_delta_str": "Δtarget -39.3/-18.3pp (vs bull/bear); Δdays -109.0/-62.0d"
+  },
+  {
+   "family": "diamond_tops",
+   "book_chapter": "ECP ch12",
+   "book_target_pct_bull_bear": [
+    76,
+    59
+   ],
+   "book_be_pct_bull_bear": [
+    6,
+    4
+   ],
+   "book_days_bull_bear": [
+    52,
+    43
+   ],
+   "vn_hit_pct": 26.47,
+   "vn_median_days": 13.5,
+   "vn_fail5_pct": 27.94,
+   "delta_target_vs_bull": -49.5,
+   "delta_target_vs_bear": -32.5,
+   "delta_days_vs_bull": -38.5,
+   "delta_days_vs_bear": -29.5,
+   "classification": "LỆCH-DO-ĐO",
+   "note_measure": "Sample VN rat nho (n=68) -> nhieu. VN 26.47 vs sach 76/59%, lech cuc lon.",
+   "_sach_str": "target% 76/59 · BE% 6/4 · days 52/43 [ECP ch12]",
+   "_vn_str": "hit 26.47% · days 13.5 · fail5 27.94%",
+   "_delta_str": "Δtarget -49.5/-32.5pp (vs bull/bear); Δdays -38.5/-29.5d"
+  },
+  {
+   "family": "broadening_bottoms",
+   "book_chapter": "ECP ch1",
+   "book_target_pct_bull_bear": [
+    59,
+    53
+   ],
+   "book_be_pct_bull_bear": [
+    10,
+    9
+   ],
+   "book_days_bull_bear": [
+    112,
+    65
+   ],
+   "vn_hit_pct": 37.48,
+   "vn_median_days": 27.0,
+   "vn_fail5_pct": 16.44,
+   "delta_target_vs_bull": -21.5,
+   "delta_target_vs_bear": -15.5,
+   "delta_days_vs_bull": -85.0,
+   "delta_days_vs_bear": -38.0,
+   "classification": "LỆCH-DO-ĐO",
+   "note_measure": "Measure rule sach = HH + (HH-LL) (pattern_height, chuan). VN 37.48 vs sach 59/53% lech 16-22pp. Broadening la 'weak' performer sach (rank 17/23).",
+   "_sach_str": "target% 59/53 · BE% 10/9 · days 112/65 [ECP ch1]",
+   "_vn_str": "hit 37.48% · days 27.0 · fail5 16.44%",
+   "_delta_str": "Δtarget -21.5/-15.5pp (vs bull/bear); Δdays -85.0/-38.0d"
+  },
+  {
+   "family": "broadening_tops",
+   "book_chapter": "ECP ch4",
+   "book_target_pct_bull_bear": [
+    37,
+    32
+   ],
+   "book_be_pct_bull_bear": [
+    18,
+    3
+   ],
+   "book_days_bull_bear": [
+    50,
+    29
+   ],
+   "vn_hit_pct": 24.53,
+   "vn_median_days": 15.0,
+   "vn_fail5_pct": 22.57,
+   "delta_target_vs_bull": -12.5,
+   "delta_target_vs_bear": -7.5,
+   "delta_days_vs_bull": -35.0,
+   "delta_days_vs_bear": -14.0,
+   "classification": "KHỚP",
+   "note_measure": "Sach %target BTop UD da thap (32-37%). VN 24.53 gan sach (lech 8-13pp). BE VN 22.57 vs sach bull 18% (gan).",
+   "_sach_str": "target% 37/32 · BE% 18/3 · days 50/29 [ECP ch4]",
+   "_vn_str": "hit 24.53% · days 15.0 · fail5 22.57%",
+   "_delta_str": "Δtarget -12.5/-7.5pp (vs bull/bear); Δdays -35.0/-14.0d"
+  },
+  {
+   "family": "bump_and_run_reversal_bottoms",
+   "book_chapter": "ECP ch7",
+   "book_target_pct_bull_bear": [
+    68,
+    64
+   ],
+   "book_be_pct_bull_bear": [
+    2,
+    1
+   ],
+   "book_days_bull_bear": [
+    186,
+    109
+   ],
+   "vn_hit_pct": 48.6,
+   "vn_median_days": 21.0,
+   "vn_fail5_pct": 19.94,
+   "delta_target_vs_bull": -19.4,
+   "delta_target_vs_bear": -15.4,
+   "delta_days_vs_bull": -165.0,
+   "delta_days_vs_bear": -88.0,
+   "classification": "LỆCH-DO-ĐO",
+   "note_measure": "Sach BARR Bottoms BE cuc thap (1-2%) -> top performer. VN fail5 19.94 lech +18. BARR can geometry lead-in/bump cu the; VN co the phat hien loose.",
+   "_sach_str": "target% 68/64 · BE% 2/1 · days 186/109 [ECP ch7]",
+   "_vn_str": "hit 48.60% · days 21.0 · fail5 19.94%",
+   "_delta_str": "Δtarget -19.4/-15.4pp (vs bull/bear); Δdays -165.0/-88.0d"
+  },
+  {
+   "family": "bump_and_run_reversal_tops",
+   "book_chapter": "ECP ch8",
+   "book_target_pct_bull_bear": [
+    78,
+    90
+   ],
+   "book_be_pct_bull_bear": [
+    5,
+    1
+   ],
+   "book_days_bull_bear": [
+    68,
+    39
+   ],
+   "vn_hit_pct": 31.65,
+   "vn_median_days": 21.0,
+   "vn_fail5_pct": 24.21,
+   "delta_target_vs_bull": -46.4,
+   "delta_target_vs_bear": -58.4,
+   "delta_days_vs_bull": -47.0,
+   "delta_days_vs_bear": -18.0,
+   "classification": "LỆCH-DO-ĐO",
+   "note_measure": "MEASURE RULE SAI: sach = breakout - lead_in_height (do trong lead-in phase); VN/digitized = bump_height (lon hon nhieu) -> target xa.",
+   "_sach_str": "target% 78/90 · BE% 5/1 · days 68/39 [ECP ch8]",
+   "_vn_str": "hit 31.65% · days 21.0 · fail5 24.21%",
+   "_delta_str": "Δtarget -46.4/-58.4pp (vs bull/bear); Δdays -47.0/-18.0d"
+  },
+  {
+   "family": "measured_move_up",
+   "book_chapter": "ECP ch33",
+   "book_target_pct_bull_bear": [
+    45,
+    56
+   ],
+   "book_be_pct_bull_bear": null,
+   "book_days_bull_bear": [
+    180,
+    85
+   ],
+   "vn_hit_pct": 61.56,
+   "vn_median_days": 37.0,
+   "vn_fail5_pct": 7.78,
+   "delta_target_vs_bull": 16.6,
+   "delta_target_vs_bear": 5.6,
+   "delta_days_vs_bull": -143.0,
+   "delta_days_vs_bear": -48.0,
+   "classification": "LỆCH-DO-ĐO",
+   "note_measure": "Sach TUCHOI failure rate ('not applicable'). VN co fail5 7.78 -> metric bi them. Target method (phase1_distance) khop sach. Target VN 61.56 vs sach 45/56%.",
+   "_sach_str": "target% 45/56 · BE% — · days 180/85 [ECP ch33]",
+   "_vn_str": "hit 61.56% · days 37.0 · fail5 7.78%",
+   "_delta_str": "Δtarget +16.6/+5.6pp (vs bull/bear); Δdays -143.0/-48.0d"
+  },
+  {
+   "family": "measured_move_down",
+   "book_chapter": "ECP ch32",
+   "book_target_pct_bull_bear": [
+    35,
+    39
+   ],
+   "book_be_pct_bull_bear": null,
+   "book_days_bull_bear": [
+    153,
+    113
+   ],
+   "vn_hit_pct": 40.53,
+   "vn_median_days": 47.0,
+   "vn_fail5_pct": 10.97,
+   "delta_target_vs_bull": 5.5,
+   "delta_target_vs_bear": 1.5,
+   "delta_days_vs_bull": -106.0,
+   "delta_days_vs_bear": -66.0,
+   "classification": "LỆCH-DO-ĐO",
+   "note_measure": "Sach TUCHOI failure rate. VN co fail5 10.97 -> metric bi them. Target VN 40.53 gan sach 35/39% (khop).",
+   "_sach_str": "target% 35/39 · BE% — · days 153/113 [ECP ch32]",
+   "_vn_str": "hit 40.53% · days 47.0 · fail5 10.97%",
+   "_delta_str": "Δtarget +5.5/+1.5pp (vs bull/bear); Δdays -106.0/-66.0d"
+  },
+  {
+   "family": "three_methods_rising",
+   "book_chapter": "EC ch73",
+   "book_target_pct_bull_bear": [
+    60,
+    60
+   ],
+   "book_be_pct_bull_bear": null,
+   "book_days_bull_bear": [
+    7,
+    7
+   ],
+   "vn_hit_pct": 45.26,
+   "vn_median_days": 2.0,
+   "vn_fail5_pct": 50.11,
+   "delta_target_vs_bull": -14.7,
+   "delta_target_vs_bear": -14.7,
+   "delta_days_vs_bull": -5.0,
+   "delta_days_vs_bear": -5.0,
+   "classification": "LỆCH-DO-ĐO",
+   "note_measure": "MEASURE RULE SAI: sach = candle_height x multiplier% (60/23/21/33); VN = first_bar_range x factor. EC KHONG publish failure rate; VN fail5 50.11 -> bi them.",
+   "_sach_str": "target% 60/60 · BE% — · days 7/7 [EC ch73]",
+   "_vn_str": "hit 45.26% · days 2.0 · fail5 50.11%",
+   "_delta_str": "Δtarget -14.7/-14.7pp (vs bull/bear); Δdays -5.0/-5.0d"
+  },
+  {
+   "family": "three_methods_falling",
+   "book_chapter": "EC ch39",
+   "book_target_pct_bull_bear": null,
+   "book_be_pct_bull_bear": null,
+   "book_days_bull_bear": null,
+   "vn_hit_pct": 32.2,
+   "vn_median_days": 2.5,
+   "vn_fail5_pct": 61.44,
+   "delta_target_vs_bull": null,
+   "delta_target_vs_bear": null,
+   "delta_days_vs_bull": null,
+   "delta_days_vs_bear": null,
+   "classification": "THIẾU-SỐ-SÁCH",
+   "note_measure": "Sach EXCLUDE toan bo Statistics (chi 64 samples, qua hiem). KHONG co %target/BE/days de so.",
+   "_sach_str": "target% — · BE% — · days — [EC ch39]",
+   "_vn_str": "hit 32.20% · days 2.5 · fail5 61.44%",
+   "_delta_str": "(sách KHÔNG có %target)"
+  },
+  {
+   "family": "three_falling_peaks",
+   "book_chapter": "ECP ch45",
+   "book_target_pct_bull_bear": [
+    33,
+    32
+   ],
+   "book_be_pct_bull_bear": [
+    12,
+    4
+   ],
+   "book_days_bull_bear": [
+    36,
+    34
+   ],
+   "vn_hit_pct": 4.17,
+   "vn_median_days": 14.0,
+   "vn_fail5_pct": 27.38,
+   "delta_target_vs_bull": -28.83,
+   "delta_target_vs_bear": -27.83,
+   "delta_days_vs_bull": -22.0,
+   "delta_days_vs_bear": -20.0,
+   "classification": "LỆCH-DO-ĐO",
+   "note_measure": "Sách CÓ %target 33/32 + measure rule nguyên văn (HH−LL, anchor lowest low) — tự trích 14/08 PDF p707/p717-718 (offset +23). Công thức code KHÔP sách 100%; gap hit do hình học nhận diện VN (pattern VN cao/rộng hơn sách — median target_dist 39,66% vs avg decline sách 17-24%).",
+   "_sach_str": "target% 33/32 · BE% 12/4 · days 36/34 [ECP ch45]",
+   "_vn_str": "hit 4.17% · days 14.0 · fail5 27.38%",
+   "_delta_str": "Δtarget -28.83/-27.83pp (vs bull/bear); Δdays -22.0/-20.0d"
+  },
+  {
+   "family": "three_rising_valleys",
+   "book_chapter": "ECP (PDF_REVIEW)",
+   "book_target_pct_bull_bear": null,
+   "book_be_pct_bull_bear": [
+    5,
+    9
+   ],
+   "book_days_bull_bear": [
+    125,
+    94
+   ],
+   "vn_hit_pct": 47.68,
+   "vn_median_days": 32.5,
+   "vn_fail5_pct": 10.34,
+   "delta_target_vs_bull": null,
+   "delta_target_vs_bear": null,
+   "delta_days_vs_bull": -92.5,
+   "delta_days_vs_bear": -61.5,
+   "classification": "KHỚP",
+   "note_measure": "Sach KHONG co %target. BE VN 10.34 nam trong khoang sach 5-9% (khop).",
+   "_sach_str": "target% — · BE% 5/9 · days 125/94 [ECP (PDF_REVIEW)]",
+   "_vn_str": "hit 47.68% · days 32.5 · fail5 10.34%",
+   "_delta_str": "(sách KHÔNG có %target); Δdays -92.5/-61.5d"
+  },
+  {
+   "family": "cup_with_handle",
+   "book_chapter": "ECP ch10",
+   "book_target_pct_bull_bear": [
+    50,
+    27
+   ],
+   "book_be_pct_bull_bear": [
+    5,
+    7
+   ],
+   "book_days_bull_bear": [
+    167,
+    63
+   ],
+   "vn_hit_pct": 63.06,
+   "vn_median_days": 32.0,
+   "vn_fail5_pct": 13.62,
+   "delta_target_vs_bull": 13.1,
+   "delta_target_vs_bear": 36.1,
+   "delta_days_vs_bull": -135.0,
+   "delta_days_vs_bear": -31.0,
+   "classification": "LỆCH-DO-ĐO",
+   "note_measure": "Measure rule sach = cup_lip - lowest_low + breakout; VN pattern_height ~ tuong duong (khop method). Target VN 63 vs sach bull 50 (lech +13, trong nguong).",
+   "_sach_str": "target% 50/27 · BE% 5/7 · days 167/63 [ECP ch10]",
+   "_vn_str": "hit 63.06% · days 32.0 · fail5 13.62%",
+   "_delta_str": "Δtarget +13.1/+36.1pp (vs bull/bear); Δdays -135.0/-31.0d"
+  },
+  {
+   "family": "cup_with_handle_inverted",
+   "book_chapter": "ECP ch10 (inverted p187-198)",
+   "book_target_pct_bull_bear": null,
+   "book_be_pct_bull_bear": null,
+   "book_days_bull_bear": null,
+   "vn_hit_pct": 72.84,
+   "vn_median_days": 11.0,
+   "vn_fail5_pct": 22.1,
+   "delta_target_vs_bull": null,
+   "delta_target_vs_bear": null,
+   "delta_days_vs_bull": null,
+   "delta_days_vs_bear": null,
+   "classification": "THIẾU-SỐ-SÁCH",
+   "note_measure": "PDF_REVIEW chi nhan trang ch10 inverted (p187-198), KHONG trich so rieng cho inverted. THIEU so sach cu the.",
+   "_sach_str": "target% — · BE% — · days — [ECP ch10 (inverted p187-198)]",
+   "_vn_str": "hit 72.84% · days 11.0 · fail5 22.10%",
+   "_delta_str": "(sách KHÔNG có %target)"
+  },
+  {
+   "family": "dead_cat_bounce",
+   "book_chapter": "ECP ch54",
+   "book_target_pct_bull_bear": null,
+   "book_be_pct_bull_bear": null,
+   "book_days_bull_bear": null,
+   "vn_hit_pct": 67.24,
+   "vn_median_days": 7.0,
+   "vn_fail5_pct": 10.13,
+   "delta_target_vs_bull": null,
+   "delta_target_vs_bear": null,
+   "delta_days_vs_bull": null,
+   "delta_days_vs_bear": null,
+   "classification": "THIẾU-SỐ-SÁCH",
+   "note_measure": "EVENT pattern: sach KHONG co BE/%target kieu chart pattern; chi co bounce 28/35%, postbounce decline 30/40%. VN target_hit 67.24 khong co tuong duong sach.",
+   "_sach_str": "target% — · BE% — · days — [ECP ch54]",
+   "_vn_str": "hit 67.24% · days 7.0 · fail5 10.13%",
+   "_delta_str": "(sách KHÔNG có %target)"
+  },
+  {
+   "family": "dead_cat_bounce_inverted",
+   "book_chapter": "ECP ch55",
+   "book_target_pct_bull_bear": null,
+   "book_be_pct_bull_bear": null,
+   "book_days_bull_bear": null,
+   "vn_hit_pct": 68.18,
+   "vn_median_days": 6.0,
+   "vn_fail5_pct": 21.67,
+   "delta_target_vs_bull": null,
+   "delta_target_vs_bear": null,
+   "delta_days_vs_bull": null,
+   "delta_days_vs_bear": null,
+   "classification": "THIẾU-SỐ-SÁCH",
+   "note_measure": "PDF_REVIEW chi tham chieu ch55, KHONG trich so rieng cho inverted. THIEU so sach cu the.",
+   "_sach_str": "target% — · BE% — · days — [ECP ch55]",
+   "_vn_str": "hit 68.18% · days 6.0 · fail5 21.67%",
+   "_delta_str": "(sách KHÔNG có %target)"
+  },
+  {
+   "family": "gaps",
+   "book_chapter": "ECP ch23",
+   "book_target_pct_bull_bear": null,
+   "book_be_pct_bull_bear": null,
+   "book_days_bull_bear": null,
+   "vn_hit_pct": 53.02,
+   "vn_median_days": 1.0,
+   "vn_fail5_pct": 55.25,
+   "delta_target_vs_bull": null,
+   "delta_target_vs_bear": null,
+   "delta_days_vs_bull": null,
+   "delta_days_vs_bear": null,
+   "classification": "THIẾU-SỐ-SÁCH",
+   "note_measure": "EVENT pattern: sach ghi 'Performance rank: Not applicable'. KHONG co %target/BE/measure rule. Chi co 'Close Within a Week' (area 89-93%, breakaway 1-9%). VN target_hit 53% khong tuong duong.",
+   "_sach_str": "target% — · BE% — · days — [ECP ch23]",
+   "_vn_str": "hit 53.02% · days 1.0 · fail5 55.25%",
+   "_delta_str": "(sách KHÔNG có %target)"
+  },
+  {
+   "family": "scallops_ascending",
+   "book_chapter": "ECP ch38",
+   "book_target_pct_bull_bear": null,
+   "book_be_pct_bull_bear": [
+    10,
+    16
+   ],
+   "book_days_bull_bear": [
+    162,
+    68
+   ],
+   "vn_hit_pct": 66.95,
+   "vn_median_days": 26.0,
+   "vn_fail5_pct": 16.79,
+   "delta_target_vs_bull": null,
+   "delta_target_vs_bear": null,
+   "delta_days_vs_bull": -136.0,
+   "delta_days_vs_bear": -42.0,
+   "classification": "KHỚP",
+   "note_measure": "Sach KHONG co %target (PDF_REVIEW). BE VN 16.79 nam trong khoang sach 10-27% (4 to hop).",
+   "_sach_str": "target% — · BE% 10/16 · days 162/68 [ECP ch38]",
+   "_vn_str": "hit 66.95% · days 26.0 · fail5 16.79%",
+   "_delta_str": "(sách KHÔNG có %target); Δdays -136.0/-42.0d"
+  },
+  {
+   "family": "scallops_descending",
+   "book_chapter": "ECP ch39",
+   "book_target_pct_bull_bear": null,
+   "book_be_pct_bull_bear": [
+    22,
+    20
+   ],
+   "book_days_bull_bear": [
+    106,
+    70
+   ],
+   "vn_hit_pct": 54.2,
+   "vn_median_days": 20.0,
+   "vn_fail5_pct": 21.87,
+   "delta_target_vs_bull": null,
+   "delta_target_vs_bear": null,
+   "delta_days_vs_bull": -86.0,
+   "delta_days_vs_bear": -50.0,
+   "classification": "KHỚP",
+   "note_measure": "Sach KHONG co %target. BE VN 21.87 nam trong khoang sach 8-22%.",
+   "_sach_str": "target% — · BE% 22/20 · days 106/70 [ECP ch39]",
+   "_vn_str": "hit 54.20% · days 20.0 · fail5 21.87%",
+   "_delta_str": "(sách KHÔNG có %target); Δdays -86.0/-50.0d"
+  },
+  {
+   "family": "rounding_bottoms",
+   "book_chapter": "ECP ch39",
+   "book_target_pct_bull_bear": [
+    57,
+    53
+   ],
+   "book_be_pct_bull_bear": [
+    5,
+    5
+   ],
+   "book_days_bull_bear": [
+    189,
+    105
+   ],
+   "vn_hit_pct": 45.34,
+   "vn_median_days": 13.0,
+   "vn_fail5_pct": 14.7,
+   "delta_target_vs_bull": -11.7,
+   "delta_target_vs_bear": -7.7,
+   "delta_days_vs_bull": -176.0,
+   "delta_days_vs_bear": -92.0,
+   "classification": "LỆCH-DO-ĐO",
+   "note_measure": "MEASURE RULE SAI dimension: sach RdB = right_saucer_lip + (lip - lowest_low); VN generic pattern_height. Target VN 45 vs sach 57/53% (lech nho 8-12, co the trung phop).",
+   "_sach_str": "target% 57/53 · BE% 5/5 · days 189/105 [ECP ch39]",
+   "_vn_str": "hit 45.34% · days 13.0 · fail5 14.70%",
+   "_delta_str": "Δtarget -11.7/-7.7pp (vs bull/bear); Δdays -176.0/-92.0d"
+  },
+  {
+   "family": "rounding_tops",
+   "book_chapter": "ECP ch40",
+   "book_target_pct_bull_bear": [
+    24,
+    15
+   ],
+   "book_be_pct_bull_bear": [
+    12,
+    9
+   ],
+   "book_days_bull_bear": [
+    45,
+    25
+   ],
+   "vn_hit_pct": 2.82,
+   "vn_median_days": 12.0,
+   "vn_fail5_pct": 25.0,
+   "delta_target_vs_bull": -21.2,
+   "delta_target_vs_bear": -12.2,
+   "delta_days_vs_bull": -33.0,
+   "delta_days_vs_bear": -13.0,
+   "classification": "LỆCH-DO-ĐO",
+   "note_measure": "MEASURE RULE SAI: sach RdT-UD = right_rim_low - (formation_high - right_rim_low); VN generic. Sach %target da RAT THAP (15-24%); VN 2.82 con thap hon.",
+   "_sach_str": "target% 24/15 · BE% 12/9 · days 45/25 [ECP ch40]",
+   "_vn_str": "hit 2.82% · days 12.0 · fail5 25.00%",
+   "_delta_str": "Δtarget -21.2/-12.2pp (vs bull/bear); Δdays -33.0/-13.0d"
+  },
+  {
+   "family": "pipe_bottoms",
+   "book_chapter": "ECP ch35",
+   "book_target_pct_bull_bear": [
+    83,
+    72
+   ],
+   "book_be_pct_bull_bear": [
+    5,
+    4
+   ],
+   "book_days_bull_bear": [
+    194,
+    133
+   ],
+   "vn_hit_pct": 63.89,
+   "vn_median_days": 8.0,
+   "vn_fail5_pct": 14.14,
+   "delta_target_vs_bull": -19.11,
+   "delta_target_vs_bear": -8.11,
+   "delta_days_vs_bull": -186.0,
+   "delta_days_vs_bear": -125.0,
+   "classification": "LỆCH-DO-ĐO",
+   "note_measure": "Sách CÓ %target 83/72 (Results Snapshot p559) nhưng KHÔNG công bố công thức (Table 35.9 chỉ có confirmation) — anchor detector = breakout_level là SUY DIỂN đối xứng, inferred not verbatim (batch 3, 14/08). Sửa note cũ: sách VÀ scanner ĐỀU weekly (W-FRI) — 'VN dùng daily' là SAI.",
+   "_sach_str": "target% 83/72 · BE% 5/4 · days 194/133 [ECP ch35 — công thức không công bố, anchor inferred]",
+   "_vn_str": "hit 63.89% · days 8.0 · fail5 14.14%",
+   "_delta_str": "Δtarget -19.11/-8.11pp (vs bull/bear); Δdays -186.0/-125.0d"
+  },
+  {
+   "family": "pipe_tops",
+   "book_chapter": "ECP ch36",
+   "book_target_pct_bull_bear": [
+    70,
+    68
+   ],
+   "book_be_pct_bull_bear": [
+    11,
+    2
+   ],
+   "book_days_bull_bear": [
+    75,
+    54
+   ],
+   "vn_hit_pct": 23.28,
+   "vn_median_days": 6.0,
+   "vn_fail5_pct": 25.65,
+   "delta_target_vs_bull": -46.7,
+   "delta_target_vs_bear": -44.7,
+   "delta_days_vs_bull": -69.0,
+   "delta_days_vs_bear": -48.0,
+   "classification": "LỆCH-DO-ĐO",
+   "note_measure": "Sach pipe_tops %target 70/68% (cao). VN 23.28 lech -45pp. BE VN 25.65 vs sach 11/2%. Can verify dinh nghia pipe_tops VN.",
+   "_sach_str": "target% 70/68 · BE% 11/2 · days 75/54 [ECP ch36]",
+   "_vn_str": "hit 23.28% · days 6.0 · fail5 25.65%",
+   "_delta_str": "Δtarget -46.7/-44.7pp (vs bull/bear); Δdays -69.0/-48.0d"
+  },
+  {
+   "family": "horn_bottoms",
+   "book_chapter": "ECP ch27",
+   "book_target_pct_bull_bear": [
+    76,
+    61
+   ],
+   "book_be_pct_bull_bear": [
+    9,
+    7
+   ],
+   "book_days_bull_bear": [
+    180,
+    90
+   ],
+   "vn_hit_pct": 66.18,
+   "vn_median_days": 7.0,
+   "vn_fail5_pct": 15.36,
+   "delta_target_vs_bull": -9.8,
+   "delta_target_vs_bear": 5.2,
+   "delta_days_vs_bull": -173.0,
+   "delta_days_vs_bear": -83.0,
+   "classification": "KHỚP",
+   "note_measure": "Target VN 66.18 vs sach 76/61% (lech -10/+5, khop). BE VN 15.36 vs sach 9/7% lech nho +6-8.",
+   "_sach_str": "target% 76/61 · BE% 9/7 · days 180/90 [ECP ch27]",
+   "_vn_str": "hit 66.18% · days 7.0 · fail5 15.36%",
+   "_delta_str": "Δtarget -9.8/+5.2pp (vs bull/bear); Δdays -173.0/-83.0d"
+  },
+  {
+   "family": "horn_tops",
+   "book_chapter": "ECP ch29",
+   "book_target_pct_bull_bear": [
+    70,
+    60
+   ],
+   "book_be_pct_bull_bear": [
+    7,
+    2
+   ],
+   "book_days_bull_bear": [
+    67,
+    64
+   ],
+   "vn_hit_pct": 22.76,
+   "vn_median_days": 6.0,
+   "vn_fail5_pct": 28.06,
+   "delta_target_vs_bull": -47.24,
+   "delta_target_vs_bear": -37.24,
+   "delta_days_vs_bull": -61.0,
+   "delta_days_vs_bear": -58.0,
+   "classification": "LỆCH-DO-ĐO",
+   "note_measure": "Sách CÓ %target 70/60 + measure rule nguyên văn ch29 p483 'Subtract the result from the lowest low' (tự trích 14/08). Anchor detector đã sửa về breakout_level theo nguyên văn (batch 3, 14/08) — hit sau rescan sẽ dịch; gap còn lại do filter siết 13/08 (visibility ≥70, similarity ≤5%) + thị trường VN.",
+   "_sach_str": "target% 70/60 · BE% 7/2 · days 67/64 [ECP ch29]",
+   "_vn_str": "hit 22.76% · days 6.0 · fail5 28.06%",
+   "_delta_str": "Δtarget -47.24/-37.24pp (vs bull/bear); Δdays -61.0/-58.0d"
+  },
+  {
+   "family": "wedges_falling",
+   "book_chapter": "ECP ch52",
+   "book_target_pct_bull_bear": [
+    70,
+    60
+   ],
+   "book_be_pct_bull_bear": [
+    11,
+    11
+   ],
+   "book_days_bull_bear": [
+    116,
+    77
+   ],
+   "vn_hit_pct": 46.92,
+   "vn_median_days": 38.5,
+   "vn_fail5_pct": 17.3,
+   "delta_target_vs_bull": -23.1,
+   "delta_target_vs_bear": -13.1,
+   "delta_days_vs_bull": -77.5,
+   "delta_days_vs_bear": -38.5,
+   "classification": "LỆCH-DO-ĐO",
+   "note_measure": "MEASURE RULE BAT XUNG: sach Falling UA = HH wedge (khong phai pattern_height). VN 46.92 vs sach 70/60% lech 13-23pp.",
+   "_sach_str": "target% 70/60 · BE% 11/11 · days 116/77 [ECP ch52]",
+   "_vn_str": "hit 46.92% · days 38.5 · fail5 17.30%",
+   "_delta_str": "Δtarget -23.1/-13.1pp (vs bull/bear); Δdays -77.5/-38.5d"
+  },
+  {
+   "family": "wedges_rising",
+   "book_chapter": "ECP ch53",
+   "book_target_pct_bull_bear": [
+    46,
+    40
+   ],
+   "book_be_pct_bull_bear": [
+    24,
+    15
+   ],
+   "book_days_bull_bear": [
+    38,
+    38
+   ],
+   "vn_hit_pct": 37.37,
+   "vn_median_days": 36.0,
+   "vn_fail5_pct": 24.73,
+   "delta_target_vs_bull": -8.6,
+   "delta_target_vs_bear": -2.6,
+   "delta_days_vs_bull": -2.0,
+   "delta_days_vs_bear": -2.0,
+   "classification": "LỆCH-DO-ĐO",
+   "note_measure": "MEASURE RULE BAT XUNG: sach Rising UD = LL wedge. VN 37.37 vs sach 46/40% (lech -3/-9, GAN KHOP); BE VN 24.73 = sach bull 24%. So khop tot NHUNG measure rule chua verify.",
+   "_sach_str": "target% 46/40 · BE% 24/15 · days 38/38 [ECP ch53]",
+   "_vn_str": "hit 37.37% · days 36.0 · fail5 24.73%",
+   "_delta_str": "Δtarget -8.6/-2.6pp (vs bull/bear); Δdays -2.0/-2.0d"
+  }
+ ],
+ "batch3_update": {
+  "updated_at": "2026-08-14",
+  "session_me": "sess_0fb10a3f-28e7-42c6-8bdd-6aca4b147362",
+  "model": "GLM-5.3",
+  "provider": "builtin:zai-coding-plan",
+  "note": "Batch 3 (đề xuất edition2_batch3_proposal.md đã duyệt): sửa 4 dòng sai — 3FP nạp 33/32 (ECP ch45), horn_tops nạp 70/60 (ECP ch29), pipe_bottoms nạp 83/72 (công thức không công bố — anchor inferred), inside_day → NOT-IN-BOOK. vn_hit_pct của pipes/horns là số BEFORE anchor-fix; số AFTER nằm trong session note."
+ }
+}
