@@ -312,7 +312,8 @@ def _example_caption(
         )
     elif key == "failure":
         lesson = (
-            "Điểm đáng học là hình thái hợp lệ không cứu được một nhịp xác nhận yếu; khi giá không đi nổi tối thiểu theo hướng mẫu, ví dụ này phải nằm trong phần thất bại."
+            "Đây là ví dụ thất bại: giá phá ngược hướng dự báo của mẫu. Điểm đáng học là hình thái hợp lệ không cứu được một nhịp xác nhận yếu; "
+            "khi giá không đi nổi tối thiểu theo hướng mẫu, ví dụ này phải nằm trong phần thất bại."
         )
     else:
         lesson = "Điểm đáng học là phải đọc hình thái cùng đường đi sau xác nhận, thay vì chỉ nhìn tên mẫu."
@@ -382,7 +383,7 @@ def _distinct_example_chart_specs(charts: Mapping[str, Path], spec: Mapping[str,
     candidates = [
         ("textbook_success", str(spec.get("success_heading", "Ví dụ đạt mục tiêu")), "Trường hợp này đi đúng hướng và chạm mục tiêu trước khi xuất hiện bất lợi 5%."),
         ("middle_case", "Ví dụ trung vị", "Trường hợp này gần trung vị của mẫu: có đi thuận lợi, nhưng không đủ xa để hoàn thành mục tiêu đầy đủ."),
-        ("failure", "Ví dụ thất bại", "Trường hợp này thất bại theo ngưỡng 5%, nhắc rằng hình thái hợp lệ không bảo đảm tiếp diễn."),
+        ("failure", "Ví dụ thất bại — giá phá ngược hướng dự báo", "Trường hợp này giá phá ngược hướng dự báo và thất bại theo ngưỡng 5%, nhắc rằng hình thái hợp lệ không bảo đảm tiếp diễn."),
     ]
     seen: set[str] = set()
     selected: list[tuple[str, str, str]] = []

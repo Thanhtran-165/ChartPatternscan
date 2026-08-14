@@ -91,6 +91,54 @@ FRESH_PAYLOADS: dict[str, str] = {
     "double_tops_eve_adam": "artifacts/scanner_v2/double_pattern_variant_public_chapters/double_tops_eve_adam/double_tops_eve_adam_public_chapter_payload.json",
     "double_tops_eve_eve": "artifacts/scanner_v2/double_pattern_variant_public_chapters/double_tops_eve_eve/double_tops_eve_eve_public_chapter_payload.json",
     "harami": "artifacts/scanner_v2/harami_family_public_chapters/harami/harami_public_chapter_payload.json",
+    # Đợt refresh vintage 40 chương (14/08 tối, chủ đầu tư duyệt re-run runner):
+    # 38 pattern dưới đây dùng payload do family runner + publication builder chạy lại sau
+    # lookahead fix + 3 đợt measure-rule fix + siết detector chuẩn sách 13-14/08.
+    # dead_cat_bounce / dead_cat_bounce_inverted KHÔNG đưa vào: events v2 đời 30/05
+    # (trước lookahead fix), v3 thiếu cột giàu — chờ chủ đầu tư duyệt riêng.
+    "area_gaps": "artifacts/scanner_v2/gap_family_public_chapters/area_gaps/area_gaps_public_chapter_payload.json",
+    "breakaway_gaps": "artifacts/scanner_v2/gap_family_public_chapters/breakaway_gaps/breakaway_gaps_public_chapter_payload.json",
+    "broadening_bottoms": "artifacts/scanner_v2/broadening_family_public_chapters/broadening_bottoms/broadening_bottoms_public_chapter_payload.json",
+    "broadening_formations_right_angled_ascending": "artifacts/scanner_v2/broadening_family_public_chapters/broadening_right_angled_ascending/broadening_right_angled_ascending_public_chapter_payload.json",
+    "broadening_formations_right_angled_descending": "artifacts/scanner_v2/broadening_family_public_chapters/broadening_right_angled_descending/broadening_right_angled_descending_public_chapter_payload.json",
+    "broadening_tops": "artifacts/scanner_v2/broadening_family_public_chapters/broadening_tops/broadening_tops_public_chapter_payload.json",
+    "broadening_wedges_ascending": "artifacts/scanner_v2/broadening_family_public_chapters/broadening_wedges_ascending/broadening_wedges_ascending_public_chapter_payload.json",
+    "broadening_wedges_descending": "artifacts/scanner_v2/broadening_family_public_chapters/broadening_wedges_descending/broadening_wedges_descending_public_chapter_payload.json",
+    "continuation_gaps": "artifacts/scanner_v2/gap_family_public_chapters/continuation_gaps/continuation_gaps_public_chapter_payload.json",
+    "cup_with_handle_inverted": "artifacts/scanner_v2/cup_handle_family_public_chapters/inverted_cup_with_handle/inverted_cup_with_handle_public_chapter_payload.json",
+    # dead_cat×2 — RENDER-ONLY cho Nhiệm 3 (caption failure-role): payload trỏ đúng bản
+    # hiện tại của chương (đời 04/06, KHÔNG có events fresh — loại khỏi đợt refresh số
+    # liệu). Mục đích duy nhất: đưa caption failure-role mới vào PDF, số liệu không đổi.
+    "dead_cat_bounce": "artifacts/scanner_v2/source_guided_refinement_edition_1_2_full_rewrite/dead_cat_bounce_family/dead_cat_bounce/chapter/dead_cat_bounce_public_chapter_payload.json",
+    "dead_cat_bounce_inverted": "artifacts/scanner_v2/source_guided_refinement_edition_1_2_full_rewrite/dead_cat_bounce_family/dead_cat_bounce_inverted/chapter/dead_cat_bounce_inverted_public_chapter_payload.json",
+    "diamond_bottoms": "artifacts/scanner_v2/diamond_family_public_chapters/diamond_bottoms/diamond_bottoms_public_chapter_payload.json",
+    "diamond_tops": "artifacts/scanner_v2/diamond_family_public_chapters/diamond_tops/diamond_tops_public_chapter_payload.json",
+    "double_bottoms_adam_adam": "artifacts/scanner_v2/double_pattern_variant_public_chapters/double_bottoms_adam_adam/double_bottoms_adam_adam_public_chapter_payload.json",
+    "double_bottoms_adam_eve": "artifacts/scanner_v2/double_pattern_variant_public_chapters/double_bottoms_adam_eve/double_bottoms_adam_eve_public_chapter_payload.json",
+    "double_bottoms_eve_adam": "artifacts/scanner_v2/double_pattern_variant_public_chapters/double_bottoms_eve_adam/double_bottoms_eve_adam_public_chapter_payload.json",
+    "double_bottoms_eve_eve": "artifacts/scanner_v2/double_pattern_variant_public_chapters/double_bottoms_eve_eve/double_bottoms_eve_eve_public_chapter_payload.json",
+    "exhaustion_gaps": "artifacts/scanner_v2/gap_family_public_chapters/exhaustion_gaps/exhaustion_gaps_public_chapter_payload.json",
+    "head_and_shoulders_bottoms": "artifacts/scanner_v2/head_shoulders_family_public_chapters/head_and_shoulders_bottoms/head_and_shoulders_bottoms_public_chapter_payload.json",
+    "head_and_shoulders_bottoms_complex": "artifacts/scanner_v2/head_shoulders_family_public_chapters/head_and_shoulders_bottoms_complex/head_and_shoulders_bottoms_complex_public_chapter_payload.json",
+    "head_and_shoulders_tops": "artifacts/scanner_v2/head_shoulders_family_public_chapters/head_and_shoulders_tops/head_and_shoulders_tops_public_chapter_payload.json",
+    "head_and_shoulders_tops_complex": "artifacts/scanner_v2/head_shoulders_family_public_chapters/head_and_shoulders_tops_complex/head_and_shoulders_tops_complex_public_chapter_payload.json",
+    "inside_day": "artifacts/scanner_v2/inside_day_family_public_chapters/inside_day/inside_day_public_chapter_payload.json",
+    "island_reversals": "artifacts/scanner_v2/island_family_public_chapters/island_reversals/island_reversals_public_chapter_payload.json",
+    "islands_long": "artifacts/scanner_v2/island_family_public_chapters/islands_long/islands_long_public_chapter_payload.json",
+    "measured_move_down": "artifacts/scanner_v2/measured_move_family_public_chapters/measured_move_down/measured_move_down_public_chapter_payload.json",
+    "measured_move_up": "artifacts/scanner_v2/measured_move_family_public_chapters/measured_move_up/measured_move_up_public_chapter_payload.json",
+    "rectangle_bottoms": "artifacts/scanner_v2/rectangle_family_public_chapters/rectangle_bottoms/rectangle_bottoms_public_chapter_payload.json",
+    "rectangle_tops": "artifacts/scanner_v2/rectangle_family_public_chapters/rectangle_tops/rectangle_tops_public_chapter_payload.json",
+    "scallops_ascending": "artifacts/scanner_v2/scallop_family_public_chapters/scallops_ascending/scallops_ascending_public_chapter_payload.json",
+    "scallops_ascending_inverted": "artifacts/scanner_v2/scallop_family_public_chapters/scallops_ascending_inverted/scallops_ascending_inverted_public_chapter_payload.json",
+    "scallops_descending": "artifacts/scanner_v2/scallop_family_public_chapters/scallops_descending/scallops_descending_public_chapter_payload.json",
+    "scallops_descending_inverted": "artifacts/scanner_v2/scallop_family_public_chapters/scallops_descending_inverted/scallops_descending_inverted_public_chapter_payload.json",
+    "three_falling_peaks": "artifacts/scanner_v2/three_peaks_valleys_family_public_chapters/three_falling_peaks/three_falling_peaks_public_chapter_payload.json",
+    "three_rising_valleys": "artifacts/scanner_v2/three_peaks_valleys_family_public_chapters/three_rising_valleys/three_rising_valleys_public_chapter_payload.json",
+    "triangles_ascending": "artifacts/scanner_v2/triangle_family_public_chapters/ascending_triangle/ascending_triangle_public_chapter_payload.json",
+    "triangles_descending": "artifacts/scanner_v2/triangle_family_public_chapters/descending_triangle/descending_triangle_public_chapter_payload.json",
+    "triple_bottoms": "artifacts/scanner_v2/triple_family_public_chapters/triple_bottoms/triple_bottoms_public_chapter_payload.json",
+    "triple_tops": "artifacts/scanner_v2/triple_family_public_chapters/triple_tops/triple_tops_public_chapter_payload.json",
 }
 
 
@@ -344,7 +392,7 @@ def main() -> None:
         raise SystemExit(1)
 
     if args.promote:
-        promote_final_chapters(
+        promote_result = promote_final_chapters(
             entry_paths=[
                 out_root / str(e.get("family") or "uncategorized") / _slug_from_entry(e) / f"{e.get('pattern_id')}_final_manifest_entry.json"
                 for e in entries
@@ -352,6 +400,12 @@ def main() -> None:
             ],
             manifest_path=Path(args.manifest),
         )
+        # Bài học 22-chương-rollback (14/08): promote_final_chapters trả dict mà KHÔNG raise —
+        # transaction all-or-nothing có thể rollback âm thầm. Bắt buộc kiểm status.
+        status = str(promote_result.get("status") or "") if isinstance(promote_result, dict) else ""
+        print(json.dumps({"promote_status": status, "promote_result": promote_result}, ensure_ascii=False)[:2000], flush=True)
+        if status != "PASS":
+            raise SystemExit(f"Promote FAILED (status={status!r}) — kiểm entry gây fail: {promote_result}")
 
 
 if __name__ == "__main__":
