@@ -320,8 +320,21 @@ def _example_caption(
     scope_note = "" if event.get("example_scope_note") is None else str(event.get("example_scope_note")).strip()
     if scope_note:
         lesson = f"{lesson} Phạm vi ví dụ: {scope_note}"
+    # Bài học BID area_gaps (15/08, vision worker phát hiện): câu lead middle_case cố định
+    # "có đi thuận lợi" sai ngôn ngữ khi mfe gần 0 (trung vị area_gaps = 0%) — đổi lead
+    # theo mfe: < 1% thì đường đi chủ yếu đi ngang hoặc ngược hướng, không phải "có thuận lợi".
+    lead = str(fallback)
+    if key == "middle_case":
+        try:
+            if float(event.get("mfe_pct")) < 1.0:
+                lead = (
+                    "Trường hợp này gần trung vị của mẫu: giá gần như không đi thuận chiều dự báo sau xác nhận, "
+                    "đường đi chủ yếu đi ngang hoặc ngược hướng."
+                )
+        except (TypeError, ValueError):
+            pass
     return (
-        f"{fallback} {symbol} xác nhận ngày {date}: thân mẫu {width} phiên, biên độ {height}%, "
+        f"{lead} {symbol} xác nhận ngày {date}: thân mẫu {width} phiên, biên độ {height}%, "
         f"{pole_label} {pole if pole == 'chưa đủ dữ liệu' else pole + '%'}, {favorable} {_fmt_public(event.get('mfe_pct'), suffix='%')}, {adverse} {_fmt_public(event.get('mae_pct'), suffix='%')}, "
         f"đạt mục tiêu {target}, thất bại 5% {failure}, {timing}, chất lượng đường giá {path_quality}. {lesson}"
     )
