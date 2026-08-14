@@ -38,8 +38,8 @@ CRITERIA: dict[str, list[tuple[str, str, str]]] = {
     ],
     # --- Harami (mẹ bọc con) ---
     "harami": [
-        ("nến con nằm trọn thân nến mẹ (body-based)", "(child_body_top <= mother_body_top) & (child_body_bottom >= mother_body_bottom)", "shape"),
-        ("tops/bottoms bằng nhau nhưng không cả hai (sách)", "~((child_body_top == mother_body_top) & (child_body_bottom == mother_body_bottom))", "shape"),
+        ("nến con nằm trọn trong mẹ (thường: thân; cross doji: biên độ — sách ch.43-46)", "(((variant == 'bearish_harami') | (variant == 'bullish_harami')) & (child_body_top <= mother_body_top) & (child_body_bottom >= mother_body_bottom)) | (((variant == 'harami_cross_bearish') | (variant == 'harami_cross_bullish')) & (child_bar_high <= mother_bar_high) & (child_bar_low >= mother_bar_low))", "shape"),
+        ("tops/bottoms bằng nhau nhưng không cả hai (thường: thân; cross: biên độ)", "(((variant == 'bearish_harami') | (variant == 'bullish_harami')) & ~((child_body_top == mother_body_top) & (child_body_bottom == mother_body_bottom))) | (((variant == 'harami_cross_bearish') | (variant == 'harami_cross_bullish')) & ~((child_bar_high == mother_bar_high) & (child_bar_low == mother_bar_low)))", "shape"),
         ("mẹ thân đủ dài, không doji (>=0.1%)", "mother_body_pct >= 0.1", "shape"),
         ("màu nến con ngược nến mẹ (sách chỉ công nhận đảo chiều)", "variant != 'neutral_harami'", "shape"),
         ("xu hướng trước đủ mạnh (|prior|>=2%) (*)", "prior_trend_pct.abs() >= 2", "quality"),

@@ -245,6 +245,10 @@ class HaramiDetector:
                     "child_body_bottom": round(float(c_body_bottom), 4),
                     "mother_bar_high": round(float(mother["high"]), 4),
                     "mother_bar_low": round(float(mother["low"]), 4),
+                    # 14/08: thêm high/low nến con để thước đo tự kiểm containment RANGE
+                    # của harami cross (doji) — không phụ thuộc cờ containment_mode của detector
+                    "child_bar_high": round(float(child["high"]), 4),
+                    "child_bar_low": round(float(child["low"]), 4),
                     "pattern_width_bars": 2,
                     "pattern_height_pct": round(float(pattern_height_pct), 2),
                     "target_multiplier_pct": round(float(multiplier * 100.0), 1),
