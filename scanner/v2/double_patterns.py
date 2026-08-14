@@ -342,7 +342,13 @@ class DoublePatternDetector:
         )
         if breakout_idx is None or breakout_price is None:
             return None
-        target_price = float(breakout_price) + height_abs if direction == "up" else float(breakout_price) - height_abs
+        if direction == "up":
+            target_price = float(breakout_price) + height_abs
+        else:
+            # sách EC Table 17.8: double tops CHIA ĐÔI height rồi trừ từ lowest low
+            # (double bottoms không chia — giữ nguyên). Sửa 14/08/2026 theo
+            # pdf_review/m5/family_doubles_20260813.md: trước đây dùng nguyên height → target xa ~gấp đôi.
+            target_price = float(breakout_price) - height_abs / 2.0
         breakout_clearance_pct = (
             (float(breakout_price) - neckline) / neckline * 100.0
             if direction == "up"

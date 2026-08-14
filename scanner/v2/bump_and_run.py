@@ -205,7 +205,19 @@ class BumpAndRunDetector:
         )
         if confirmation_idx is None or confirmation_price is None or trend_at_confirm is None:
             return None
-        target = confirmation_price + bump_height_abs if self.direction == 1 else confirmation_price - bump_height_abs
+        if self.direction == 1:
+            # Sửa 14/08/2026 theo pdf_review/m5/family_bump_and_run_20260813.md — sách ECP Table 7.8:
+            # "I changed the measure rule ... to simply the top of the chart pattern"
+            # → target = đỉnh cao nhất toàn pattern (mở nhẹ 2 nến về trước để bắt đỉnh thật đầu lead-in).
+            target = float(df.iloc[max(0, lead_start - 2) : bump_idx + 1]["high"].max())
+        else:
+            # Sách ECP Table 8.8: target = breakout − lead-in height; lead-in height = highest high
+            # trong PHẦN TƯ ĐẦU của formation − giá trendline tại vị trí đó (trước đây dùng bump_height — SAI, xa ≥2×).
+            quarter_end = lead_start + max(1, (bump_idx - lead_start) // 4)
+            seg = df.iloc[lead_start : quarter_end + 1]["high"]
+            lead_peak_idx = int(seg.idxmax())
+            lead_in_height = abs(float(seg.max()) - self._trend_at(lead_start, slope, intercept, lead_peak_idx))
+            target = confirmation_price - lead_in_height
         if target <= 0:
             return None
         target_dist_pct = abs(target - confirmation_price) / confirmation_price * 100.0

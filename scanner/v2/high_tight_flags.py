@@ -182,7 +182,9 @@ class HighTightFlagDetector:
             if breakout_idx is None or breakout_price is None:
                 continue
             pole_height_abs = peak_price - pole_price
-            target_price = float(breakout_price) + pole_height_abs
+            # Sửa 14/08/2026 theo ECP ch.22 (PDF p373-398): target = ĐÁY CỜ + (đỉnh HTF − đáy trend)/2
+            # — CHIA ĐÔI và cộng vào flag low, KHÔNG phải breakout + nguyên chiều cao pole.
+            target_price = float(body_low) + (peak_price - pole_price) / 2.0
             body_volume = pd.to_numeric(body.get("volume"), errors="coerce").dropna()
             prior_volume = pd.to_numeric(prior.get("volume"), errors="coerce").dropna()
             volume_contracts = bool(not body_volume.empty and not prior_volume.empty and float(body_volume.median()) <= float(prior_volume.median()))

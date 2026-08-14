@@ -227,7 +227,11 @@ class PennantDetector:
             return None
 
         pole_height_abs = abs(anchor_price - float(pole["pole_price"]))
-        target_price = float(breakout_price) + pole_height_abs if direction == "up" else float(breakout_price) - pole_height_abs
+        # Sửa 14/08/2026 theo EC Table 34.8: target = chiều cao trend cộng vào giá CUỐI
+        # formation (ngày trước breakout — bull: low cuối formation; bear: high cuối
+        # formation), KHÔNG phải breakout price.
+        end_anchor = float(df.iloc[idxs[-1]]["low"]) if direction == "up" else float(df.iloc[idxs[-1]]["high"])
+        target_price = end_anchor + pole_height_abs if direction == "up" else end_anchor - pole_height_abs
         quality_score = 68
         if float(pole["pole_move_pct"]) >= 14.0:
             quality_score += 8
