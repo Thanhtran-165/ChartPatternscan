@@ -92,11 +92,15 @@ def run_parity_check(artifacts_dir: Path, published_only: bool = False) -> dict:
     """
     artifacts_dir = Path(artifacts_dir)
     if published_only:
-        from scanner.rebuild_source_guided_final_chapters import EVENT_SOURCES
+        from scanner.rebuild_source_guided_final_chapters import DOUBLE_VARIANTS, EVENT_SOURCES
 
         published_events = set()
         for _, (events_path, _filters) in EVENT_SOURCES.items():
             published_events.add((ROOT / Path(events_path)).resolve())
+        # Đợt B (15/08/2026): 8 chương sách double variants (AA/AE/EA/EE × tops/bottoms)
+        # đọc CHUNG 2 events.csv gốc này — cũng là events xuất bản, phải qua gate.
+        for base, _variant in DOUBLE_VARIANTS.values():
+            published_events.add((ROOT / f"artifacts/scanner_v2/double_pattern_family/{base}/db_active/events.csv").resolve())
     else:
         published_events = None
     pairs: list[tuple[Path, Path]] = []

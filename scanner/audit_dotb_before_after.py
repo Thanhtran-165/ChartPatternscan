@@ -67,12 +67,31 @@ def _scoped(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _before_path(d: Path) -> tuple[Path, str]:
+    """Chọn file TRƯỚC: ưu tiên .bak_pre_dotb (backup đợt B); double không thuộc
+    EVENT_SOURCES nên backup đợt B bỏ sót → fallback .bak_vintage_pre_rerun
+    (14/08, 782 events — CÙNG tập event_id với bản mới, khác mỗi cột đánh giá:
+    cô lập đúng tác động đo của đợt B) trước, rồi mới .bak_pre_edition2 (802
+    events, đời cũ hơn)."""
+    preferred = d / "events.csv.bak_pre_dotb"
+    if preferred.exists():
+        return preferred, "events.csv.bak_pre_dotb (backup ngay trước rescan đợt B)"
+    for fallback_name in ("events.csv.bak_vintage_pre_rerun", "events.csv.bak_pre_edition2"):
+        fallback = d / fallback_name
+        if fallback.exists():
+            extra = " — cùng tập event_id với bản SAU, khác mỗi cột đánh giá" if "vintage" in fallback_name else ""
+            return fallback, f"{fallback_name} (đời code cũ, double không thuộc EVENT_SOURCES nên backup đợt B không phủ{extra})"
+    raise FileNotFoundError(f"Không tìm thấy file TRƯỚC cho {d}")
+
+
 def _chapter_block(pattern_id: str) -> dict:
     d = SOURCES[pattern_id]
-    before = pd.read_csv(d / "events.csv.bak_pre_dotb", low_memory=False)
+    before_path, before_note = _before_path(d)
+    before = pd.read_csv(before_path, low_memory=False)
     after = pd.read_csv(d / "events.csv", low_memory=False)
     return {
         "pattern_id": pattern_id,
+        "before_source": before_note,
         "raw": {"before": _stats(before), "after": _stats(after)},
         "scoped_premium_standard": {"before": _stats(_scoped(before)), "after": _stats(_scoped(after))},
     }
@@ -116,6 +135,12 @@ def _md(chapters: list[dict], barr: dict) -> str:
         "# Đợt B — Bảng TRƯỚC/SAU 3 chương (rescan toàn thị trường 16/08/2026)",
         "",
         "TRƯỚC = `events.csv.bak_pre_dotb` (code cũ). SAU = rescan bằng `target_hit_core` full precision.",
+        "",
+        "Nguồn TRƯỚC từng chương:",
+    ]
+    for ch in chapters:
+        lines.append(f"- {ch['pattern_id']}: {ch['before_source']}")
+    lines += [
         "",
         "| Chương | Phạm vi | N TRƯỚC | N SAU | Hit TRƯỚC | Hit SAU | Δ pp | Fail5 TRƯỚC | Fail5 SAU | Median dist TRƯỚC | SAU |",
         "|---|---|---|---|---|---|---|---|---|---|---|",
