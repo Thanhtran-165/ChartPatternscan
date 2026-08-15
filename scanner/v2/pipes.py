@@ -363,6 +363,8 @@ def _evaluate_detection(df: pd.DataFrame, detection: Mapping[str, Any], *, looka
             "b_exec_price": round(b_exec, 4) if b_exec is not None else None,
             "mfe_pct": None,
             "mae_pct": None,
+            "mfe_pct_full": None,
+            "mae_pct_full": None,
             "target_hit": None,
             "failure_5pct": None,
             "weak_move_5pct": None,
@@ -400,6 +402,11 @@ def _evaluate_detection(df: pd.DataFrame, detection: Mapping[str, Any], *, looka
         "b_exec_price": round(b_exec, 4) if b_exec is not None else None,
         "mfe_pct": round(float(mfe), 2),
         "mae_pct": round(float(mae), 2),
+        # Đợt A round-2 (16/08/2026, Sol P2/MEDIUM-3): bản full precision để tái lập
+        # failure_5pct (= mfe_full < 5.0) từ CSV mà không phụ thuộc làm tròn 2 chữ số
+        # (mfe_pct 2dp không tái lập được khi mfe nằm sát ngưỡng 5%).
+        "mfe_pct_full": float(mfe),
+        "mae_pct_full": float(mae),
         "target_hit": target_hit,
         "failure_5pct": bool(float(mfe) < 5.0),
         "weak_move_5pct": bool(float(mfe) < 5.0),
@@ -590,6 +597,8 @@ EVENT_FIELDS = [
     "target_dist_pct",
     "mfe_pct",
     "mae_pct",
+    "mfe_pct_full",
+    "mae_pct_full",
     "target_hit",
     "failure_5pct", "weak_move_5pct", "failure_busted", "days_to_bust",
     "target_first_before_adverse_5pct",

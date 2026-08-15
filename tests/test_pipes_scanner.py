@@ -78,3 +78,47 @@ def test_pipe_top_requires_two_near_equal_up_spikes_and_down_confirmation() -> N
     assert row["breakout_direction"] == "down"
     assert row["spike_similarity_pct"] <= 4.0
 
+
+
+def test_evaluate_detection_exposes_full_precision_mfe_for_failure_replay() -> None:
+    """VIỆC 4 đợt A (Sol P2): failure_5pct = mfe_full < 5.0 — cột mfe_pct_full
+    phải đủ để tái lập đúng failure_5pct kể cả khi mfe_pct (2dp) nằm sát ngưỡng."""
+    from scanner.v2.pipes import _evaluate_detection
+
+    # breakout tại idx 12 (giá 16.8); sau breakout 1 nến high 17.65 → mfe 5.0595...%
+    values = []
+    for close in [18, 17.4, 16.8, 16.1, 15.2, 14.4]:
+        values.append((close, close * 1.01, close * 0.99, close))
+    values.extend(
+        [
+            (14.2, 15.2, 10.0, 14.9),
+            (15.1, 16.2, 14.7, 15.7),
+            (15.6, 16.4, 15.2, 15.9),
+            (15.0, 15.3, 10.2, 14.8),
+            (15.4, 16.1, 14.9, 15.8),
+            (16.4, 17.2, 16.2, 16.8),
+        ]
+    )
+    # mfe = (17.6393-16.8)/16.8*100 = 4.99583...% — làm tròn 2dp thành 5.00
+    # (không tái lập được failure), nhưng mfe_pct_full giữ 4.99583 → tái lập đúng.
+    values.append((17.0, 17.6393, 16.9, 17.5))
+    values.extend([(17.5, 17.55, 17.2, 17.6)] * 25)
+    frame = _frame(values)
+    detection = {
+        "pattern_key": PIPE_BOTTOMS,
+        "breakout_idx": 11,  # nến close 16.8 (values[11]) — future bắt đầu từ values[12]
+        "breakout_price": 16.8,
+        "target_price": 17.2,
+        "breakout_direction": "up",
+    }
+    res = _evaluate_detection(frame, detection)
+    mfe_full = float(res["mfe_pct_full"])
+    assert round(mfe_full, 4) == round((17.6393 - 16.8) / 16.8 * 100.0, 4)
+    assert res["mfe_pct"] == 5.0  # cột cũ vẫn làm tròn 2dp
+    # tái lập failure_5pct CHÍNH XÁC từ cột full (điều kiện Sol VIỆC 4):
+    # từ mfe_pct rounded (5.0) sẽ ra False — SAI; từ full 4.99583 → True.
+    assert res["failure_5pct"] == (mfe_full < 5.0)
+    assert res["failure_5pct"] is True
+    # trường hợp empty future: các cột full là None (không crash builder đọc CSV)
+    empty = _evaluate_detection(frame.iloc[:12], {**detection, "breakout_idx": 11}, lookahead=0)
+    assert empty["mfe_pct_full"] is None and empty["mae_pct_full"] is None
