@@ -47,6 +47,39 @@ BARR_TOPS = "bump_and_run_reversal_tops"
 BARR_PATTERNS = (BARR_BOTTOMS, BARR_TOPS)
 DEFAULT_OUT_DIR = Path("artifacts/scanner_v2/bump_and_run_family")
 
+# Cửa sổ dò OLD HIGH cho BARR bottom target — chốt bằng đo thực nghiệm đợt A
+# round-2 (16/08/2026, Sol NO-GO): trên 2.116 events bản hiện hành, 100% events
+# xác định được old_high trong 60 nến trước lead_start (30 events ls<60 dùng cửa
+# sổ ngắn hơn = 1,42%); phân phối khoảng cách p50=33, p90=60. Mở rộng 120 chỉ
+# giảm chạm mép 10,3%→5,8% nhưng thổi target median +11,4% (bắt đỉnh của swing
+# cấu trúc khác, xa 'start of the formation' sách vẽ). Chi tiết:
+# tests/fixtures/barr_bottom_targets.json (_meta.window_choice).
+BARR_OLD_HIGH_LOOKBACK_BARS = 60
+
+
+def barr_bottom_target(df: pd.DataFrame, lead_start: int, bump_idx: int) -> Tuple[float, int, float]:
+    """Target BARR bottom theo sách ECP Table 7.8 (tr.285-287).
+
+    "The highest high in the pattern is the target" — pattern bắt đầu tại OLD
+    HIGH ("the old high (which is the start of the formation)" — đỉnh trước đà
+    giảm lead-in). old_high_idx = đỉnh cao nhất trong BARR_OLD_HIGH_LOOKBACK_BARS
+    nến trước lead_start; target = highest high từ old_high_idx tới bump_idx
+    (tức trong pattern thật, mở về quá khứ tới đỉnh cũ).
+
+    Trả về (target_price, old_high_idx, old_high_price).
+    """
+    lo = max(0, lead_start - BARR_OLD_HIGH_LOOKBACK_BARS)
+    window = df["high"].iloc[lo:lead_start].to_numpy(dtype=float)
+    if window.size == 0:
+        old_high_idx = int(lead_start)
+    else:
+        # argmax trả vị trí ĐẦU TIÊN đạt max — deterministic; các vị trí đồng
+        # giá trị cho cùng target vì đoạn [old_high_idx..bump] đều chứa max.
+        old_high_idx = lo + int(np.argmax(window))
+    old_high_price = float(df["high"].iloc[old_high_idx])
+    target = float(df["high"].iloc[old_high_idx : bump_idx + 1].max())
+    return target, old_high_idx, old_high_price
+
 
 @dataclass(frozen=True)
 class BumpAndRunConfig:
@@ -205,11 +238,17 @@ class BumpAndRunDetector:
         )
         if confirmation_idx is None or confirmation_price is None or trend_at_confirm is None:
             return None
+        old_high_idx: Optional[int] = None
+        old_high_price: Optional[float] = None
         if self.direction == 1:
-            # Sửa 14/08/2026 theo pdf_review/m5/family_bump_and_run_20260813.md — sách ECP Table 7.8:
-            # "I changed the measure rule ... to simply the top of the chart pattern"
-            # → target = đỉnh cao nhất toàn pattern (mở nhẹ 2 nến về trước để bắt đỉnh thật đầu lead-in).
-            target = float(df.iloc[max(0, lead_start - 2) : bump_idx + 1]["high"].max())
+            # Sửa 16/08/2026 đợt A round-2 (Sol NO-GO): sách ECP Table 7.8 target =
+            # highest high trong pattern, pattern BẮT ĐẦU tại old high (đỉnh trước đà
+            # giảm lead-in). Code cũ max(high[lead_start-2 .. bump]) vừa lấy 2 nến
+            # ngoài pattern vừa bỏ sót old high xa hơn (đo 2.116 events: 70,6% events
+            # target cũ THẤP hơn sách, median -5,46%) → target_hit bị thổi phồng
+            # (58,11% → 45,15% sau sửa). BARR tops (branch -1) giữ nguyên — đã
+            # verify đúng sách Table 8.1/8.8 (V4 Pro + Sol).
+            target, old_high_idx, old_high_price = barr_bottom_target(df, int(lead_start), int(bump_idx))
         else:
             # Sách ECP Table 8.8: target = breakout − lead-in height; lead-in height = highest high
             # trong PHẦN TƯ ĐẦU của formation − giá trendline tại vị trí đó (trước đây dùng bump_height — SAI, xa ≥2×).
@@ -245,6 +284,8 @@ class BumpAndRunDetector:
             "breakout_direction": "up" if self.direction == 1 else "down",
             "breakout_price": round(float(confirmation_price), 4),
             "target_price": round(float(target), 4),
+            "barr_old_high_idx": int(old_high_idx) if old_high_idx is not None else None,
+            "barr_old_high_price": round(float(old_high_price), 4) if old_high_price is not None else None,
             "pattern_width_bars": int(bump_idx - lead_start + 1),
             "pattern_height_pct": round(float(bump_height_pct), 2),
             "variant": self.pattern_key,
