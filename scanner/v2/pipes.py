@@ -27,6 +27,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from scanner.v2.measurement_registry import lookahead_weeks as _registry_lookahead
 from scanner.v2.failure_logic import failure_busted_days, failure_busted_flag
+from scanner.v2.target_hit_core import evaluate_target_hit
 
 from scanner.ohlcv_normalizer import OHLCVNormalizer  # noqa: E402
 from scanner.pivot_detector import Pivot, PivotDetector, PivotType  # noqa: E402
@@ -378,25 +379,23 @@ def _evaluate_detection(df: pd.DataFrame, detection: Mapping[str, Any], *, looka
     if direction == 1:
         mfe = (float(future["high"].max()) - breakout_price) / breakout_price * 100.0
         mae = (breakout_price - float(future["low"].min())) / breakout_price * 100.0
-        target_hit = bool(float(future["high"].max()) >= target)
         retest_rows = future.iloc[:30][future.iloc[:30]["low"] <= breakout_price * 1.005]
     else:
         mfe = (breakout_price - float(future["low"].min())) / breakout_price * 100.0
         mae = (float(future["high"].max()) - breakout_price) / breakout_price * 100.0
-        target_hit = bool(float(future["low"].min()) <= target)
         retest_rows = future.iloc[:30][future.iloc[:30]["high"] >= breakout_price * 0.995]
-    days_to_target: Optional[int] = None
-    days_to_adverse_5: Optional[int] = None
-    for offset, (_, row) in enumerate(future.iterrows(), start=1):
-        high = float(row["high"])
-        low = float(row["low"])
-        target_now = high >= target if direction == 1 else low <= target
-        adverse_now = low <= breakout_price * 0.95 if direction == 1 else high >= breakout_price * 1.05
-        if days_to_target is None and target_now:
-            days_to_target = offset
-        if days_to_adverse_5 is None and adverse_now:
-            days_to_adverse_5 = offset
-    target_first = False if days_to_target is None else (True if days_to_adverse_5 is None else days_to_target < days_to_adverse_5)
+    # BLOCKER 3 (đợt A2, Sol): target_hit / days / target_first qua HÀM CHUẨN DUY
+    # NHẤT scanner.v2.target_hit_core — tính từ target_price (4dp) so giá forward
+    # full precision. Trước đây vòng lặp riêng trong detector (dù cùng kết quả
+    # số học, 2 nguồn tính = rủi ro lệch khi một bên đổi). Adverse 5% core dùng
+    # breakout×0.95 / ×1.05 — cùng công thức vòng lặp cũ.
+    core = evaluate_target_hit(
+        pd.to_numeric(future["high"], errors="coerce").to_numpy(),
+        pd.to_numeric(future["low"], errors="coerce").to_numpy(),
+        breakout_price,
+        target,
+        direction,
+    )
     return {
         "evaluated_bars": int(len(future)),
         "b_exec_price": round(b_exec, 4) if b_exec is not None else None,
@@ -407,13 +406,13 @@ def _evaluate_detection(df: pd.DataFrame, detection: Mapping[str, Any], *, looka
         # (mfe_pct 2dp không tái lập được khi mfe nằm sát ngưỡng 5%).
         "mfe_pct_full": float(mfe),
         "mae_pct_full": float(mae),
-        "target_hit": target_hit,
+        "target_hit": bool(core["target_hit"]),
         "failure_5pct": bool(float(mfe) < 5.0),
         "weak_move_5pct": bool(float(mfe) < 5.0),
         "failure_busted": failure_busted_flag(detection, future, breakout_price=breakout_price, target_price=target, mfe_pct=float(mfe)),
         "days_to_bust": failure_busted_days(detection, future, breakout_price=breakout_price, target_price=target, mfe_pct=float(mfe)),
-        "target_first_before_adverse_5pct": bool(target_first),
-        "days_to_target": int(days_to_target) if days_to_target is not None else None,
+        "target_first_before_adverse_5pct": bool(core["target_first_before_adverse"]),
+        "days_to_target": core["days_to_target"],
         "throwback_pullback_30d": bool(not retest_rows.empty),
         "days_to_throwback_pullback": int(retest_rows.index[0] - breakout_idx) if not retest_rows.empty else None,
     }

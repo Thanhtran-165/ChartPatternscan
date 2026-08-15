@@ -27,6 +27,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from scanner.v2.measurement_registry import lookahead_bars as _registry_lookahead
 from scanner.v2.failure_logic import failure_busted_days, failure_busted_flag
+from scanner.v2.target_hit_core import evaluate_target_hit
 
 from scanner.run_bear_flag_db_source_parity_audit import (  # noqa: E402
     DEFAULT_DB,
@@ -196,29 +197,32 @@ def _evaluate_island(df: pd.DataFrame, row: Mapping[str, Any], *, lookahead: int
         low = pd.to_numeric(future["low"], errors="coerce")
         mfe_series = (high - breakout_price) / breakout_price * 100.0
         mae_series = (breakout_price - low) / breakout_price * 100.0
-        target_series = high >= target
     else:
         low = pd.to_numeric(future["low"], errors="coerce")
         high = pd.to_numeric(future["high"], errors="coerce")
         mfe_series = (breakout_price - low) / breakout_price * 100.0
         mae_series = (high - breakout_price) / breakout_price * 100.0
-        target_series = low <= target
-    adverse_series = mae_series >= 5.0
-    target_hit = bool(target_series.fillna(False).any())
-    first_target = int(np.argmax(target_series.to_numpy())) + 1 if target_hit else None
-    adverse_hit = bool(adverse_series.fillna(False).any())
-    first_adverse = int(np.argmax(adverse_series.to_numpy())) + 1 if adverse_hit else None
+    # BLOCKER 3 (đợt A2, Sol): target_hit / days / target_first qua HÀM CHUẨN
+    # DUY NHẤT scanner.v2.target_hit_core — target_price (4dp) so giá forward
+    # full precision, adverse 5% từ breakout_price (trước đây vòng lặp riêng).
+    core = evaluate_target_hit(
+        pd.to_numeric(future["high"], errors="coerce").to_numpy(),
+        pd.to_numeric(future["low"], errors="coerce").to_numpy(),
+        breakout_price,
+        target,
+        direction,
+    )
     return {
         "evaluated_bars": int(len(future)),
         "mfe_pct": round(float(mfe_series.max()), 2) if not mfe_series.dropna().empty else None,
         "mae_pct": round(float(mae_series.max()), 2) if not mae_series.dropna().empty else None,
-        "target_hit": target_hit,
+        "target_hit": bool(core["target_hit"]),
         "failure_5pct": bool(float(mfe_series.max()) < 5.0) if not mfe_series.dropna().empty else None,
         "weak_move_5pct": bool(float(mfe_series.max()) < 5.0) if not mfe_series.dropna().empty else None,
         "failure_busted": failure_busted_flag(row, future, breakout_price=breakout_price, target_price=target, mfe_pct=float(mfe_series.max()) if not mfe_series.dropna().empty else None),
         "days_to_bust": failure_busted_days(row, future, breakout_price=breakout_price, target_price=target, mfe_pct=float(mfe_series.max()) if not mfe_series.dropna().empty else None),
-        "target_first_before_adverse_5pct": bool(target_hit and (first_adverse is None or int(first_target or 10**9) < first_adverse)),
-        "time_to_target_bars": first_target,
+        "target_first_before_adverse_5pct": bool(core["target_first_before_adverse"]),
+        "time_to_target_bars": core["days_to_target"],
     }
 
 

@@ -25,6 +25,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from scanner.v2.measurement_registry import lookahead_bars as _registry_lookahead
 from scanner.v2.failure_logic import failure_busted_days, failure_busted_flag
+from scanner.v2.target_hit_core import evaluate_target_hit
 
 from scanner.ohlcv_normalizer import OHLCVNormalizer  # noqa: E402
 from scanner.pivot_detector import Pivot, PivotDetector, PivotType  # noqa: E402
@@ -435,24 +436,29 @@ def _evaluate_detection(df: pd.DataFrame, det: Mapping[str, Any], horizon: Optio
     else:
         favorable = (1.0 - pd.to_numeric(forward["low"], errors="coerce") / breakout_price) * 100.0
         adverse = (pd.to_numeric(forward["high"], errors="coerce") / breakout_price - 1.0) * 100.0
-    target_dist = float(det.get("target_dist_pct") or 0.0)
     mfe = float(favorable.max()) if not favorable.dropna().empty else 0.0
     mae = float(adverse.max()) if not adverse.dropna().empty else 0.0
-    bars = pd.Series(range(1, len(forward) + 1), index=forward.index)
-    target_bars = bars[favorable >= target_dist]
-    adverse_bars = bars[adverse >= 5.0]
-    target_day = int(target_bars.iloc[0]) if not target_bars.empty else None
-    adverse_day = int(adverse_bars.iloc[0]) if not adverse_bars.empty else None
+    # BLOCKER 3 (đợt A2, Sol): target_hit / days / target_first qua HÀM CHUẨN DUY
+    # NHẤT scanner.v2.target_hit_core — tính từ target_price (4dp) so giá forward
+    # full precision. Trước đây so favorable >= target_dist_pct LÀM TRÒN 2dp →
+    # lệch hệ thống so builder (cùng họ bug Sol MEDIUM-1).
+    core = evaluate_target_hit(
+        pd.to_numeric(forward["high"], errors="coerce").to_numpy(),
+        pd.to_numeric(forward["low"], errors="coerce").to_numpy(),
+        breakout_price,
+        float(det["target_price"]),
+        direction,
+    )
     return {
         "mfe_pct": round(mfe, 2),
         "mae_pct": round(mae, 2),
-        "target_hit": bool(target_day is not None),
+        "target_hit": bool(core["target_hit"]),
         "failure_5pct": bool(mfe < 5.0),
         "weak_move_5pct": bool(mfe < 5.0),
         "failure_busted": failure_busted_flag(det, forward, breakout_price=breakout_price, target_price=float(det["target_price"]), mfe_pct=float(mfe)),
         "days_to_bust": failure_busted_days(det, forward, breakout_price=breakout_price, target_price=float(det["target_price"]), mfe_pct=float(mfe)),
-        "target_first_before_adverse_5pct": bool(target_day is not None and (adverse_day is None or target_day < adverse_day)),
-        "days_to_target": target_day,
+        "target_first_before_adverse_5pct": bool(core["target_first_before_adverse"]),
+        "days_to_target": core["days_to_target"],
         "evaluated_bars": int(len(forward)),
         "throwback_pullback_30d": bool(adverse.iloc[: min(30, len(adverse))].max() >= 1.0) if not adverse.dropna().empty else False,
     }

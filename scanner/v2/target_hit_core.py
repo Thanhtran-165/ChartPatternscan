@@ -6,6 +6,23 @@ bằng `target_dist_pct` LÀM TRÒN 2 chữ số → lệch hệ thống (CSV ro
 khoảng cách lớn hơn → 111/4.442 event Inside Day lật hit→miss; payload 66,68%
 so với raw 69,18%).
 
+Đợt A2 (16/08/2026, Sol BLOCKER 3): core giờ là nguồn chuẩn duy nhất KỂ CẢ
+DETECTOR — mọi `_evaluate_detection` trong scanner/v2 gọi `evaluate_target_hit`
+thay vì vòng lặp/so sánh riêng. Release gate bắt buộc: `raw events target_hit ==
+canonical core target_hit, mismatch = 0 trên toàn bộ events được xuất bản`
+(script `scanner/audit_target_hit_core_parity.py`, chạy trong
+`tests/test_target_hit_core_parity.py`).
+
+PRECISION CHUẨN (tuyên bố chính thức, phương án Sol (ii)):
+  - `target_price` và `breakout_price` được LÀM TRÒN 4 CHỮ SỐ THẬP PHÂN tại
+    detection (giá DB VND có tối đa 4dp; round 4dp = không mất thông tin giá)
+    và mọi tính toán sau đó dùng ĐÚNG giá trị đã round này. KHÔNG có đường nào
+    tính trên target chưa round.
+  - Đường giá so sánh (high/low trong post_breakout_path.csv) là FULL
+    PRECISION — độ chính xác giá thực tế của DB.
+  - `target_dist_pct` (2dp) CHỈ là cột hiển thị/phân tích khoảng cách, KHÔNG
+    được dùng làm mốc so target_hit.
+
 Module này là hàm chuẩn dùng CHUNG cho detector và mọi builder:
   - mốc target nội suy từ `breakout_price` + `target_price` (độ chính xác 4dp
     lưu trong events.csv — không phụ thuộc target_dist_pct làm tròn);

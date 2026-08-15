@@ -30,6 +30,7 @@ from .source_data import classify_market_regimes as _classify_market_regimes
 from .source_data import load_market_stats_symbol as _load_market_stats_symbol
 from .source_data import symbol_concentration as _symbol_concentration
 from .source_data import symbol_from_path as _symbol_from_path
+from .target_hit_core import evaluate_target_hit
 
 
 PATTERN_KEY = "flags_experiment"
@@ -368,40 +369,32 @@ def _evaluate_detection(df: pd.DataFrame, detection: Mapping[str, Any], *, looka
     if direction == "up":
         mfe = (float(future["high"].max()) - breakout_price) / breakout_price * 100.0
         mae = (breakout_price - float(future["low"].min())) / breakout_price * 100.0
-        target_hit = bool(float(future["high"].max()) >= target)
     else:
         mfe = (breakout_price - float(future["low"].min())) / breakout_price * 100.0
         mae = (float(future["high"].max()) - breakout_price) / breakout_price * 100.0
-        target_hit = bool(float(future["low"].min()) <= target)
-    days_to_target: Optional[int] = None
-    days_to_adverse_5: Optional[int] = None
-    for offset, (_, row) in enumerate(future.iterrows(), start=1):
-        high = float(row["high"])
-        low = float(row["low"])
-        if direction == "up":
-            if days_to_target is None and high >= target:
-                days_to_target = offset
-            if days_to_adverse_5 is None and low <= breakout_price * 0.95:
-                days_to_adverse_5 = offset
-        else:
-            if days_to_target is None and low <= target:
-                days_to_target = offset
-            if days_to_adverse_5 is None and high >= breakout_price * 1.05:
-                days_to_adverse_5 = offset
-    target_first = False if days_to_target is None else (True if days_to_adverse_5 is None else days_to_target < days_to_adverse_5)
+    # BLOCKER 3 (đợt A2, Sol): target_hit / days / target_first qua HÀM CHUẨN
+    # DUY NHẤT scanner.v2.target_hit_core — target_price (4dp) so giá forward
+    # full precision, adverse 5% từ breakout_price (trước đây vòng lặp riêng).
+    core = evaluate_target_hit(
+        pd.to_numeric(future["high"], errors="coerce").to_numpy(),
+        pd.to_numeric(future["low"], errors="coerce").to_numpy(),
+        breakout_price,
+        target,
+        1 if direction == "up" else -1,
+    )
     return {
         "evaluated_bars": int(len(future)),
         "b_exec_price": round(b_exec, 4) if b_exec is not None else None,
         "mfe_pct": round(float(mfe), 2),
         "mae_pct": round(float(mae), 2),
         "target_dist_pct": round(float(target_dist_pct), 2),
-        "target_hit": target_hit,
+        "target_hit": bool(core["target_hit"]),
         "failure_5pct": bool(float(mfe) < 5.0),
         "weak_move_5pct": bool(float(mfe) < 5.0),
         "failure_busted": failure_busted_flag(detection, future, breakout_price=breakout_price, target_price=target, mfe_pct=float(mfe)),
         "days_to_bust": failure_busted_days(detection, future, breakout_price=breakout_price, target_price=target, mfe_pct=float(mfe)),
-        "target_first_before_adverse_5pct": bool(target_first),
-        "days_to_target": int(days_to_target) if days_to_target is not None else None,
+        "target_first_before_adverse_5pct": bool(core["target_first_before_adverse"]),
+        "days_to_target": core["days_to_target"],
     }
 
 
