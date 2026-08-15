@@ -85,7 +85,8 @@ def main() -> int:
     rows = []
     for _, r in ev.iterrows():
         sym = str(r["symbol"]).upper()
-        ls, le, bi = int(r["lead_in_start_idx"]), int(r["lead_in_end_idx"]), int(r["bump_idx"])
+        lead_start_col = "lead_in_start_idx" if "lead_in_start_idx" in ev.columns else "lead_in_fit_start_idx"
+        ls, le, bi = int(r[lead_start_col]), int(r["lead_in_end_idx"]), int(r["bump_idx"])
         df, highs = load(sym)
         if df.empty:
             rows.append({"detection_id": r["detection_id"], "symbol": sym, "ok": False, "reason": "no_series"})

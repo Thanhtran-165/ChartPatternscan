@@ -113,3 +113,41 @@ def test_barr_bottom_no_valid_anchor_is_rejected_not_window_max() -> None:
         )
         assert res is None, event["detection_id"]
     assert checked == 2
+
+
+def test_barr_bottom_record_formation_boundary_uses_old_high() -> None:
+    """BLOCKER 2 (đợt A2): formation_start của BARR bottom phải là OLD HIGH,
+    pattern_width_bars tính từ old high, lead_start giữ dưới tên riêng
+    lead_in_fit_start_idx."""
+    import pandas as pd
+
+    from scanner.pivot_detector import Pivot, PivotType
+    from scanner.v2.bump_and_run import BARR_BOTTOMS, BumpAndRunConfig, BumpAndRunDetector
+
+    data = _load_fixture()
+    event = next(e for e in data["events"] if e["expected_status"] == "ok")
+    df = _frame(event)
+    ls = int(event["lead_start_idx_in_segment"])
+    le = int(event["lead_end_idx_in_segment"])
+    bi = int(event["bump_idx_in_segment"])
+    old_idx = int(event["expected_old_high_idx_in_segment"])
+    bump = Pivot(
+        idx=bi,
+        date=df.iloc[bi]["date"],
+        price=float(df.iloc[bi]["low"]),
+        type=PivotType.LOW,
+        strength=5,
+        classification="intermediate",
+    )
+    detector = BumpAndRunDetector(BARR_BOTTOMS, BumpAndRunConfig())
+    record = detector.scan_candidate(
+        df, bump, le - ls + 1, [int(i) for i in event["high_pivot_indices_in_segment"]]
+    )
+    assert record is not None, "fixture event thật phải detect được"
+    assert record["formation_start_idx"] == old_idx
+    assert record["formation_start_date"] == str(pd.Timestamp(df.iloc[old_idx]["date"]).date())
+    assert record["pattern_width_bars"] == bi - old_idx + 1
+    assert record["lead_in_fit_start_idx"] == ls
+    assert record["barr_old_high_idx"] == old_idx
+    assert record["barr_old_high_date"] == str(pd.Timestamp(df.iloc[old_idx]["date"]).date())
+    assert "lead_in_start_idx" not in record

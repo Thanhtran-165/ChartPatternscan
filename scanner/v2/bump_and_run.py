@@ -330,10 +330,15 @@ class BumpAndRunDetector:
             score += 4.0
         score = int(max(0, min(100, round(score))))
 
+        # BLOCKER 2 (đợt A2, Sol): boundary artifact — formation của BARR bottom
+        # bắt đầu tại OLD HIGH (đúng boundary sách); tops giữ lead_start (pattern
+        # của tops bắt đầu tại lead_start thật). lead_start đổi tên ra field riêng
+        # lead_in_fit_start_idx (điểm bắt đầu fit lead-in — trung tính cả 2 hướng).
+        formation_start_idx = int(old_high_idx) if (self.direction == 1 and old_high_idx is not None) else int(lead_start)
         return {
-            "formation_start_idx": int(lead_start),
+            "formation_start_idx": formation_start_idx,
             "formation_end_idx": int(bump_idx),
-            "formation_start_date": str(pd.Timestamp(df.iloc[lead_start]["date"]).date()),
+            "formation_start_date": str(pd.Timestamp(df.iloc[formation_start_idx]["date"]).date()),
             "formation_end_date": str(pd.Timestamp(df.iloc[bump_idx]["date"]).date()),
             "breakout_idx": int(confirmation_idx),
             "breakout_date": str(pd.Timestamp(df.iloc[int(confirmation_idx)]["date"]).date()),
@@ -341,11 +346,12 @@ class BumpAndRunDetector:
             "breakout_price": round(float(confirmation_price), 4),
             "target_price": round(float(target), 4),
             "barr_old_high_idx": int(old_high_idx) if old_high_idx is not None else None,
+            "barr_old_high_date": str(pd.Timestamp(df.iloc[int(old_high_idx)]["date"]).date()) if old_high_idx is not None else None,
             "barr_old_high_price": round(float(old_high_price), 4) if old_high_price is not None else None,
-            "pattern_width_bars": int(bump_idx - lead_start + 1),
+            "pattern_width_bars": int(bump_idx - formation_start_idx + 1),
             "pattern_height_pct": round(float(bump_height_pct), 2),
             "variant": self.pattern_key,
-            "lead_in_start_idx": int(lead_start),
+            "lead_in_fit_start_idx": int(lead_start),
             "lead_in_end_idx": int(lead_end),
             "lead_in_bars": int(lead_bars),
             "lead_in_change_pct": round(float(lead_change_pct), 2),
@@ -581,8 +587,11 @@ EVENT_FIELDS = [
     "publication_quality_reasons",
     "pattern_width_bars",
     "pattern_height_pct",
-    "lead_in_start_idx",
+    "lead_in_fit_start_idx",
     "lead_in_end_idx",
+    "barr_old_high_idx",
+    "barr_old_high_date",
+    "barr_old_high_price",
     "lead_in_bars",
     "lead_in_change_pct",
     "lead_in_r2",
