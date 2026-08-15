@@ -459,7 +459,16 @@ def main() -> None:
     parser.add_argument("--all-symbols", action="store_true", help="Scan every symbol in the OHLCV DB instead of the active-symbol subset.")
     parser.add_argument("--config-json", default=None)
     args = parser.parse_args()
-    allowed = None if args.all_symbols else (sorted(_load_active_symbols(DEFAULT_MARKET_STATS_JSON)) if args.active_only else None)
+    # Đợt B (15/08/2026): _load_active_symbols trả DICT metadata, không phải set.
+    # Trước đây `sorted(dict)` lấy sorted CÁC KEY → danh sách tên trường bị đem đi
+    # query symbol → quét 0 mã → events.csv rỗng (bắt qua gate parity). Sửa theo
+    # pattern chuẩn ascending_triangles: đọc active_symbols từ meta dict.
+    active_meta = _load_active_symbols(DEFAULT_MARKET_STATS_JSON)
+    active_symbols = active_meta.get("active_symbols") if active_meta.get("enabled") else None
+    if args.all_symbols or not args.active_only:
+        allowed = None
+    else:
+        allowed = sorted(active_symbols) if active_symbols else None
     config = json.loads(args.config_json) if args.config_json else None
     outputs = scan_island_family_db(
         db_path=Path(args.db),
