@@ -28,6 +28,7 @@ if str(ROOT) not in sys.path:
 from scanner.publication_flow_contract import SOURCE_GROUNDED_PUBLICATION_GATE_ID  # noqa: E402
 from scanner.rounding_family_publication_specs import build_rounding_publication_spec  # noqa: E402
 from scanner.v2.rounding import _to_weekly_ohlcv  # noqa: E402
+from scanner.v2.target_hit_core import target_hit_stats  # noqa: E402
 
 
 DEFAULT_OUT_DIR = Path("artifacts/scanner_v2/rounding_family_public_chapters")
@@ -100,26 +101,31 @@ def _events_for_scope(events: pd.DataFrame) -> pd.DataFrame:
     return events.copy()
 
 
-def _metric_for_target(events: pd.DataFrame, multiple: float, role: str) -> dict[str, Any]:
+def _metric_for_target(events: pd.DataFrame, path_df: pd.DataFrame, multiple: float, role: str) -> dict[str, Any]:
     if events.empty:
         return {"target_multiple": multiple, "target_role": role, "n": 0}
+    if "event_id" not in events.columns:
+        events = events.assign(event_id=events["detection_id"])
+    # Đợt B (16/08/2026, Sol MEDIUM-1): hits/firsts/days qua hàm chuẩn full precision
+    # scanner/v2/target_hit_core — bỏ hit = mfe_pct(2dp) >= target_dist_pct(2dp)
+    # (rounding luôn làm khoảng cách lớn hơn → hit rate bị bóp thấp).
+    hits, firsts, days = target_hit_stats(events, path_df, multiple)
     mfe = pd.to_numeric(events.get("mfe_pct"), errors="coerce")
     mae = pd.to_numeric(events.get("mae_pct"), errors="coerce")
-    target_dist = pd.to_numeric(events.get("target_dist_pct"), errors="coerce") * multiple
-    hit = (mfe >= target_dist).fillna(False)
     fail = events.get("failure_5pct", pd.Series(False, index=events.index)).map(_truthy)
-    first = events.get("target_first_before_adverse_5pct", pd.Series(False, index=events.index)).map(_truthy)
+    hit_days = pd.Series(days).dropna()
     return {
         "target_multiple": multiple,
         "target_role": role,
         "target_label": f"{multiple}x",
-        "target_hit_rate": round(float(hit.mean() * 100.0), 2),
-        "target_first_before_adverse_5pct_rate": round(float(first.mean() * 100.0), 2),
+        "target_hit_rate": round(float(np.mean(hits) * 100.0), 2),
+        "target_first_before_adverse_5pct_rate": round(float(np.mean(firsts) * 100.0), 2),
         "failure_5pct_rate": round(float(fail.mean() * 100.0), 2),
         "median_mfe_pct": round(float(mfe.median()), 2) if not mfe.dropna().empty else None,
         "median_mae_pct": round(float(mae.median()), 2) if not mae.dropna().empty else None,
         "mfe_mae_median_ratio": round(float(mfe.median() / max(mae.median(), 1.0)), 2) if not mfe.dropna().empty and not mae.dropna().empty else None,
-        "median_target_dist_pct": round(float(target_dist.median()), 2) if not target_dist.dropna().empty else None,
+        "median_target_dist_pct": round(float((pd.to_numeric(events.get("target_dist_pct"), errors="coerce") * multiple).median()), 2) if not pd.to_numeric(events.get("target_dist_pct"), errors="coerce").dropna().empty else None,
+        "median_days_to_target": round(float(hit_days.median()), 1) if not hit_days.empty else None,
         "n": int(len(events)),
     }
 
@@ -359,7 +365,7 @@ def _source_notes(pattern_id: str, meta: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _publication_payload(pattern_id: str, meta: Mapping[str, Any], events: pd.DataFrame, all_events: pd.DataFrame) -> dict[str, Any]:
+def _publication_payload(pattern_id: str, meta: Mapping[str, Any], events: pd.DataFrame, all_events: pd.DataFrame, path_df: pd.DataFrame) -> dict[str, Any]:
     if events.empty:
         raise SystemExit(f"No events available for {pattern_id}; cannot build a publication chapter seed.")
     mfe = pd.to_numeric(events.get("mfe_pct"), errors="coerce")
@@ -367,8 +373,8 @@ def _publication_payload(pattern_id: str, meta: Mapping[str, Any], events: pd.Da
     fail = events.get("failure_5pct", pd.Series(False, index=events.index)).map(_truthy)
     first = events.get("target_first_before_adverse_5pct", pd.Series(False, index=events.index)).map(_truthy)
     hit = events.get("target_hit", pd.Series(False, index=events.index)).map(_truthy)
-    base_target = _metric_for_target(events, float(meta["base_target_multiple"]), "local_cautious_base")
-    legacy_target = _metric_for_target(events, float(meta["legacy_target_multiple"]), "source_full_height")
+    base_target = _metric_for_target(events, path_df, float(meta["base_target_multiple"]), "local_cautious_base")
+    legacy_target = _metric_for_target(events, path_df, float(meta["legacy_target_multiple"]), "source_full_height")
     return {
         "source_family_factory_id": "rounding_family_public_chapter_seed_v1",
         "pattern_id": pattern_id,
@@ -429,8 +435,11 @@ def build_one_rounding_chapter(*, pattern_id: str, out_dir: Path, price_db: Path
         shutil.rmtree(chapter_dir)
     chapter_dir.mkdir(parents=True, exist_ok=True)
     all_events = pd.read_csv(meta["scan_dir"] / "events.csv")
+    if "event_id" not in all_events.columns:
+        all_events["event_id"] = all_events["detection_id"]
+    path_df = pd.read_csv(meta["scan_dir"] / "post_breakout_path.csv")
     events = _events_for_scope(all_events)
-    payload = _publication_payload(pattern_id, meta, events, all_events)
+    payload = _publication_payload(pattern_id, meta, events, all_events, path_df)
     spec = _spec(pattern_id, meta)
     publication_spec = build_rounding_publication_spec(pattern_id=pattern_id, title=str(meta["title"]), spec=spec)
     payload["publication_spec_id"] = publication_spec["publication_spec_id"]

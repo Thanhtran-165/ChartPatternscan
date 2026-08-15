@@ -23,6 +23,7 @@ from matplotlib.patches import Rectangle
 
 from scanner.publication_flow_contract import SOURCE_GROUNDED_PUBLICATION_GATE_ID
 from scanner.publication_semantic_contract import PUBLICATION_SEMANTIC_GATE_ID
+from scanner.v2.target_hit_core import target_hit_stats  # noqa: E402
 
 
 DEFAULT_OUT_DIR = Path("artifacts/scanner_v2/scallop_family_public_chapters")
@@ -279,40 +280,30 @@ def _events_for_scope(events: pd.DataFrame) -> pd.DataFrame:
 def _metric_for_target(events: pd.DataFrame, path_df: pd.DataFrame, multiple: float, role: str) -> dict[str, Any]:
     if events.empty:
         return {"target_multiple": multiple, "target_role": role, "target_label": f"{multiple:.2g}x", "n": 0}
+    if "event_id" not in events.columns:
+        events = events.assign(event_id=events["detection_id"])
+    # Đợt B (16/08/2026, Sol MEDIUM-1): hits/firsts/days qua hàm chuẩn full precision
+    # scanner/v2/target_hit_core (target_price 4dp nội suy multiple + high/low path
+    # full precision) — bỏ khối vector hóa mfe_pct(2dp) >= target_dist_pct(2dp) và
+    # signed_excursion so threshold làm tròn (cùng bug builder island/rounding/gap).
+    hits, firsts, days = target_hit_stats(events, path_df, multiple)
     work = events.copy()
-    work["target_dist_scaled_pct"] = pd.to_numeric(work["target_dist_pct"], errors="coerce") * float(multiple)
     work["mfe_pct"] = pd.to_numeric(work["mfe_pct"], errors="coerce")
     work["mae_pct"] = pd.to_numeric(work["mae_pct"], errors="coerce")
-    work["target_hit_scaled"] = work["mfe_pct"] >= work["target_dist_scaled_pct"]
-    event_ids = set(work["detection_id"].astype(str))
-    path = path_df[path_df["event_id"].astype(str).isin(event_ids)].copy() if not path_df.empty else pd.DataFrame()
-    first_target: dict[str, float] = {}
-    first_adverse: dict[str, float] = {}
-    if not path.empty:
-        path["threshold"] = path["event_id"].map(dict(zip(work["detection_id"].astype(str), work["target_dist_scaled_pct"])))
-        path["bar_after_breakout"] = pd.to_numeric(path["bar_after_breakout"], errors="coerce")
-        path["signed_high_excursion_pct"] = pd.to_numeric(path["signed_high_excursion_pct"], errors="coerce")
-        path["signed_low_excursion_pct"] = pd.to_numeric(path["signed_low_excursion_pct"], errors="coerce")
-        hit_rows = path[path["signed_high_excursion_pct"] >= path["threshold"]]
-        adv_rows = path[path["signed_low_excursion_pct"] <= -5.0]
-        first_target = hit_rows.groupby("event_id")["bar_after_breakout"].min().to_dict()
-        first_adverse = adv_rows.groupby("event_id")["bar_after_breakout"].min().to_dict()
-    first_target_series = work["detection_id"].astype(str).map(first_target)
-    first_adverse_series = work["detection_id"].astype(str).map(first_adverse)
-    target_first = first_target_series.notna() & (first_adverse_series.isna() | (first_target_series < first_adverse_series))
-    hit_days = first_target_series.dropna()
+    fail = work.get("failure_5pct", pd.Series(False, index=work.index)).map(_truthy)
+    hit_days = pd.Series(days).dropna()
     ratio = float(work["mfe_pct"].median() / max(work["mae_pct"].median(), 1e-9)) if work["mae_pct"].notna().any() else float("nan")
     return {
         "target_multiple": multiple,
         "target_role": role,
         "target_label": f"{multiple:g}x",
-        "target_hit_rate": round(float(work["target_hit_scaled"].mean() * 100.0), 2),
-        "target_first_before_adverse_5pct_rate": round(float(target_first.mean() * 100.0), 2),
-        "failure_5pct_rate": round(float(work["failure_5pct"].map(_truthy).mean() * 100.0), 2),
+        "target_hit_rate": round(float(np.mean(hits) * 100.0), 2),
+        "target_first_before_adverse_5pct_rate": round(float(np.mean(firsts) * 100.0), 2),
+        "failure_5pct_rate": round(float(fail.mean() * 100.0), 2),
         "median_mfe_pct": round(float(work["mfe_pct"].median()), 2),
         "median_mae_pct": round(float(work["mae_pct"].median()), 2),
         "mfe_mae_median_ratio": round(ratio, 2) if math.isfinite(ratio) else None,
-        "median_target_dist_pct": round(float(work["target_dist_scaled_pct"].median()), 2),
+        "median_target_dist_pct": round(float(pd.to_numeric(work["target_dist_pct"], errors="coerce").median() * multiple), 2),
         "median_days_to_target": round(float(hit_days.median()), 1) if not hit_days.empty else None,
         "n": int(len(work)),
     }
