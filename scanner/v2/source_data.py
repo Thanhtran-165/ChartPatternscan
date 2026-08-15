@@ -34,6 +34,20 @@ def load_market_stats_symbol(path: Path) -> pd.DataFrame:
         return df
     df["symbol"] = symbol
     df["date"] = pd.to_datetime(df["date"])
+    for col in ("open", "high", "low", "close", "volume"):
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+    # Đợt B (15/08/2026, gate parity Sol): chuẩn hoá ĐƯỜNG GIÁ tại NGUỒN cho
+    # nguồn JSON stock_series (HTF / pennants dùng nguồn này) — bỏ bar có OHLC
+    # <= 0, đảo high<low, kẹp open/close vào biên — ĐỒNG BỘ với fix tương ứng
+    # tại _load_symbol_from_db (nguồn sqlite). Trước đây detector normalize
+    # nội bộ (index lỗ chỗi) còn _path_rows dùng frame thô index liền → 25
+    # mismatch parity high_tight_flags. Normalizer idempotent nên detector
+    # normalize lại không đổi kết quả detection.
+    from scanner.ohlcv_normalizer import OHLCVNormalizer  # import lười tránh vòng
+
+    df, _norm_stats = OHLCVNormalizer().normalize(df)
+    df = df.reset_index(drop=True)
     cols = ["symbol", "date", "open", "high", "low", "close", "volume"]
     return df[cols].copy()
 
