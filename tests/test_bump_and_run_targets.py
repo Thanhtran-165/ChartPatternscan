@@ -1,18 +1,22 @@
-"""Fixture test BARR bottom target — sách ECP Table 7.8 (đợt A round-2, Sol NO-GO 15/08/2026).
+"""Fixture test BARR bottom target — LOCAL PIVOT cơ chế (BLOCKER 1, đợt A2 16/08/2026).
 
-Fixture đóng băng từ dữ liệu thật: 8 events của
-artifacts/scanner_v2/bump_and_run_family/bump_and_run_reversal_bottoms/db_active/events.csv
-+ OHLC daily normalized từ market_cache/stock_ohlcv/latest.sqlite.
+Sách ECP Table 7.8: "The highest high in the pattern is the target"; pattern
+bắt đầu tại OLD HIGH — "the old high (which is the start of the formation)".
 
-Quy tắc sách: "The highest high in the pattern is the target" và pattern bắt đầu
-tại OLD HIGH (đỉnh trước đà giảm lead-in — "the old high (which is the start of
-the formation)"). old_high_idx = argmax(high) trong 60 nến trước lead_start
-(cửa sổ chốt bằng đo 2.116 events: 100% có old_high xác định, p50 dist=33, p90=60;
-xem _meta trong fixtures/barr_bottom_targets.json).
+Cơ chế (thay cơ chế argmax cửa sổ 60 của đợt A — Sol duyệt có điều kiện):
+old high = pivot HIGH GẦN NHẤT trước lead_start neo được vào CÙNG đường
+lead-in: fit mở rộng [pivot, lead_end] trên close vẫn đạt hướng dốc (slope<0)
+và tiêu chuẩn fit của detector (r2 >= lead_in_min_r2). Duyệt pivot GẦN → XA
+trong cap kỹ thuật 250 bars (cap KHÔNG phải định nghĩa). Không pivot hợp lệ →
+event BỊ LOẠI (barr_bottom_target trả None) — không được thay bằng cực đại
+cửa sổ.
 
-6 events đầu: đỉnh cũ XA lead_start (dist 45-60) — code cũ (max high
-[lead_start-2 .. bump]) cho target THẤP hơn sách → fixture FAIL với code cũ.
-2 events cuối: đỉnh cũ TRÙNG pattern — target không đổi (bảo vệ case ổn định).
+Fixture 8 events thật (tests/fixtures/barr_bottom_targets.json):
+- 6 events có pivot hợp lệ, dist 5/30/31/120/121/249 (đa dạng gần→xa)
+- 2 events CÓ candidate pivots nhưng mọi pivot fail fit → no_valid_anchor
+
+Với code đợt A (argmax cửa sổ 60) các test này FAIL — chữ ký và ngữ nghĩa khác
+(chứng minh fail-trước bằng TypeError trước khi sửa code).
 """
 
 from __future__ import annotations
@@ -23,7 +27,7 @@ from pathlib import Path
 import pandas as pd
 
 from scanner.v2.bump_and_run import (
-    BARR_OLD_HIGH_LOOKBACK_BARS,
+    BARR_OLD_HIGH_SEARCH_CAP_BARS,
     barr_bottom_target,
 )
 
@@ -31,8 +35,7 @@ FIXTURE = Path(__file__).resolve().parents[1] / "tests/fixtures/barr_bottom_targ
 
 
 def _load_fixture() -> dict:
-    data = json.loads(FIXTURE.read_text(encoding="utf-8"))
-    return data
+    return json.loads(FIXTURE.read_text(encoding="utf-8"))
 
 
 def _frame(event: dict) -> pd.DataFrame:
@@ -42,54 +45,71 @@ def _frame(event: dict) -> pd.DataFrame:
     return bars.reset_index(drop=True)
 
 
-def test_barr_bottom_target_matches_book_on_frozen_real_events() -> None:
+def test_barr_bottom_target_anchors_at_local_pivot_on_frozen_real_events() -> None:
     data = _load_fixture()
-    assert BARR_OLD_HIGH_LOOKBACK_BARS == 60  # cửa sổ chốt từ đo 2.116 events (xem _meta)
+    assert BARR_OLD_HIGH_SEARCH_CAP_BARS == 250  # cap kỹ thuật, không phải định nghĩa
+    checked_ok = 0
     for event in data["events"]:
         df = _frame(event)
         ls = int(event["lead_start_idx_in_segment"])
+        le = int(event["lead_end_idx_in_segment"])
         bi = int(event["bump_idx_in_segment"])
-        target, old_idx, old_high = barr_bottom_target(df, ls, bi)
-        assert old_idx == int(event["expected_old_high_idx_in_segment"]), (
-            f"{event['detection_id']}: old_high_idx {old_idx} != {event['expected_old_high_idx_in_segment']}"
-        )
+        pivots = [int(i) for i in event["high_pivot_indices_in_segment"]]
+        res = barr_bottom_target(df, ls, le, bi, pivots)
+        if event["expected_status"] == "no_valid_anchor":
+            assert res is None, (
+                f"{event['detection_id']}: phải None (no_valid_anchor) nhưng được {res}"
+            )
+            continue
+        checked_ok += 1
+        target, old_idx, old_high = res
+        assert old_idx == int(event["expected_old_high_idx_in_segment"]), event["detection_id"]
         assert abs(old_high - float(event["expected_old_high"])) < 1e-9, event["detection_id"]
-        assert abs(target - float(event["expected_target"])) < 1e-9, (
-            f"{event['detection_id']}: target {target} != sách {event['expected_target']}"
-        )
+        assert abs(target - float(event["expected_target"])) < 1e-9, event["detection_id"]
+    assert checked_ok == 6
 
 
-def test_barr_bottom_far_old_high_raises_target_vs_legacy_window() -> None:
-    """Các event đỉnh cũ xa: target sách PHẢI CAO hơn code cũ (max [ls-2..bump])
-    — chính là các case mà fixture FAIL với code hiện tại trước khi sửa."""
-    data = _load_fixture()
-    for event in data["events"]:
-        if float(event["target_current_code"]) == float(event["expected_target"]):
-            continue  # 2 events trùng — kiểm ở test dưới
-        assert float(event["expected_target"]) > float(event["target_current_code"]), event["detection_id"]
-        df = _frame(event)
-        ls = int(event["lead_start_idx_in_segment"])
-        bi = int(event["bump_idx_in_segment"])
-        target, _, _ = barr_bottom_target(df, ls, bi)
-        legacy = float(df.iloc[max(0, ls - 2) : bi + 1]["high"].max())
-        assert target > legacy, event["detection_id"]
-
-
-def test_barr_bottom_old_high_inside_pattern_keeps_target_stable() -> None:
-    """2 events đỉnh cũ nằm TRONG [ls-2..bump]: target sách == target code cũ —
-    sửa không được làm thay đổi các case vốn đã đúng."""
+def test_barr_bottom_pivot_far_beyond_legacy_window_raises_target() -> None:
+    """Events pivot cách lead_start > 60 (ngoài cửa sổ cũ): target pivot PHẢI cao
+    hơn legacy max(high[lead_start-2 .. bump]) — đây là các case mà cơ chế cửa sổ
+    60 của đợt A sai (bỏ sót old high thật)."""
     data = _load_fixture()
     checked = 0
     for event in data["events"]:
-        if float(event["target_current_code"]) != float(event["expected_target"]):
+        if event["expected_status"] != "ok":
+            continue
+        ls = int(event["lead_start_idx_in_segment"])
+        if ls - int(event["expected_old_high_idx_in_segment"]) <= 60:
             continue
         checked += 1
         df = _frame(event)
-        ls = int(event["lead_start_idx_in_segment"])
+        le = int(event["lead_end_idx_in_segment"])
         bi = int(event["bump_idx_in_segment"])
-        target, old_idx, old_high = barr_bottom_target(df, ls, bi)
-        assert abs(target - float(event["expected_target"])) < 1e-9, event["detection_id"]
-        # old high có thể xa hơn 2 nến nhưng KHÔNG vượt đỉnh pattern
-        # (bằng hoặc thấp hơn — target giữ nguyên)
-        assert old_high <= target + 1e-9, event["detection_id"]
+        pivots = [int(i) for i in event["high_pivot_indices_in_segment"]]
+        target, _, _ = barr_bottom_target(df, ls, le, bi, pivots)
+        legacy = float(df.iloc[max(0, ls - 2) : bi + 1]["high"].max())
+        assert target > legacy, event["detection_id"]
+    assert checked >= 3  # dist 120/121/249
+
+
+def test_barr_bottom_no_valid_anchor_is_rejected_not_window_max() -> None:
+    """2 events có candidate pivots nhưng mọi pivot fail fit lead-in: kết quả
+    PHẢI là None (caller loại event) — không được im lặng thay bằng cực đại
+    cửa sổ (yêu cầu Sol BLOCKER 1)."""
+    data = _load_fixture()
+    checked = 0
+    for event in data["events"]:
+        if event["expected_status"] != "no_valid_anchor":
+            continue
+        checked += 1
+        assert len(event["high_pivot_indices_in_segment"]) > 0, "fixture phải có candidates để test fit-fail"
+        df = _frame(event)
+        res = barr_bottom_target(
+            df,
+            int(event["lead_start_idx_in_segment"]),
+            int(event["lead_end_idx_in_segment"]),
+            int(event["bump_idx_in_segment"]),
+            [int(i) for i in event["high_pivot_indices_in_segment"]],
+        )
+        assert res is None, event["detection_id"]
     assert checked == 2

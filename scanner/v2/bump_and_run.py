@@ -47,36 +47,76 @@ BARR_TOPS = "bump_and_run_reversal_tops"
 BARR_PATTERNS = (BARR_BOTTOMS, BARR_TOPS)
 DEFAULT_OUT_DIR = Path("artifacts/scanner_v2/bump_and_run_family")
 
-# Cửa sổ dò OLD HIGH cho BARR bottom target — chốt bằng đo thực nghiệm đợt A
-# round-2 (16/08/2026, Sol NO-GO): trên 2.116 events bản hiện hành, 100% events
-# xác định được old_high trong 60 nến trước lead_start (30 events ls<60 dùng cửa
-# sổ ngắn hơn = 1,42%); phân phối khoảng cách p50=33, p90=60. Mở rộng 120 chỉ
-# giảm chạm mép 10,3%→5,8% nhưng thổi target median +11,4% (bắt đỉnh của swing
-# cấu trúc khác, xa 'start of the formation' sách vẽ). Chi tiết:
-# tests/fixtures/barr_bottom_targets.json (_meta.window_choice).
-BARR_OLD_HIGH_LOOKBACK_BARS = 60
+# Cap DÒ old high cho BARR bottom target — đợt A2 16/08/2026 (Sol BLOCKER 1,
+# duyệt có điều kiện). KHÔNG PHẢI ĐỊNH NGHĨA "old high" — chỉ là giới hạn kỹ
+# thuật của bước dò (tránh quét nửa lịch sử). Định nghĩa: pivot HIGH GẦN NHẤT
+# trước lead_start neo được vào CÙNG đường lead-in. Chọn 250 bars: ~2× chiều
+# dài formation tối đa (lead_in_max 95 + bump_max 95 ≈ 190) + biên; đo 2.116
+# events: cap 250 phủ 1.484/1.552 events có pivot hợp lệ (95,6%), p95 phân
+# phối dist = 234. Chi tiết: scanner/audits/barr_old_high_audit.json.
+BARR_OLD_HIGH_SEARCH_CAP_BARS = 250
 
 
-def barr_bottom_target(df: pd.DataFrame, lead_start: int, bump_idx: int) -> Tuple[float, int, float]:
+def barr_bottom_old_high(
+    df: pd.DataFrame,
+    lead_start: int,
+    lead_end: int,
+    high_pivot_indices: Sequence[int],
+    *,
+    r2_min: float = 0.32,
+    cap_bars: int = BARR_OLD_HIGH_SEARCH_CAP_BARS,
+) -> Optional[Tuple[int, float]]:
+    """OLD HIGH của BARR bottom — pivot HIGH neo được vào đường lead-in.
+
+    Sách ECP Table 7.8: pattern bắt đầu tại old high. Cơ chế (Sol BLOCKER 1,
+    đợt A2): duyệt pivot HIGH trước lead_start theo thứ tự GẦN → XA trong
+    `cap_bars`; pivot hợp lệ khi nối vào đoạn lead-in (fit mở rộng
+    [pivot_idx, lead_end] trên close, cùng loại fit `_line_fit` của detector)
+    đường xu hướng VẪN HỢP LỆ: slope cùng hướng dốc của pattern (âm với
+    bottom) và r2 >= r2_min (mặc định = lead_in_min_r2).
+
+    Trả (old_high_idx, old_high_price) của pivot hợp lệ ĐẦU TIÊN (gần nhất),
+    hoặc None khi không pivot nào neo được. Caller PHẢI loại event khi None —
+    không được im lặng thay bằng cực đại cửa sổ.
+    """
+    closes = df["close"]
+    for idx in sorted({int(i) for i in high_pivot_indices if 0 <= int(i) < lead_start}, reverse=True):
+        if lead_start - idx > cap_bars:
+            break
+        seg = pd.to_numeric(closes.iloc[idx : lead_end + 1], errors="coerce").dropna().to_list()
+        slope, _intercept, r2 = _line_fit(seg)
+        if slope is None or r2 is None:
+            continue
+        if slope < 0.0 and r2 >= float(r2_min):
+            return idx, float(df["high"].iloc[idx])
+    return None
+
+
+def barr_bottom_target(
+    df: pd.DataFrame,
+    lead_start: int,
+    lead_end: int,
+    bump_idx: int,
+    high_pivot_indices: Sequence[int],
+    *,
+    r2_min: float = 0.32,
+    cap_bars: int = BARR_OLD_HIGH_SEARCH_CAP_BARS,
+) -> Optional[Tuple[float, int, float]]:
     """Target BARR bottom theo sách ECP Table 7.8 (tr.285-287).
 
     "The highest high in the pattern is the target" — pattern bắt đầu tại OLD
-    HIGH ("the old high (which is the start of the formation)" — đỉnh trước đà
-    giảm lead-in). old_high_idx = đỉnh cao nhất trong BARR_OLD_HIGH_LOOKBACK_BARS
-    nến trước lead_start; target = highest high từ old_high_idx tới bump_idx
-    (tức trong pattern thật, mở về quá khứ tới đỉnh cũ).
+    HIGH ("the old high (which is the start of the formation)"). old high xác
+    định bằng `barr_bottom_old_high` (pivot neo lead-in — xem docstring); target
+    = highest high từ old_high_idx tới bump_idx (trong pattern thật).
 
-    Trả về (target_price, old_high_idx, old_high_price).
+    Trả (target_price, old_high_idx, old_high_price) hoặc None khi không có
+    pivot hợp lệ — caller loại event (Sol BLOCKER 1: không thay bằng cực đại
+    cửa sổ).
     """
-    lo = max(0, lead_start - BARR_OLD_HIGH_LOOKBACK_BARS)
-    window = df["high"].iloc[lo:lead_start].to_numpy(dtype=float)
-    if window.size == 0:
-        old_high_idx = int(lead_start)
-    else:
-        # argmax trả vị trí ĐẦU TIÊN đạt max — deterministic; các vị trí đồng
-        # giá trị cho cùng target vì đoạn [old_high_idx..bump] đều chứa max.
-        old_high_idx = lo + int(np.argmax(window))
-    old_high_price = float(df["high"].iloc[old_high_idx])
+    anchor = barr_bottom_old_high(df, lead_start, lead_end, high_pivot_indices, r2_min=r2_min, cap_bars=cap_bars)
+    if anchor is None:
+        return None
+    old_high_idx, old_high_price = anchor
     target = float(df["high"].iloc[old_high_idx : bump_idx + 1].max())
     return target, old_high_idx, old_high_price
 
@@ -182,7 +222,13 @@ class BumpAndRunDetector:
                 return idx, close, trend, _rolling_volume_ratio(df, idx)
         return None, None, None, None
 
-    def scan_candidate(self, df: pd.DataFrame, bump: Pivot, lead_bars: int) -> Optional[Dict[str, Any]]:
+    def scan_candidate(
+        self,
+        df: pd.DataFrame,
+        bump: Pivot,
+        lead_bars: int,
+        high_pivot_indices: Sequence[int] = (),
+    ) -> Optional[Dict[str, Any]]:
         bump_idx = int(bump.idx)
         lead_end = bump_idx - self.config.bump_min_bars_after_lead
         lead_start = lead_end - int(lead_bars) + 1
@@ -241,14 +287,24 @@ class BumpAndRunDetector:
         old_high_idx: Optional[int] = None
         old_high_price: Optional[float] = None
         if self.direction == 1:
-            # Sửa 16/08/2026 đợt A round-2 (Sol NO-GO): sách ECP Table 7.8 target =
-            # highest high trong pattern, pattern BẮT ĐẦU tại old high (đỉnh trước đà
-            # giảm lead-in). Code cũ max(high[lead_start-2 .. bump]) vừa lấy 2 nến
-            # ngoài pattern vừa bỏ sót old high xa hơn (đo 2.116 events: 70,6% events
-            # target cũ THẤP hơn sách, median -5,46%) → target_hit bị thổi phồng
-            # (58,11% → 45,15% sau sửa). BARR tops (branch -1) giữ nguyên — đã
-            # verify đúng sách Table 8.1/8.8 (V4 Pro + Sol).
-            target, old_high_idx, old_high_price = barr_bottom_target(df, int(lead_start), int(bump_idx))
+            # Sách ECP Table 7.8: target = highest high trong pattern; pattern bắt
+            # đầu tại OLD HIGH. Đợt A2 (Sol BLOCKER 1): old high = pivot HIGH GẦN
+            # NHẤT trước lead_start neo được vào cùng đường lead-in (fit mở rộng
+            # đạt slope<0 + r2 chuẩn) — xem barr_bottom_old_high. Không pivot hợp lệ
+            # → LOẠI event (measure rule sách không xác định được khi thiếu old
+            # high; đo 2.116 events: 29,87% bị loại — audit barr_old_high_audit).
+            # BARR tops (branch -1) giữ nguyên — đúng sách Table 8.1/8.8.
+            anchor = barr_bottom_target(
+                df,
+                int(lead_start),
+                int(lead_end),
+                int(bump_idx),
+                high_pivot_indices,
+                r2_min=float(self.config.lead_in_min_r2),
+            )
+            if anchor is None:
+                return None
+            target, old_high_idx, old_high_price = anchor
         else:
             # Sách ECP Table 8.8: target = breakout − lead-in height; lead-in height = highest high
             # trong PHẦN TƯ ĐẦU của formation − giá trendline tại vị trí đó (trước đây dùng bump_height — SAI, xa ≥2×).
@@ -329,11 +385,12 @@ def scan_symbol(
     used_confirmations: list[int] = []
     symbol = str(df.iloc[0]["symbol"])
     lead_lengths = sorted(set([config.lead_in_min_bars, 50, 70, config.lead_in_max_bars]))
+    high_pivot_indices = [int(p.idx) for p in pivots if p.type == PivotType.HIGH]
     for pivot in pivots:
         if pivot.type != detector.bump_pivot_type:
             continue
         for lead_bars in lead_lengths:
-            candidate = detector.scan_candidate(df, pivot, lead_bars)
+            candidate = detector.scan_candidate(df, pivot, lead_bars, high_pivot_indices)
             if not candidate:
                 continue
             confirmation_idx = int(candidate["breakout_idx"])
