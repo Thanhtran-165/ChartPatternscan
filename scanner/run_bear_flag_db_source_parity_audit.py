@@ -104,6 +104,20 @@ def _load_symbol_from_db(conn: sqlite3.Connection, symbol: str) -> pd.DataFrame:
     frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
     for col in ("open", "high", "low", "close", "volume"):
         frame[col] = pd.to_numeric(frame[col], errors="coerce")
+    # Đợt B (15/08/2026, gate parity Sol): về mặt ĐỊNH NGHĨA đường giá phải là
+    # chuỗi ĐÃ LÀM SẠCH mà detector nhìn thấy (bỏ bar có OHLC <= 0 / không hữu
+    # hạn, đảo high<low, kẹp open/close vào biên high/low). Trước đây hàm trả
+    # frame RAW: detector tự normalize bên trong scan_symbol còn post_breakout_path
+    # sinh từ frame RAW → path chứa bar giá 0.00 → parity csv-vs-core
+    # lệch (ví dụ gap 88-896 event). Chuẩn hoá tại NGUỒN: mọi caller (detector
+    # + path + enrichment) dùng cùng một chuỗi sạch. OHLCVNormalizer là
+    # idempotent nên các scan_symbol normalize lại bên trong không đổi kết quả
+    # detection.
+    from scanner.ohlcv_normalizer import OHLCVNormalizer  # import lười tránh vòng
+
+    keep_cols = ["symbol", "date", "open", "high", "low", "close", "volume"]
+    frame, _norm_stats = OHLCVNormalizer().normalize(frame)
+    frame = frame[keep_cols]
     frame["value"] = frame["close"] * frame["volume"]
     return frame.dropna(subset=["date", "open", "high", "low", "close"]).reset_index(drop=True)
 

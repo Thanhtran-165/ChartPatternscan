@@ -44,14 +44,18 @@ EVENTS_CSV_NAME = "events.csv"
 MAX_SAMPLE_MISMATCH = 20
 
 
-def _horizon_of(event: pd.Series, group: pd.DataFrame) -> tuple[int, str]:
+def _horizon_of(event: pd.Series, group: pd.DataFrame, pattern_key: str | None = None) -> tuple[int, str]:
     """Số bars mà DETECTOR đã evaluate — gate phải cắt path đúng ngưỡng này.
 
     Thứ tự ưu tiên:
       1. Cột `evaluated_bars` trong events.csv — con số detector thực sự dùng.
-      2. Độ dài path của chính event (path được sinh cùng pipeline, cắt đúng
-         horizon detector dùng — vérify thực nghiệm trên bear_flags: mfe_pct
-         khớp mfe tính trên path-length horizon, KHÔNG khớp registry 25).
+      2. `measurement_registry.lookahead_bars(pattern_key)` — chuẩn đo lường
+         mà detector gọi (đợt B 15/08/2026: path parity dirs bull/bear_flags
+         ghi 120 bars trong khi detector evaluate 25 = registry; gate cắt sai
+         120 → 34-47 mismatch giả).
+      3. Độ dài path của chính event (fallback cuối — chỉ đúng khi module ghi
+         path đúng horizon detector, đã chuẩn hoá sau đợt B).
+
     Trả (horizon, nguồn) — không bao giờ None (path luôn có ≥ 1 bar).
     """
     eb = event.get("evaluated_bars")
@@ -62,6 +66,12 @@ def _horizon_of(event: pd.Series, group: pd.DataFrame) -> tuple[int, str]:
                 return val, "evaluated_bars"
         except (TypeError, ValueError):
             pass
+    if pattern_key:
+        from scanner.v2.measurement_registry import lookahead_bars
+
+        reg = lookahead_bars(pattern_key)
+        if reg:
+            return int(reg), "registry"
     return int(len(group)), "path_length"
 
 
@@ -91,16 +101,21 @@ def run_parity_check(artifacts_dir: Path, published_only: bool = False) -> dict:
     --published-only làm cổng phát hành.
     """
     artifacts_dir = Path(artifacts_dir)
+    key_by_path: dict[Path, str] = {}
     if published_only:
         from scanner.rebuild_source_guided_final_chapters import DOUBLE_VARIANTS, EVENT_SOURCES
 
         published_events = set()
-        for _, (events_path, _filters) in EVENT_SOURCES.items():
-            published_events.add((ROOT / Path(events_path)).resolve())
+        for key, (events_path, _filters) in EVENT_SOURCES.items():
+            resolved = (ROOT / Path(events_path)).resolve()
+            published_events.add(resolved)
+            key_by_path[resolved] = key
         # Đợt B (15/08/2026): 8 chương sách double variants (AA/AE/EA/EE × tops/bottoms)
         # đọc CHUNG 2 events.csv gốc này — cũng là events xuất bản, phải qua gate.
         for base, _variant in DOUBLE_VARIANTS.values():
-            published_events.add((ROOT / f"artifacts/scanner_v2/double_pattern_family/{base}/db_active/events.csv").resolve())
+            resolved = (ROOT / f"artifacts/scanner_v2/double_pattern_family/{base}/db_active/events.csv").resolve()
+            published_events.add(resolved)
+            key_by_path.setdefault(resolved, base)
     else:
         published_events = None
     pairs: list[tuple[Path, Path]] = []
@@ -147,7 +162,7 @@ def run_parity_check(artifacts_dir: Path, published_only: bool = False) -> dict:
             if pd.isna(raw_hit):
                 skipped_blank_hit += 1
                 continue
-            horizon, horizon_src = _horizon_of(event, group)
+            horizon, horizon_src = _horizon_of(event, group, pattern_key=key_by_path.get(events_path.resolve()))
             bars = pd.to_numeric(group["bar_after_breakout"], errors="coerce")
             window = group[bars <= horizon]
             if window.empty:

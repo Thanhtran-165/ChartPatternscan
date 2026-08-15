@@ -613,7 +613,13 @@ def scan_gaps_db(
     }
     _enrich_events_from_series(scan, series_by_symbol, corporate_db=index_db)
     _assign_publication_quality_tiers(scan["detections"])
-    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=_registry_lookahead(AREA_GAPS))  # gap_family placeholder — dùng loại dài nhất (63)
+    # Đợt B (15/08/2026, gate parity Sol): path phải đủ DÀI cho pattern có cửa
+    # sổ đánh giá lớn nhất trong family (breakaway 136 bars) — mỗi event cắt
+    # theo evaluated_bars của chính nó ở tầng audit/builder. Trước đây dùng
+    # lookahead(AREA_GAPS)=3 cho cả family → path breakaway/continuation chỉ
+    # 3 bars trong khi detector đánh giá 136/98 bars → 896+490 mismatch parity.
+    gap_path_horizon = max(int(_registry_lookahead(key) or 1) for key in GAP_PATTERNS)
+    path_rows = _path_rows_from_series(scan, series_by_symbol, horizon_bars=gap_path_horizon)
     paths: dict[str, Path] = {"detections": out_dir / "detections.json"}
     _write_json(paths["detections"], scan)
     for pattern_key in GAP_PATTERNS:

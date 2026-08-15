@@ -440,7 +440,10 @@ def scan_island_family_db(
         pattern_scan["statistics"] = _summarize(pattern_rows, config=config, symbols_scanned=len(symbols), db_path=db_path)
         _write_json(pattern_dir / "scan.json", pattern_scan)
         _write_json(pattern_dir / "statistics.json", pattern_scan["statistics"])
-        path_rows = _path_rows_from_series(pattern_scan, series_by_symbol, horizon_bars=_registry_lookahead(ISLAND_REVERSALS))  # island_family placeholder — dùng reversal
+        # Đợt B (15/08/2026): theo registry của TỪNG pattern (trước đây placeholder
+        # dùng ISLAND_REVERSALS cho cả family — 2 giá trị hiện cùng 128 nhưng giữ
+        # đúng nguồn chuẩn nếu registry đổi).
+        path_rows = _path_rows_from_series(pattern_scan, series_by_symbol, horizon_bars=_registry_lookahead(pattern_id))
         _write_csv(pattern_dir / "events.csv", pattern_rows, _csv_fields(pattern_rows))
         _write_csv(pattern_dir / "post_breakout_path.csv", path_rows, _csv_fields(path_rows))
         paths[f"{pattern_id}_scan"] = pattern_dir / "scan.json"

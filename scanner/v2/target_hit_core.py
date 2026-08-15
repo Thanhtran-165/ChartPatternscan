@@ -127,11 +127,19 @@ def target_hit_stats(
     breakout_direction. path_df cần: event_id, bar_after_breakout, high, low
     (giá full precision). Event thiếu path hoặc thiếu giá → (False, False, NaN)
     — giữ hành vi các builder trước đây.
+
+    Đợt B (15/08/2026, gate parity Sol): nếu events có cột `evaluated_bars`
+    (số bars detector thực sự đánh giá — ghi tại detection), path được CẮT
+    theo đúng ngưỡng đó cho từng event trước khi so target. Trước đây hàm dùng
+    TOÀN path: family có path dài hơn cửa sổ detector (gap path 136 bars,
+    area_gaps đánh giá 3 bars) → payload lệch events.csv — đúng loại lệch mà
+    gate parity cấm.
     """
     grouped: Dict[str, pd.DataFrame] = {}
     if "event_id" in getattr(path_df, "columns", []):
         for event_id, group in path_df.groupby("event_id"):
             grouped[str(event_id)] = group.sort_values("bar_after_breakout")
+    has_evaluated_bars = "evaluated_bars" in getattr(events, "columns", [])
     hits: List[bool] = []
     firsts: List[bool] = []
     days: List[Optional[float]] = []
@@ -146,6 +154,17 @@ def target_hit_stats(
             firsts.append(False)
             days.append(float("nan"))
             continue
+        if has_evaluated_bars:
+            eb = event.get("evaluated_bars")
+            if eb is not None and not pd.isna(eb):
+                try:
+                    eb_int = int(eb)
+                    bars = pd.to_numeric(group["bar_after_breakout"], errors="coerce")
+                    clipped = group[bars <= eb_int]
+                    if not clipped.empty:
+                        group = clipped
+                except (TypeError, ValueError):
+                    pass
         res = evaluate_target_hit(
             group["high"].to_numpy(),
             group["low"].to_numpy(),
