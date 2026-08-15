@@ -591,13 +591,39 @@ def _build_front_matter(items: list[BookItem], output: Path) -> int:
     story.append(PageBreak())
 
     story.append(_p("Giới hạn dữ liệu và cách đọc thống kê", styles["H1"]))
-    for paragraph in [
+    data_limits_paragraphs = [
         "Các con số trong sách là lịch sử đã đo được, không phải lời hứa về tương lai. Một tỷ lệ cao không có nghĩa là mẫu sẽ lặp lại trong lần kế tiếp; một tỷ lệ thấp cũng không có nghĩa là mẫu vô dụng trong mọi bối cảnh. Thống kê ở đây nên được đọc như một bản đồ xác suất, không phải một mệnh lệnh hành động.",
         "Dữ liệu Việt Nam có những giới hạn mà người đọc cần giữ trong đầu: chuỗi lịch sử không dài như các thị trường lâu đời, thanh khoản giữa các cổ phiếu rất khác nhau, và không phải mọi trạng thái niêm yết, tạm ngừng, hủy niêm yết hay điều chỉnh giá đều có thể được tái dựng hoàn hảo như một cơ sở dữ liệu point-in-time tuyệt đối.",
+    ]
+    # Đợt B (16/08/2026, Sol HIGH-3): phát biểu phạm vi dữ liệu PHẢI hẹp đúng
+    # db_manifest.json — không nói "full-reload toàn bộ adjusted"; ghi rõ giá
+    # chỉ được nhà cung cấp mô tả là đã điều chỉnh (chưa kiểm chứng hệ số),
+    # lần làm mới gần nhất chỉ xác nhận lại một phần mã, và cách xử lí phiên
+    # close=0. Số đọc trực tiếp từ manifest để không lệch nguồn.
+    db_manifest_path = ROOT / "artifacts" / "scanner_v2" / "db_manifest.json"
+    if db_manifest_path.exists():
+        try:
+            db_manifest = json.loads(db_manifest_path.read_text(encoding="utf-8"))
+            db_info = db_manifest.get("database", {})
+            refresh = db_manifest.get("source_provider", {}).get("last_refresh_meta") or {}
+            def _num(v):
+                return f"{v:,}".replace(",", ".") if isinstance(v, int) else str(v)
+            data_limits_paragraphs.append(
+                "Phạm vi dữ liệu cụ thể của ấn bản này (khai báo trong db_manifest, SHA-256 "
+                f"{str(db_info.get('sha256', ''))[:12]}…): {_num(db_info.get('symbols', '?'))} mã, "
+                f"{_num(db_info.get('rows', '?'))} phiên, từ {db_info.get('min_date', '?')} đến {db_info.get('max_date', '?')}. "
+                "Giá được nhà cung cấp mô tả là đã điều chỉnh toàn tuyến, nhưng dự án chưa có kiểm chứng hệ số điều chỉnh độc lập; "
+                f"lần làm mới gần nhất chỉ xác nhận lại {_num(refresh.get('symbols', '?'))} trong tổng số mã (không phải toàn bộ), "
+                "và các phiên đóng cửa bằng 0 (tạm ngừng hoặc hủy niêm yết) được loại khỏi thống kê mẫu hình."
+            )
+        except (json.JSONDecodeError, OSError):
+            pass
+    data_limits_paragraphs.extend([
         "Các phương pháp thống kê trong sách cũng không tạo ra độ chính xác tuyệt đối. Khoảng tin cậy, kiểm tra độ bền, phân nhóm mẫu và kiểm tra qua từng giai đoạn chỉ giúp người đọc thấy kết quả có ổn định hơn hay mong manh hơn; chúng không loại bỏ hoàn toàn sai lệch dữ liệu, nhiễu thị trường, lựa chọn mẫu hay khả năng mẫu hình mất hiệu lực trong tương lai.",
         "Một số chương có nhiều mẫu và cho cảm giác vững hơn; một số chương có mẫu mỏng hơn nên kết luận phải thận trọng hơn. Vì vậy, hãy đọc số mẫu, vai trò sử dụng và phần thất bại cùng nhau. Nếu một mẫu có đường đi sau xác nhận kém bền, sách sẽ giữ nhãn thận trọng dù hình thái của nó có vẻ quen thuộc.",
         "Các mẫu phía giảm trong cổ phiếu cơ sở Việt Nam chủ yếu được dùng để đọc rủi ro, bear-trap hoặc điểm cần thận trọng với vị thế đang có. Chúng không được trình bày như lời mời bán khống phổ quát. Ngược lại, các mẫu phía mua dù có kết quả tốt vẫn cần được đặt cạnh thanh khoản, biến động và bối cảnh thị trường.",
-    ]:
+    ])
+    for paragraph in data_limits_paragraphs:
         story.append(_p(paragraph, styles["Body"]))
 
     footer = _footer("Bulkowski Việt Nam - Edition 1", font_regular)
