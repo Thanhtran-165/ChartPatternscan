@@ -1,0 +1,156 @@
+{
+  "generated_at": "2026-08-15T17:26:39.249790+00:00",
+  "method": "Recompute độc lập từ snapshot DB giá raw (latest.sqlite.dotb_20260815, SHA trong db_manifest) — không dùng post_breakout_path.csv hay cột target_hit; cửa sổ forward theo evaluated_bars của từng event (trần measurement_registry); chương tuần (horn) resample W-FRI đúng detector; failure_5pct = MFE full < 5.0.",
+  "chapters": [
+    {
+      "pattern_id": "double_tops",
+      "events_total": 783,
+      "compared": 783,
+      "skipped": 0,
+      "event_level_mismatch_target_hit": 0,
+      "event_level_mismatch_failure_5pct": 0,
+      "event_level_parity": "PASS",
+      "my_target_hit_rate_1x_pct": 69.48,
+      "payload_level_checks": [
+        {
+          "row": "(bỏ qua)",
+          "skip_reason": "payload double_tops chung là bản TRƯỚC đợt B (sách dùng 8 variant riêng có payload fresh) — không so hit-rate ở đây."
+        }
+      ],
+      "sample_mismatches": []
+    },
+    {
+      "pattern_id": "bump_and_run_reversal_bottoms",
+      "events_total": 1447,
+      "compared": 1445,
+      "skipped": 2,
+      "event_level_mismatch_target_hit": 0,
+      "event_level_mismatch_failure_5pct": 0,
+      "event_level_parity": "PASS",
+      "my_target_hit_rate_1x_pct": 41.11,
+      "payload_level_checks": [
+        {
+          "row": "multiple_0.5x_conservative_half_bump_height",
+          "multiple": 0.5,
+          "n_payload": 860,
+          "n_recomputed": 860,
+          "payload_hit_rate_pct": 63.84,
+          "recomputed_hit_rate_pct": 64.19,
+          "abs_diff_pp": 0.35,
+          "match": true
+        },
+        {
+          "row": "multiple_1.0x_source_full_bump_height",
+          "multiple": 1.0,
+          "n_payload": 860,
+          "n_recomputed": 860,
+          "payload_hit_rate_pct": 41.28,
+          "recomputed_hit_rate_pct": 41.98,
+          "abs_diff_pp": 0.7,
+          "match": true
+        }
+      ],
+      "sample_mismatches": []
+    },
+    {
+      "pattern_id": "inside_day",
+      "events_total": 14282,
+      "compared": 14281,
+      "skipped": 1,
+      "event_level_mismatch_target_hit": 0,
+      "event_level_mismatch_failure_5pct": 0,
+      "event_level_parity": "PASS",
+      "my_target_hit_rate_1x_pct": 58.98,
+      "payload_level_checks": [
+        {
+          "row": "multiple_0.5x_conservative_half_inside_range",
+          "multiple": 0.5,
+          "n_payload": 4446,
+          "n_recomputed": 4446,
+          "payload_hit_rate_pct": 78.7,
+          "recomputed_hit_rate_pct": 78.7,
+          "abs_diff_pp": 0.0,
+          "match": true
+        },
+        {
+          "row": "multiple_1.0x_full_inside_range",
+          "multiple": 1.0,
+          "n_payload": 4446,
+          "n_recomputed": 4446,
+          "payload_hit_rate_pct": 69.14,
+          "recomputed_hit_rate_pct": 69.14,
+          "abs_diff_pp": 0.0,
+          "match": true
+        }
+      ],
+      "sample_mismatches": []
+    },
+    {
+      "pattern_id": "area_gaps",
+      "events_total": 7902,
+      "compared": 7902,
+      "skipped": 0,
+      "event_level_mismatch_target_hit": 0,
+      "event_level_mismatch_failure_5pct": 0,
+      "event_level_parity": "PASS",
+      "my_target_hit_rate_1x_pct": 27.73,
+      "payload_level_checks": [
+        {
+          "row": "multiple_0.5x_conservative_half_gap",
+          "multiple": 0.5,
+          "n_payload": 2709,
+          "n_recomputed": 2709,
+          "payload_hit_rate_pct": 61.68,
+          "recomputed_hit_rate_pct": 61.68,
+          "abs_diff_pp": 0.0,
+          "match": true
+        },
+        {
+          "row": "multiple_1.0x_source_full_gap",
+          "multiple": 1.0,
+          "n_payload": 2709,
+          "n_recomputed": 2709,
+          "payload_hit_rate_pct": 50.72,
+          "recomputed_hit_rate_pct": 50.72,
+          "abs_diff_pp": 0.0,
+          "match": true
+        }
+      ],
+      "sample_mismatches": []
+    },
+    {
+      "pattern_id": "horn_bottoms",
+      "events_total": 2226,
+      "compared": 2223,
+      "skipped": 3,
+      "event_level_mismatch_target_hit": 0,
+      "event_level_mismatch_failure_5pct": 0,
+      "event_level_parity": "PASS",
+      "my_target_hit_rate_1x_pct": 76.34,
+      "payload_level_checks": [
+        {
+          "row": "multiple_0.5x_conservative_half_horn",
+          "multiple": 0.5,
+          "n_payload": 809,
+          "n_recomputed": 809,
+          "payload_hit_rate_pct": 89.37,
+          "recomputed_hit_rate_pct": 89.37,
+          "abs_diff_pp": 0.0,
+          "match": true
+        },
+        {
+          "row": "multiple_1.0x_source_full_horn",
+          "multiple": 1.0,
+          "n_payload": 809,
+          "n_recomputed": 809,
+          "payload_hit_rate_pct": 80.84,
+          "recomputed_hit_rate_pct": 80.84,
+          "abs_diff_pp": 0.0,
+          "match": true
+        }
+      ],
+      "sample_mismatches": []
+    }
+  ],
+  "overall_event_level_parity": "PASS"
+}

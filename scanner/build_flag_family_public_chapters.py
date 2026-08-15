@@ -458,6 +458,12 @@ def build_flag_family_public_chapters(
         "example_captions": bull_ai_captions,
         "example_events": bull_examples,
         "example_chart_report": bull_example_report,
+        # Đợt B: refresh edition 2 render lại payload qua canonical factory —
+        # publication core đòi source_rules_public TRÊN PAYLOAD (spec render của
+        # refresh không mang public_rule_rows như builder). Ghi nguồn rõ ràng.
+        "source_rules_public": [
+            {"rule": str(row[0]), "application": str(row[1])} for row in _bull_spec()["public_rule_rows"]
+        ],
     }
     bull_publication_dir.mkdir(parents=True, exist_ok=True)
     bull_publication_payload_path = bull_publication_dir / "bull_flag_publication_payload.json"
@@ -493,8 +499,17 @@ def build_flag_family_public_chapters(
         price_db=price_db,
         schematic=bear_schematic,
     )
-    bear_payload = {**bear_payload, "editorial_source_path": str(bear_ai), "example_events": bear_examples, "example_chart_report": bear_example_report}
     branch = bear_stats_data.get("bear_branch_headline") if isinstance(bear_stats_data.get("bear_branch_headline"), Mapping) else {}
+    bear_payload = {
+        **bear_payload,
+        "editorial_source_path": str(bear_ai),
+        "example_events": bear_examples,
+        "example_chart_report": bear_example_report,
+        # Đợt B: như bull_payload — refresh edition 2 cần source_rules_public trên payload.
+        "source_rules_public": [
+            {"rule": str(row[0]), "application": str(row[1])} for row in _bear_spec(branch)["public_rule_rows"]
+        ],
+    }
     bear_paths = build_flag_public_chapter(
         payload=bear_payload,
         source_notes=bear_source,

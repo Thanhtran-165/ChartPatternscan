@@ -1,13 +1,13 @@
 {
-  "generated_at": "2026-08-15T13:29:21.176131+00:00",
+  "generated_at": "2026-08-15T17:18:14.126581+00:00",
   "artifacts_dir": "/Users/bobo/Library/Mobile Documents/com~apple~CloudDocs/main sonet/Nghiên cứu mô hình nến/artifacts/scanner_v2",
   "published_only": true,
   "pairs_scanned": 57,
-  "total_events": 164023,
-  "compared": 163983,
+  "total_events": 164016,
+  "compared": 163977,
   "mismatch": 0,
   "mismatch_reasons": {},
-  "skipped_no_path": 40,
+  "skipped_no_path": 39,
   "skipped_blank_hit": 0,
   "skipped_missing_fields": 0,
   "skipped_unknown_horizon": 0,
@@ -115,28 +115,28 @@
       "mismatch": 0
     },
     "gap_family/area_gaps/db_active": {
-      "events": 7907,
-      "compared": 7907,
+      "events": 7902,
+      "compared": 7902,
       "mismatch": 0
     },
     "gap_family/breakaway_gaps/db_active": {
-      "events": 2564,
-      "compared": 2564,
+      "events": 2563,
+      "compared": 2563,
       "mismatch": 0
     },
     "gap_family/continuation_gaps/db_active": {
-      "events": 1765,
-      "compared": 1765,
+      "events": 1769,
+      "compared": 1769,
       "mismatch": 0
     },
     "gap_family/exhaustion_gaps/db_active": {
-      "events": 2670,
-      "compared": 2670,
+      "events": 2671,
+      "compared": 2671,
       "mismatch": 0
     },
     "harami_family/harami/db_active": {
-      "events": 17054,
-      "compared": 17053,
+      "events": 17051,
+      "compared": 17050,
       "mismatch": 0
     },
     "head_shoulders_family/head_and_shoulders_bottoms/db_active": {
@@ -165,18 +165,18 @@
       "mismatch": 0
     },
     "horn_family/horn_bottoms/db_active": {
-      "events": 2229,
-      "compared": 2227,
+      "events": 2226,
+      "compared": 2223,
       "mismatch": 0
     },
     "horn_family/horn_tops/db_active": {
-      "events": 2186,
-      "compared": 2184,
+      "events": 2189,
+      "compared": 2188,
       "mismatch": 0
     },
     "inside_day_family/inside_day/db_active": {
       "events": 14282,
-      "compared": 14282,
+      "compared": 14281,
       "mismatch": 0
     },
     "island_family/island_reversals/db_active": {
@@ -205,13 +205,13 @@
       "mismatch": 0
     },
     "pipe_family/pipe_bottoms/db_active": {
-      "events": 1591,
+      "events": 1588,
       "compared": 1587,
       "mismatch": 0
     },
     "pipe_family/pipe_tops/db_active": {
       "events": 1813,
-      "compared": 1812,
+      "compared": 1811,
       "mismatch": 0
     },
     "rectangle_family/rectangle_bottoms/db_active": {
@@ -240,13 +240,13 @@
       "mismatch": 0
     },
     "scallop_family/scallops_ascending_inverted/db_active": {
-      "events": 830,
-      "compared": 830,
+      "events": 829,
+      "compared": 829,
       "mismatch": 0
     },
     "scallop_family/scallops_descending/db_active": {
-      "events": 1133,
-      "compared": 1133,
+      "events": 1134,
+      "compared": 1134,
       "mismatch": 0
     },
     "scallop_family/scallops_descending_inverted/db_active": {

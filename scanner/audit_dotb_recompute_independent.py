@@ -32,9 +32,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scanner.v2.measurement_registry import lookahead_bars as registry_lookahead  # noqa: E402
+from scanner.v2.pipes import _to_weekly_ohlcv  # noqa: E402
 from scanner.v2.target_hit_core import evaluate_target_hit  # noqa: E402
 
-DB = Path("/Users/bobo/dev/market_stats_v2/market_cache/stock_ohlcv/latest.sqlite")
+# Snapshot read-only đợt B (ISS-002): KHÔNG dùng latest.sqlite sống — nó bị
+# reload mỗi ngày và từng đổi GIỮA chừng rescan 15/08 (điều chỉnh lịch sử).
+DB = Path("/Users/bobo/dev/market_stats_v2/market_cache/stock_ohlcv/latest.sqlite.dotb_20260815")
 
 CHAPTERS = [
     {
@@ -71,6 +74,9 @@ CHAPTERS = [
         "events": ROOT / "artifacts/scanner_v2/horn_family/horn_bottoms/db_active/events.csv",
         "payload": ROOT / "artifacts/scanner_v2/horn_family_public_chapters/horn_bottoms/horn_bottoms_public_chapter_payload.json",
         "scope": "meta_scope_tier",
+        # Horn là mẫu hình BIỂU ĐỒ TUẦN (Bulkowski) — detector resample daily→weekly
+        # (W-FRI, high=max/low=min tuần) TRƯỚC khi đo. Recompute phải resample cùng cách.
+        "weekly": True,
     },
 ]
 OUT_JSON = ROOT / "scanner/audits/dotb_recompute_independent.json"
@@ -109,13 +115,19 @@ def _recompute_event(prices: pd.DataFrame, row: pd.Series, registry_key: str) ->
     if pd.isna(bo_date) or pd.isna(bp) or pd.isna(tp):
         return {"status": "skip_missing_fields"}
     pos = int(dates.searchsorted(bo_date, side="left"))
-    # nến PHÁ vỡ là nến breakout — cửa sổ forward bắt đầu SAU nó (đúng detector)
-    try:
-        lookahead = registry_lookahead(registry_key)
-        if lookahead is None:
-            raise KeyError(registry_key)
-    except Exception:
-        lookahead = int(pd.to_numeric(row.get("evaluated_bars"), errors="coerce") or 120)
+    # nến PHÁ vỡ là nến breakout — cửa sổ forward bắt đầu SAU nó (đúng detector).
+    # Ưu tiên evaluated_bars của chính event (số bar detector thực sự đánh giá,
+    # ví dụ horn cắt sớm 36 bars) — registry chỉ là trần trên (horn 180 tuần).
+    eb = pd.to_numeric(row.get("evaluated_bars"), errors="coerce")
+    if eb is not None and not pd.isna(eb) and int(eb) > 0:
+        lookahead = int(eb)
+    else:
+        try:
+            lookahead = registry_lookahead(registry_key)
+            if lookahead is None:
+                raise KeyError(registry_key)
+        except Exception:
+            lookahead = 120
     future = prices.iloc[pos + 1 : pos + 1 + int(lookahead)]
     for col in ("high", "low"):
         future = future.assign(**{col: pd.to_numeric(future[col], errors="coerce")})
@@ -175,12 +187,16 @@ def main() -> int:
         samples: list[dict] = []
         for _, row in events.iterrows():
             symbol = str(row.get("symbol") or "")
-            if symbol not in symbol_prices:
+            cache_key = (bool(chapter.get("weekly")), symbol)
+            if cache_key not in symbol_prices:
                 try:
-                    symbol_prices[symbol] = _load_prices(conn, symbol)
+                    frame = _load_prices(conn, symbol)
+                    if chapter.get("weekly"):
+                        frame = _to_weekly_ohlcv(frame)
+                    symbol_prices[cache_key] = frame
                 except Exception:
-                    symbol_prices[symbol] = pd.DataFrame()
-            prices = symbol_prices[symbol]
+                    symbol_prices[cache_key] = pd.DataFrame()
+            prices = symbol_prices[cache_key]
             if prices.empty:
                 skipped += 1
                 continue
@@ -239,7 +255,7 @@ def main() -> int:
                 hits: list[bool] = []
                 for _, row in scoped.iterrows():
                     symbol = str(row.get("symbol") or "")
-                    prices = symbol_prices.get(symbol)
+                    prices = symbol_prices.get((bool(chapter.get("weekly")), symbol))
                     if prices is None or prices.empty:
                         continue
                     dates = pd.to_datetime(prices["date"], errors="coerce")
@@ -248,12 +264,16 @@ def main() -> int:
                     if pd.isna(bo_date) or pd.isna(bp) or pd.isna(tp):
                         continue
                     pos = int(dates.searchsorted(bo_date, side="left"))
-                    try:
-                        lookahead = registry_lookahead(chapter["pattern_id"])
-                        if lookahead is None:
-                            raise KeyError(chapter["pattern_id"])
-                    except Exception:
-                        lookahead = int(pd.to_numeric(row.get("evaluated_bars"), errors="coerce") or 120)
+                    eb = pd.to_numeric(row.get("evaluated_bars"), errors="coerce")
+                    if eb is not None and not pd.isna(eb) and int(eb) > 0:
+                        lookahead = int(eb)
+                    else:
+                        try:
+                            lookahead = registry_lookahead(chapter["pattern_id"])
+                            if lookahead is None:
+                                raise KeyError(chapter["pattern_id"])
+                        except Exception:
+                            lookahead = 120
                     future = prices.iloc[pos + 1 : pos + 1 + int(lookahead)]
                     for col in ("high", "low"):
                         future = future.assign(**{col: pd.to_numeric(future[col], errors="coerce")})
@@ -302,8 +322,10 @@ def main() -> int:
     doc = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "method": (
-            "Recompute độc lập từ DB giá raw (latest.sqlite) — không dùng post_breakout_path.csv "
-            "hay cột target_hit; cửa sổ forward theo measurement_registry; failure_5pct = MFE full < 5.0."
+            "Recompute độc lập từ snapshot DB giá raw (latest.sqlite.dotb_20260815, SHA trong db_manifest) — "
+            "không dùng post_breakout_path.csv hay cột target_hit; cửa sổ forward theo evaluated_bars của từng "
+            "event (trần measurement_registry); chương tuần (horn) resample W-FRI đúng detector; "
+            "failure_5pct = MFE full < 5.0."
         ),
         "chapters": results,
         "overall_event_level_parity": "PASS" if all(r["event_level_parity"] == "PASS" for r in results) else "FAIL",
