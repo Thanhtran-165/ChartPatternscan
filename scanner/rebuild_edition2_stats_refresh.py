@@ -106,11 +106,11 @@ FRESH_PAYLOADS: dict[str, str] = {
     "broadening_wedges_descending": "artifacts/scanner_v2/broadening_family_public_chapters/broadening_wedges_descending/broadening_wedges_descending_public_chapter_payload.json",
     "continuation_gaps": "artifacts/scanner_v2/gap_family_public_chapters/continuation_gaps/continuation_gaps_public_chapter_payload.json",
     "cup_with_handle_inverted": "artifacts/scanner_v2/cup_handle_family_public_chapters/inverted_cup_with_handle/inverted_cup_with_handle_public_chapter_payload.json",
-    # dead_cat×2 — RENDER-ONLY cho Nhiệm 3 (caption failure-role): payload trỏ đúng bản
-    # hiện tại của chương (đời 04/06, KHÔNG có events fresh — loại khỏi đợt refresh số
-    # liệu). Mục đích duy nhất: đưa caption failure-role mới vào PDF, số liệu không đổi.
-    "dead_cat_bounce": "artifacts/scanner_v2/source_guided_refinement_edition_1_2_full_rewrite/dead_cat_bounce_family/dead_cat_bounce/chapter/dead_cat_bounce_public_chapter_payload.json",
-    "dead_cat_bounce_inverted": "artifacts/scanner_v2/source_guided_refinement_edition_1_2_full_rewrite/dead_cat_bounce_family/dead_cat_bounce_inverted/chapter/dead_cat_bounce_inverted_public_chapter_payload.json",
+    # dead_cat×2 — refresh số liệu thật (chủ đầu tư duyệt 15/08): A2 runner re-run 15/08
+    # (detector đã siết chuẩn sách 069bbec/7cb07ac + measure-rule 3 đợt) + A3 builder re-run
+    # → payload fresh thay cho bản render-only đời 04/06 trước đây.
+    "dead_cat_bounce": "artifacts/scanner_v2/dead_cat_bounce_family_public_chapters/dead_cat_bounce/dead_cat_bounce_public_chapter_payload.json",
+    "dead_cat_bounce_inverted": "artifacts/scanner_v2/dead_cat_bounce_family_public_chapters/dead_cat_bounce_inverted/dead_cat_bounce_inverted_public_chapter_payload.json",
     "diamond_bottoms": "artifacts/scanner_v2/diamond_family_public_chapters/diamond_bottoms/diamond_bottoms_public_chapter_payload.json",
     "diamond_tops": "artifacts/scanner_v2/diamond_family_public_chapters/diamond_tops/diamond_tops_public_chapter_payload.json",
     "double_bottoms_adam_adam": "artifacts/scanner_v2/double_pattern_variant_public_chapters/double_bottoms_adam_adam/double_bottoms_adam_adam_public_chapter_payload.json",
