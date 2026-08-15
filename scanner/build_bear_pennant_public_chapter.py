@@ -38,6 +38,8 @@ from scanner.build_bull_pennant_public_chapter import (  # noqa: E402
     _window_for_event,
 )
 from scanner.flag_family_public_chapter_factory import FACTORY_ID, build_flag_public_chapter  # noqa: E402
+EDITORIAL_SOURCE_PATH = Path("artifacts/scanner_v2/quick_read_editorial_upgrade_v1/flag_family/bear_pennants/approved_ai_sections.json")  # đợt B: editorial upgraded quick_read (9 sections)
+
 from scanner.run_pennant_candidate_quality_audit import _load_events, _target_path_flags  # noqa: E402
 from scanner.v2.source_data import DEFAULT_SOURCE_DIR  # noqa: E402
 
@@ -460,6 +462,19 @@ def build_bear_pennant_public_chapter(
     source_notes = _source_notes(source_notes_json)
     spec = _spec()
     payload = _payload(events, audit, stats, examples)
+    # Đợt B (15/08/2026): builder phải khai editorial nguồn cho canonical factory
+    # (_resolve_editorial_source_path) — giống build_flag_family_public_chapters
+    # (DEFAULT_BULL_AI/DEFAULT_BEAR_AI). File upgraded quick_read đủ 9 sections.
+    payload = {
+        **dict(payload),
+        "editorial_source_path": str(EDITORIAL_SOURCE_PATH),
+    }
+    # Đợt B: publication core đòi source_rules_public ngay khi render — tái dùng
+    # nguyên văn bản rules AI đã duyệt 14/08 (public_rule_backfill), không gọi AI lại.
+    from scanner.public_rule_backfill_loader import apply_backfill_public_rules
+
+    apply_backfill_public_rules(payload, "bear_pennants")
+
     outputs = build_flag_public_chapter(
         payload=payload,
         source_notes=source_notes,

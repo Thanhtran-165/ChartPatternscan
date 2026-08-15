@@ -524,6 +524,11 @@ def build_double_pattern_variant_public_chapter(
     story_spec = dict(publication_spec["story_spec"]) if publication_spec else _variant_spec(base_pattern, variant, len(events))
     payload["publication_id"] = f"{variant_pattern_id}_publication_chapter_v1"
     payload["pattern_id"] = variant_pattern_id
+    # Đợt B: publication core đòi source_rules_public ngay khi render — tái dùng
+    # nguyên văn bản rules AI đã duyệt 14/08 (public_rule_backfill), không gọi AI lại.
+    from scanner.public_rule_backfill_loader import apply_backfill_public_rules
+
+    apply_backfill_public_rules(payload, variant_pattern_id)
     if publication_spec:
         payload["publication_spec_id"] = publication_spec["publication_spec_id"]
     payload["classification"] = (

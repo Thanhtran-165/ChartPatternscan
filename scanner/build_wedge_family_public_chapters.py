@@ -792,6 +792,11 @@ def build_one_wedge_chapter(*, pattern_id: str, out_dir: Path, price_db: Path) -
     editorial_sections, editorial_source_path = _load_required_editorial(meta)
     payload["editorial_sections"] = editorial_sections
     payload["editorial_source_path"] = editorial_source_path
+    # Đợt B: publication core đòi source_rules_public ngay khi render — tái dùng
+    # nguyên văn bản rules AI đã duyệt 14/08 (public_rule_backfill), không gọi AI lại.
+    from scanner.public_rule_backfill_loader import apply_backfill_public_rules
+
+    apply_backfill_public_rules(payload, pattern_id)
     spec = _spec(pattern_id, meta)
     publication_spec = build_wedge_publication_spec(pattern_id=pattern_id, title=str(meta["title"]), spec=spec)
     payload["publication_spec_id"] = publication_spec["publication_spec_id"]

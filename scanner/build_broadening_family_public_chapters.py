@@ -641,6 +641,11 @@ def build_one_broadening_chapter(*, pattern_id: str, out_dir: Path, scan_dir: Pa
     publication_spec = build_broadening_publication_spec(pattern_id=pattern_id, title=str(meta["title"]), spec=spec)
     spec["publication_spec"] = publication_spec
     payload = _build_payload(pattern_id, meta, stats, events, examples)
+    # Đợt B: publication core đòi source_rules_public ngay khi render — tái dùng
+    # nguyên văn bản rules AI đã duyệt 14/08 (public_rule_backfill), không gọi AI lại.
+    from scanner.public_rule_backfill_loader import apply_backfill_public_rules
+
+    apply_backfill_public_rules(payload, pattern_id)
     source_notes = _source_notes(pattern_id, meta)
     paths = build_broadening_public_chapter(
         payload=payload,
