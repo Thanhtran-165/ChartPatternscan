@@ -80,11 +80,29 @@ def _truthy(raw) -> bool:
     return str(raw).strip().lower() in ("true", "1", "1.0", "yes")
 
 
-def run_parity_check(artifacts_dir: Path) -> dict:
-    """Quét mọi cặp events+path dưới `artifacts_dir`, trả summary parity."""
+def run_parity_check(artifacts_dir: Path, published_only: bool = False) -> dict:
+    """Quét mọi cặp events+path dưới `artifacts_dir`, trả summary parity.
+
+    published_only=True (đợt B, 16/08/2026): chỉ kiểm các cặp events.csv thuộc
+    EVENT_SOURCES của `rebuild_source_guided_final_chapters` — tức events THỰC
+    SỰ nuôi sách. Cổng release của Sol nói "mismatch = 0 trên toàn bộ events
+    được XUẤT BẢN"; các thư mục grid/smoke/thử nghiệm trong artifacts là di
+    sản nghiên cứu, không xuất bản — chạy mặc định (full) để tham khảo, chạy
+    --published-only làm cổng phát hành.
+    """
     artifacts_dir = Path(artifacts_dir)
+    if published_only:
+        from scanner.rebuild_source_guided_final_chapters import EVENT_SOURCES
+
+        published_events = set()
+        for _, (events_path, _filters) in EVENT_SOURCES.items():
+            published_events.add((ROOT / Path(events_path)).resolve())
+    else:
+        published_events = None
     pairs: list[tuple[Path, Path]] = []
     for events_path in sorted(artifacts_dir.rglob(EVENTS_CSV_NAME)):
+        if published_events is not None and events_path.resolve() not in published_events:
+            continue
         path_csv = events_path.parent / PATH_CSV_NAME
         if path_csv.exists():
             pairs.append((events_path, path_csv))
@@ -179,6 +197,7 @@ def run_parity_check(artifacts_dir: Path) -> dict:
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "artifacts_dir": str(artifacts_dir),
+        "published_only": bool(published_only),
         "pairs_scanned": len(pairs),
         "total_events": total_events,
         "compared": compared,
@@ -198,9 +217,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Release gate parity target_hit (Sol BLOCKER 3)")
     parser.add_argument("--artifacts-dir", default=str(DEFAULT_ARTIFACTS_DIR))
     parser.add_argument("--out", default=str(DEFAULT_OUT))
+    parser.add_argument(
+        "--published-only",
+        action="store_true",
+        help="Chỉ kiểm các events.csv thuộc EVENT_SOURCES nuôi sách (release gate); mặc định quét toàn bộ artifacts (tham khảo).",
+    )
     args = parser.parse_args(argv)
 
-    summary = run_parity_check(Path(args.artifacts_dir))
+    summary = run_parity_check(Path(args.artifacts_dir), published_only=bool(args.published_only))
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
