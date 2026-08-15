@@ -611,7 +611,7 @@ EVENT_FIELDS = [
     "detection_id", "symbol", "variant", "market_group", "market_regime",
     "formation_start_idx", "formation_end_idx", "formation_start_date", "formation_end_date",
     "breakout_idx", "breakout_date", "breakout_direction", "breakout_price", "b_exec_price",
-    "target_price", "target_dist_pct", "mfe_pct", "mae_pct", "target_hit", "failure_5pct", "weak_move_5pct", "failure_busted", "days_to_bust",
+    "target_price", "target_dist_pct", "mfe_pct", "mae_pct", "mfe_pct_full", "mae_pct_full", "target_hit", "failure_5pct", "weak_move_5pct", "failure_busted", "days_to_bust",
     "target_first_before_adverse_5pct", "days_to_target", "throwback_pullback_30d",
     "days_to_throwback_pullback", "pattern_quality_score", "pattern_quality_tier",
     "pattern_width_bars", "pattern_height_pct", "high_rise_pct", "low_fall_pct",

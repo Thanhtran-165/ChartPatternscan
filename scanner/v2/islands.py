@@ -184,6 +184,8 @@ def _evaluate_island(df: pd.DataFrame, row: Mapping[str, Any], *, lookahead: int
             "evaluated_bars": 0,
             "mfe_pct": None,
             "mae_pct": None,
+            "mfe_pct_full": None,
+            "mae_pct_full": None,
             "target_hit": None,
             "failure_5pct": None,
             "weak_move_5pct": None,
@@ -216,6 +218,9 @@ def _evaluate_island(df: pd.DataFrame, row: Mapping[str, Any], *, lookahead: int
         "evaluated_bars": int(len(future)),
         "mfe_pct": round(float(mfe_series.max()), 2) if not mfe_series.dropna().empty else None,
         "mae_pct": round(float(mae_series.max()), 2) if not mae_series.dropna().empty else None,
+        # Đợt A2 (Sol điều kiện 3): bản full precision để tái lập failure_5pct/target checks
+        "mfe_pct_full": float(mfe_series.max()) if not mfe_series.dropna().empty else None,
+        "mae_pct_full": float(mae_series.max()) if not mae_series.dropna().empty else None,
         "target_hit": bool(core["target_hit"]),
         "failure_5pct": bool(float(mfe_series.max()) < 5.0) if not mfe_series.dropna().empty else None,
         "weak_move_5pct": bool(float(mfe_series.max()) < 5.0) if not mfe_series.dropna().empty else None,

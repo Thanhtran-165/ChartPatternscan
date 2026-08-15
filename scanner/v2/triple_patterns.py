@@ -410,6 +410,8 @@ EVENT_FIELDS = [
     "target_dist_pct",
     "mfe_pct",
     "mae_pct",
+    "mfe_pct_full",
+    "mae_pct_full",
     "target_hit",
     "failure_5pct", "weak_move_5pct", "failure_busted", "days_to_bust",
     "target_first_before_adverse_5pct",
