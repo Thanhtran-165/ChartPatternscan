@@ -14,6 +14,7 @@ from typing import Any, Mapping
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scanner.v2.target_hit_core import enrich_events_with_target_hit, target_hit_stats  # noqa: E402
 from matplotlib.patches import Rectangle
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -335,36 +336,11 @@ def _metric_for_target(events: pd.DataFrame, path_df: pd.DataFrame, multiple: fl
 
 
 def _enrich_events_for_target(events: pd.DataFrame, path_df: pd.DataFrame, multiple: float) -> pd.DataFrame:
-    events = events.copy()
     metrics = _metric_for_target(events, path_df, multiple, "base_target")
-    if "event_id" not in events.columns:
-        events["event_id"] = events["detection_id"]
-    grouped = {str(event_id): group.copy() for event_id, group in path_df.groupby("event_id")}
-    hits: list[bool] = []
-    firsts: list[bool] = []
-    days: list[float] = []
-    for _, event in events.iterrows():
-        distance = float(event.get("target_dist_pct") or 0.0) * multiple
-        group = grouped.get(str(event.get("event_id")))
-        if group is None or group.empty:
-            hits.append(False)
-            firsts.append(False)
-            days.append(float("nan"))
-            continue
-        favorable = pd.to_numeric(group["signed_high_excursion_pct"], errors="coerce")
-        adverse = pd.to_numeric(group["signed_low_excursion_pct"], errors="coerce")
-        bars = pd.to_numeric(group["bar_after_breakout"], errors="coerce")
-        target_bars = bars[favorable >= distance]
-        adverse_bars = bars[adverse <= -5.0]
-        hit_day = float(target_bars.min()) if not target_bars.empty else float("nan")
-        adverse_day = float(adverse_bars.min()) if not adverse_bars.empty else float("inf")
-        hit = math.isfinite(hit_day)
-        hits.append(hit)
-        firsts.append(bool(hit and hit_day < adverse_day))
-        days.append(hit_day if hit else float("nan"))
-    events["target_hit"] = hits
-    events["target_first_before_adverse_5pct"] = firsts
-    events["days_to_target"] = days
+    # Đợt A round-2 (16/08/2026, Sol MEDIUM-1): 3 cột target_hit / first / days
+    # qua hàm chuẩn full precision scanner/v2/target_hit_core — bỏ tái lập từ
+    # target_dist_pct làm tròn 2dp (Inside Day 66,68% vs raw 69,18%).
+    events = enrich_events_with_target_hit(events, path_df, multiple)
     events["base_target_metrics"] = json.dumps(metrics, ensure_ascii=False)
     return events
 
