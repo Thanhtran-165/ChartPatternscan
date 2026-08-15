@@ -343,12 +343,17 @@ class DoublePatternDetector:
         if breakout_idx is None or breakout_price is None:
             return None
         if direction == "up":
+            # Double bottoms: sách KHÔNG chia đôi height — target = breakout + height (giữ nguyên).
             target_price = float(breakout_price) + height_abs
         else:
-            # sách EC Table 17.8: double tops CHIA ĐÔI height rồi trừ từ lowest low
-            # (double bottoms không chia — giữ nguyên). Sửa 14/08/2026 theo
-            # pdf_review/m5/family_doubles_20260813.md: trước đây dùng nguyên height → target xa ~gấp đôi.
-            target_price = float(breakout_price) - height_abs / 2.0
+            # Sách EC Table 17.8 (tr.287) double tops: "Compute the pattern height
+            # from the lowest low between the two tops to the highest peak and then
+            # divide in half. Subtract the result from the lowest low."
+            # → neo là NECKLINE (= lowest low giữa 2 đỉnh trong code này), KHÔNG phải
+            # breakout_price. height_abs đã đúng = highest peak − lowest low.
+            # Sửa 16/08/2026 đợt A round-2 (Sol NO-GO): trước đây neo breakout_price
+            # → target thấp hơn sách (V4 Pro đo hit 69,15% code vs 82,45% neo sách).
+            target_price = float(neckline) - height_abs / 2.0
         breakout_clearance_pct = (
             (float(breakout_price) - neckline) / neckline * 100.0
             if direction == "up"
