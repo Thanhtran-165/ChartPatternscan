@@ -197,7 +197,7 @@ def _target_path_flags(events: pd.DataFrame, path: pd.DataFrame, *, target_multi
             "event_id": events["event_id"].astype(str).values,
             "target_hit_band": [bool(h) if h is not None else False for h in hits],
             "target_first_band": [bool(f) if f is not None else False for f in firsts],
-            "days_to_target_band": [int(d) if d is not None else None for d in days],
+            "days_to_target_band": [int(d) if d is not None and math.isfinite(float(d)) else None for d in days],
             "_evaluated": [h is not None for h in hits],
         }
     )

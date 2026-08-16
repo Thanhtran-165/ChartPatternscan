@@ -99,10 +99,16 @@ def test_triangle_cooldown_keeps_first_event_per_symbol_window() -> None:
 
 
 def test_triangle_metrics_uses_path_order_for_target_first() -> None:
+    # dotC (16/08/2026, Sol round-2 BLOCKER 1): _target_path_flags giờ đi qua
+    # scanner.v2.target_hit_core — mốc nội suy từ breakout_price/target_price
+    # (4dp) so high/low path full precision, thay cho excursion 2dp cũ.
+    # breakout=100, target=110 → băng 0.5x = 105; adverse = low <= 95.
     events = pd.DataFrame(
         {
             "event_id": ["a", "b"],
-            "target_dist_pct": [10.0, 10.0],
+            "breakout_price": [100.0, 100.0],
+            "target_price": [110.0, 110.0],
+            "breakout_direction": ["up", "up"],
             "mfe_pct": [12.0, 12.0],
             "mae_pct": [2.0, 7.0],
             "failure_5pct": [False, False],
@@ -112,13 +118,16 @@ def test_triangle_metrics_uses_path_order_for_target_first() -> None:
         {
             "event_id": ["a", "a", "b", "b"],
             "bar_after_breakout": [1, 2, 1, 2],
-            "signed_high_excursion_pct": [6.0, 7.0, 1.0, 6.0],
-            "signed_low_excursion_pct": [-1.0, -2.0, -6.0, -6.5],
+            "high": [106.0, 107.0, 101.0, 106.0],
+            "low": [99.0, 98.0, 94.0, 93.5],
         }
     )
 
     row = _metrics(events, path, target_multiple=0.5)
 
+    # a: chạm 105 ở bar 1, chưa adverse -> hit + target_first.
+    # b: adverse (low 94 <= 95) bar 1 TRƯỚC khi chạm 105 ở bar 2 -> hit nhưng
+    # không target_first.
     assert row["target_hit_rate_pct"] == 100.0
     assert row["target_first_before_adverse_5pct_rate_pct"] == 50.0
 
