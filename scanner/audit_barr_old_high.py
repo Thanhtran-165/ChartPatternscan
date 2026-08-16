@@ -146,6 +146,10 @@ def main() -> int:
     delta_vs_w60 = (kept["target_new"] - kept["target_window60"]) / kept["target_window60"] * 100
     same_idx = int((kept["old_high_idx"].astype(int) == (kept["lead_start"].astype(int) - kept["pivot_dist"].astype(int))).sum())
 
+    db_rows, db_symbols, db_min, db_max = conn.execute(
+        "SELECT COUNT(*), COUNT(DISTINCT symbol), MIN(time), MAX(time) FROM stock_price_history"
+    ).fetchone()
+
     audit = {
         "_meta": {
             "created_utc": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
@@ -164,7 +168,9 @@ def main() -> int:
             "pattern": BARR_BOTTOMS,
             "events_source": str(args.events.relative_to(REPO)) if args.events.is_relative_to(REPO) else str(args.events),
             "db_source": str(args.db),
-            "db_rows_meta": "1.599 symbols / 4.249.160 rows / max_date 2026-08-14 (db_source_meta statistics.json)",
+            # dotC: đo thẳng DB truyền vào (--db) — không hardcode số của bản trước
+            # snapshot nữa (bản cũ ghi 4.249.160 rows của latest.sqlite sống).
+            "db_rows_meta": f"{int(db_symbols)} symbols / {int(db_rows)} rows / {str(db_min)[:10]} → {str(db_max)[:10]} (đo trực tiếp từ db_source lần chạy này)",
         },
         "population": {
             "events_total": int(len(ok)),
@@ -183,7 +189,15 @@ def main() -> int:
         "cap_censorship": {
             "search_cap_bars": int(BARR_OLD_HIGH_SEARCH_CAP_BARS),
             "events_cut_by_cap_would_pass_at_cap_400": int((dropped["reason"] == "cut_by_search_cap").sum()),
-            "note": "cap = giới hạn kỹ thuật; đo cap 400 để lượng censor. p95 dist = 234 <= cap 250.",
+            # dotC (16/08/2026, Sol SAI LỆCH HỒ SƠ): note cũ hardcode "p95 dist =
+            # 234" mâu thuẫn pivot_distance_bars.p95 = 161 của cùng file (234 là
+            # số của lần chạy trước chưa lưu đúng). Giờ note sinh TỪ SỐ ĐO của
+            # chính lần chạy (không còn hardcode để lệch nữa).
+            "note": (
+                f"cap = giới hạn kỹ thuật; đo cap 400 để lượng censor. "
+                f"p95 pivot_dist của lần chạy này = {pct(d, 95)} (nguồn: pivot_distance_bars.p95 phía trên) "
+                f"<= cap {int(BARR_OLD_HIGH_SEARCH_CAP_BARS)}; p100 = {int(d.max())}."
+            ),
         },
         "target_change_vs_legacy_code": {
             "median_pct": round(float(delta_vs_code.median()), 2),

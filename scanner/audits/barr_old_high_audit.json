@@ -1,33 +1,33 @@
 {
  "_meta": {
-  "created_utc": "2026-08-15T06:29:48+00:00",
+  "created_utc": "2026-08-16T01:19:43+00:00",
   "mechanism": "old high = pivot HIGH intermediate GẦN NHẤT trước lead_start neo được vào cùng đường lead-in: fit mở rộng [pivot, lead_end] trên close đạt slope<0 và r2 >= 0.32 (lead_in_min_r2); duyệt gần→xa; search cap 250 bars (cap kỹ thuật, KHÔNG phải định nghĩa — Sol BLOCKER 1). Không pivot hợp lệ → LOẠI event tại detection (không thay bằng cực đại cửa sổ).",
   "reason_loi_not_mark": "Chọn LOẠI thay vì đánh dấu: measure rule sách không xác định được khi thiếu old high — event không đo được target thì không thuộc population target_hit; đánh dấu sẽ đòi target=None xuyên suốt evaluate/builder (phá vỡ nhiều điểm chạm hơn).",
   "pattern": "bump_and_run_reversal_bottoms",
-  "events_source": "artifacts/scanner_v2/bump_and_run_family/bump_and_run_reversal_bottoms/db_active/events.csv",
-  "db_source": "/Users/bobo/dev/market_stats_v2/market_cache/stock_ohlcv/latest.sqlite",
-  "db_rows_meta": "1.599 symbols / 4.249.160 rows / max_date 2026-08-14 (db_source_meta statistics.json)"
+  "events_source": "artifacts/scanner_v2/bump_and_run_family/bump_and_run_reversal_bottoms/db_active/events.csv.bak_pre_dotb",
+  "db_source": "/Users/bobo/dev/market_stats_v2/market_cache/stock_ohlcv/latest.sqlite.dotb_20260815",
+  "db_rows_meta": "1599 symbols / 4255894 rows / 2002-05-02 → 2026-08-14 (đo trực tiếp từ db_source lần chạy này)"
  },
  "population": {
   "events_total": 2116,
-  "kept": 1484,
-  "kept_pct": 70.13,
-  "dropped": 632,
-  "dropped_pct": 29.87,
+  "kept": 1482,
+  "kept_pct": 70.04,
+  "dropped": 634,
+  "dropped_pct": 29.96,
   "dropped_reasons": {
-   "no_pivot_fits_lead_in": 540,
+   "no_pivot_fits_lead_in": 542,
    "cut_by_search_cap": 68,
    "no_pivot_before_lead_start": 24
   },
   "dropped_tier_distribution": {
-   "data_limited": 289,
+   "data_limited": 291,
    "standard": 190,
    "premium": 119,
    "loose": 34
   },
   "kept_tier_distribution": {
    "standard": 553,
-   "data_limited": 542,
+   "data_limited": 540,
    "premium": 327,
    "loose": 62
   }
@@ -35,7 +35,7 @@
  "pivot_distance_bars": {
   "p50": 27.0,
   "p75": 59.0,
-  "p90": 110.7,
+  "p90": 110.9,
   "p95": 161.0,
   "p99": 229.2,
   "p100": 249
@@ -43,25 +43,25 @@
  "cap_censorship": {
   "search_cap_bars": 250,
   "events_cut_by_cap_would_pass_at_cap_400": 68,
-  "note": "cap = giới hạn kỹ thuật; đo cap 400 để lượng censor. p95 dist = 234 <= cap 250."
+  "note": "cap = giới hạn kỹ thuật; đo cap 400 để lượng censor. p95 pivot_dist của lần chạy này = 161.0 (nguồn: pivot_distance_bars.p95 phía trên) <= cap 250; p100 = 249."
  },
  "target_change_vs_legacy_code": {
-  "median_pct": 8.22,
-  "p90_pct": 35.52,
-  "events_target_up": 1277,
+  "median_pct": 8.25,
+  "p90_pct": 35.54,
+  "events_target_up": 1276,
   "events_target_down": 0,
-  "events_same": 207
+  "events_same": 206
  },
  "target_change_vs_window60_dotA": {
   "median_pct": 0.0,
   "p90_pct": 15.79,
   "events_pivot_higher": 388,
-  "events_pivot_lower": 385,
-  "events_same": 711,
+  "events_pivot_lower": 384,
+  "events_same": 710,
   "note": "so old high pivot với argmax cửa sổ 60 của đợt A (cơ chế bị Sol bác)."
  },
  "gate_dist_110_audit": {
-  "candidates_before_gate": 1484,
+  "candidates_before_gate": 1482,
   "rejected_gt_110": 59,
   "rejected_pct": 3.98,
   "rejected_tier_distribution": {
@@ -73,9 +73,9 @@
   "note": "Điều kiện bổ sung 1 (đợt A2): ứng viên bị loại bởi ngưỡng target_dist_pct>110 giữ vết ở đây — KHÔNG biến mất không dấu. Số chính thức sau rescan Đợt B."
  },
  "hit_rate_simulated_path120": {
-  "n": 1483,
-  "target_hit_code_current_pct": 57.32,
-  "target_hit_pivot_pct": 39.85,
+  "n": 1034,
+  "target_hit_code_current_pct": 55.71,
+  "target_hit_pivot_pct": 51.84,
   "note": "mô phỏng trên path 120 bars của events hiện hành (population cũ, trước các cổng loại mới) — số chính thức sau rescan Đợt B."
  }
 }
