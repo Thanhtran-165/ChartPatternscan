@@ -1,0 +1,858 @@
+{
+ "_meta": {
+  "created": "2026-08-16 đợt D (điều kiện 3 Sol vòng 3)",
+  "purpose": "Inventory tái lập 2 tập hợp: (A) artifacts rescan snapshot của đợt B + BARR đợt C, (B) 40 chương AI-refresh đợt C. Nguồn tái lập: mtime file trên đĩa + final_chapters_manifest.json.",
+  "caveat": "Session note đợt B ghi 'rescan 31/31 module rc=0' — danh sách 31 lệnh của runner nằm trong /tmp, đã mất sau restart, KHÔNG tái lập được nguyên văn. Bản này khai mức artifact (kiểm chứng được bằng SHA-256 từng file): toàn bộ events.csv đổi trong cửa sổ rescan 15/08 21:00 → 16/08 01:00 (57 file, gồm 2 bản db_all đúp của flags) + 2 file BARR rescan đợt C (08:10). 57 file này phủ 29 module detector theo ánh xạ dir→module bên dưới — superset theo pattern so với ghi chú 31 module; phần chênh không xác định được nguyên văn runner (không声明 thêm)."
+ },
+ "rescan_window_dotb": {
+  "window": "2026-08-15 21:00 → 2026-08-16 01:00 (sau sự cố DB-trộn ISS-002, trên snapshot đóng băng)",
+  "files": [
+   {
+    "path": "artifacts/scanner_v2/ascending_triangles_db_source_parity/db_active/events.csv",
+    "mtime": "2026-08-15 23:56:07",
+    "rows": 1808,
+    "sha256": "b80b651feab499cbd4b5cee848531a14ba8036f2ffec79d924d71e90aa7eba5f"
+   },
+   {
+    "path": "artifacts/scanner_v2/bear_flags_db_source_parity/db_active/events.csv",
+    "mtime": "2026-08-16 00:05:26",
+    "rows": 132,
+    "sha256": "8f05954e99fc536adac5086af458b232353726956dd99d6f2a2b9a64dea99418"
+   },
+   {
+    "path": "artifacts/scanner_v2/bear_flags_db_source_parity/db_all/events.csv",
+    "mtime": "2026-08-16 00:07:05",
+    "rows": 141,
+    "sha256": "08b90ec988efcbfd1a52bf5d19d642691dec8129a93fda5e52d6af0d41ac3ce5"
+   },
+   {
+    "path": "artifacts/scanner_v2/broadening_family/broadening_bottoms/db_active/events.csv",
+    "mtime": "2026-08-15 23:15:19",
+    "rows": 817,
+    "sha256": "0ad26cf4abf69fc3e5db9933ff42e1afc1fa31423b05f075bb2bde53029b49a5"
+   },
+   {
+    "path": "artifacts/scanner_v2/broadening_family/broadening_formations_right_angled_ascending/db_active/events.csv",
+    "mtime": "2026-08-15 23:17:30",
+    "rows": 3044,
+    "sha256": "7a70963c29a2ca41f5bbceacc20b44da8f12c8b96b930e8619961c58b0693570"
+   },
+   {
+    "path": "artifacts/scanner_v2/broadening_family/broadening_formations_right_angled_descending/db_active/events.csv",
+    "mtime": "2026-08-15 23:19:37",
+    "rows": 2448,
+    "sha256": "f74612efff075de24f25c4d0fdca25e2ef264942793214c5f56c7c3547f0ba8b"
+   },
+   {
+    "path": "artifacts/scanner_v2/broadening_family/broadening_tops/db_active/events.csv",
+    "mtime": "2026-08-15 23:21:05",
+    "rows": 1131,
+    "sha256": "98c1a85fcb83bf0e2c4770fb2a9e55270e7742181a6c82e6991b95878ab790cb"
+   },
+   {
+    "path": "artifacts/scanner_v2/broadening_family/broadening_wedges_ascending/db_active/events.csv",
+    "mtime": "2026-08-15 23:24:13",
+    "rows": 10190,
+    "sha256": "6f3cfcd5f3a964977c36ca53d551b17f2f4aa53fef714fe6d932152b53125334"
+   },
+   {
+    "path": "artifacts/scanner_v2/broadening_family/broadening_wedges_descending/db_active/events.csv",
+    "mtime": "2026-08-15 23:27:18",
+    "rows": 8833,
+    "sha256": "6c5c6d9c86b7392875054d5499e437ca96f654104c97f0dbf9e178e9d2862de8"
+   },
+   {
+    "path": "artifacts/scanner_v2/bull_flags_db_source_parity/db_active/events.csv",
+    "mtime": "2026-08-16 00:02:07",
+    "rows": 179,
+    "sha256": "7ea1506c492b55903bb336c2b2b42010cd87763e6f1b0e72dbaa1ec87403d1b9"
+   },
+   {
+    "path": "artifacts/scanner_v2/bull_flags_db_source_parity/db_all/events.csv",
+    "mtime": "2026-08-16 00:03:47",
+    "rows": 186,
+    "sha256": "db13c45b7a7a7b1962abeb3ad3759b6603af75e5e57fd800d9ad9b8142bf5996"
+   },
+   {
+    "path": "artifacts/scanner_v2/cup_with_handle_family/cup_with_handle/db_active/events.csv",
+    "mtime": "2026-08-15 22:59:14",
+    "rows": 5945,
+    "sha256": "ce49c807b528985c72c52fab9367aad7cebfd84040292870cd032a4bec431afe"
+   },
+   {
+    "path": "artifacts/scanner_v2/cup_with_handle_family/cup_with_handle_inverted/db_active/events.csv",
+    "mtime": "2026-08-15 23:13:00",
+    "rows": 6773,
+    "sha256": "38aa5ae45200bcd36823c1422aea40164f70fa618d096d11d4d438f00e19f557"
+   },
+   {
+    "path": "artifacts/scanner_v2/dead_cat_bounce_family/dead_cat_bounce/db_active/events.csv",
+    "mtime": "2026-08-15 23:42:00",
+    "rows": 8336,
+    "sha256": "dd07c2241289ee2084c5da0567ff9026635625deb4ea2d37013dffbf89b66fe7"
+   },
+   {
+    "path": "artifacts/scanner_v2/dead_cat_bounce_family/dead_cat_bounce_inverted/db_active/events.csv",
+    "mtime": "2026-08-15 23:44:43",
+    "rows": 11845,
+    "sha256": "acb479eb90d54796012ddf568f97fe9d85f3ac9e5c30f5d09547d7dc05767b90"
+   },
+   {
+    "path": "artifacts/scanner_v2/descending_triangles_db_source_parity/db_active/events.csv",
+    "mtime": "2026-08-15 23:58:06",
+    "rows": 1902,
+    "sha256": "a8a0c44fc50b6953023cedc580818bc544657304d62adca73e980133f83a46f5"
+   },
+   {
+    "path": "artifacts/scanner_v2/diamond_family/diamond_bottoms/db_active/events.csv",
+    "mtime": "2026-08-15 23:49:45",
+    "rows": 59,
+    "sha256": "3c3b8380f44f70ab73b90e8fbfc54979c88a358bb70ce517b7427e3d63e6b04a"
+   },
+   {
+    "path": "artifacts/scanner_v2/diamond_family/diamond_tops/db_active/events.csv",
+    "mtime": "2026-08-15 23:50:44",
+    "rows": 68,
+    "sha256": "0b857e3d76876b41c04a566047d6927bc80350b70a219eaaad11abf55f02caa5"
+   },
+   {
+    "path": "artifacts/scanner_v2/double_pattern_family/double_bottoms/db_active/events.csv",
+    "mtime": "2026-08-15 22:49:56",
+    "rows": 1146,
+    "sha256": "0d74ad25a1a09cc20585476d258efb485f5136410ddccc355d90820c465056cc"
+   },
+   {
+    "path": "artifacts/scanner_v2/double_pattern_family/double_tops/db_active/events.csv",
+    "mtime": "2026-08-15 22:51:06",
+    "rows": 783,
+    "sha256": "727ccc349f480ade8a854374bfbdb5cd046b435fd39fc3dc647706664c465664"
+   },
+   {
+    "path": "artifacts/scanner_v2/gap_family/area_gaps/db_active/events.csv",
+    "mtime": "2026-08-15 22:22:37",
+    "rows": 7902,
+    "sha256": "9e438cde91eb48ead2d5779f217c34947e67beb9568c21fac9b99d5c0e02f331"
+   },
+   {
+    "path": "artifacts/scanner_v2/gap_family/breakaway_gaps/db_active/events.csv",
+    "mtime": "2026-08-15 22:26:32",
+    "rows": 2563,
+    "sha256": "a255e1bbe6dc12c53d9a7429b8e65a56dd90c6a6ff50a42afac2cb2332c56f07"
+   },
+   {
+    "path": "artifacts/scanner_v2/gap_family/continuation_gaps/db_active/events.csv",
+    "mtime": "2026-08-15 22:29:01",
+    "rows": 1769,
+    "sha256": "8ee03512c8d57a11b14d09a4af2cbb80757cc330cf48a07b02e64f85f866c935"
+   },
+   {
+    "path": "artifacts/scanner_v2/gap_family/exhaustion_gaps/db_active/events.csv",
+    "mtime": "2026-08-15 22:33:10",
+    "rows": 2671,
+    "sha256": "5dbe54dcc2d55ac83214accbd56550b791ae43245fb58102a972690096504b93"
+   },
+   {
+    "path": "artifacts/scanner_v2/harami_family/harami/db_active/events.csv",
+    "mtime": "2026-08-15 21:42:58",
+    "rows": 17051,
+    "sha256": "008c7f55d3bb4146cb81334b53075e8046e4cbb6db5835a8868d79fc32d5019e"
+   },
+   {
+    "path": "artifacts/scanner_v2/head_shoulders_family/head_and_shoulders_bottoms/db_active/events.csv",
+    "mtime": "2026-08-15 23:13:56",
+    "rows": 30,
+    "sha256": "0519e258d063040f521ee1a3ca0f6d643b60656ac1b3a3b6cfa600ac296b9ed9"
+   },
+   {
+    "path": "artifacts/scanner_v2/head_shoulders_family/head_and_shoulders_bottoms_complex/db_active/events.csv",
+    "mtime": "2026-08-15 23:13:57",
+    "rows": 104,
+    "sha256": "fe299c4e7760b29dd6bfcbeb044329c580330d196b87f3d1c3a5ac1bb9ce03b4"
+   },
+   {
+    "path": "artifacts/scanner_v2/head_shoulders_family/head_and_shoulders_tops/db_active/events.csv",
+    "mtime": "2026-08-15 23:13:58",
+    "rows": 12,
+    "sha256": "6014826bd91d3dad71294ad3fc7c76c42a9c0aab076a4a123eeccd3fd7203dd7"
+   },
+   {
+    "path": "artifacts/scanner_v2/head_shoulders_family/head_and_shoulders_tops_complex/db_active/events.csv",
+    "mtime": "2026-08-15 23:13:59",
+    "rows": 184,
+    "sha256": "82bd8970d084344bcd6ab2efbd00f1f764456b4082e8602eee69ee393a6a0c05"
+   },
+   {
+    "path": "artifacts/scanner_v2/high_tight_flags/events.csv",
+    "mtime": "2026-08-16 00:12:19",
+    "rows": 1428,
+    "sha256": "900f0a107d02af63299c97e248e0c2fc711eeb8c9dfc7e7b99e41c1f07f54fc4"
+   },
+   {
+    "path": "artifacts/scanner_v2/horn_family/horn_bottoms/db_active/events.csv",
+    "mtime": "2026-08-15 21:50:30",
+    "rows": 2226,
+    "sha256": "e00d629107e75beaf46c305ae5a7495a5ab8ef1b383f8d27f260b5f034bf093b"
+   },
+   {
+    "path": "artifacts/scanner_v2/horn_family/horn_tops/db_active/events.csv",
+    "mtime": "2026-08-15 21:52:33",
+    "rows": 2189,
+    "sha256": "95978425bfe2700480d1079e07d873c8ae7f2dfe3855be4ca833f1a0f2294a5c"
+   },
+   {
+    "path": "artifacts/scanner_v2/inside_day_family/inside_day/db_active/events.csv",
+    "mtime": "2026-08-15 21:46:23",
+    "rows": 14282,
+    "sha256": "aceb26fae9654c7e57cc56e77c84b9a93bf9460d9de897041e2fde5f3a473a7f"
+   },
+   {
+    "path": "artifacts/scanner_v2/island_family/island_reversals/db_active/events.csv",
+    "mtime": "2026-08-15 22:48:05",
+    "rows": 3831,
+    "sha256": "dce23d36122d9ea0ecb234ebd34f9d485106a7ba4a379709eb789c42828eaffb"
+   },
+   {
+    "path": "artifacts/scanner_v2/island_family/islands_long/db_active/events.csv",
+    "mtime": "2026-08-15 22:48:33",
+    "rows": 12170,
+    "sha256": "4252a1528116a2e21a34a390699bce1f1737929eeeaf74876fc9c0586c5d21da"
+   },
+   {
+    "path": "artifacts/scanner_v2/measured_move_family/measured_move_down/db_active/events.csv",
+    "mtime": "2026-08-15 23:29:05",
+    "rows": 564,
+    "sha256": "d5db3c8c9bc4cd33a1d1bce8efefc3bc14ff7ee5f0adfea423df9ceec380d2da"
+   },
+   {
+    "path": "artifacts/scanner_v2/measured_move_family/measured_move_up/db_active/events.csv",
+    "mtime": "2026-08-15 23:28:14",
+    "rows": 426,
+    "sha256": "71b9b35b93b508f072cb6f1003aaa6914452117c6d3069b3b57635059264faab"
+   },
+   {
+    "path": "artifacts/scanner_v2/pennants/events.csv",
+    "mtime": "2026-08-16 00:08:12",
+    "rows": 553,
+    "sha256": "9341de2d5ead903fc458d9b796c0e8e50dcc9a087640c7c646a96d2dc0ec335e"
+   },
+   {
+    "path": "artifacts/scanner_v2/pipe_family/pipe_bottoms/db_active/events.csv",
+    "mtime": "2026-08-15 21:47:24",
+    "rows": 1588,
+    "sha256": "96d9144e3f5faeb8f4873bbe7be5182dc64ea165f607699a2923ef9bee966f79"
+   },
+   {
+    "path": "artifacts/scanner_v2/pipe_family/pipe_tops/db_active/events.csv",
+    "mtime": "2026-08-15 21:48:23",
+    "rows": 1813,
+    "sha256": "01dd275a0c3a2315c8eae2cdf9653187405181e634bd6a368e96fa10548a93c6"
+   },
+   {
+    "path": "artifacts/scanner_v2/rectangle_family/rectangle_bottoms/db_active/events.csv",
+    "mtime": "2026-08-15 23:32:34",
+    "rows": 4208,
+    "sha256": "065040d6b4c156ae8dd6f76c8304128e40f3c33210b8d160b79feb60e75cf04e"
+   },
+   {
+    "path": "artifacts/scanner_v2/rectangle_family/rectangle_tops/db_active/events.csv",
+    "mtime": "2026-08-15 23:36:17",
+    "rows": 4494,
+    "sha256": "a6be28cc73d4a71a25d79bad0fdedf15f5d65196913dbae97dbb2272514d7e3c"
+   },
+   {
+    "path": "artifacts/scanner_v2/rounding_family/rounding_bottoms/db_active/events.csv",
+    "mtime": "2026-08-15 22:34:51",
+    "rows": 546,
+    "sha256": "444da4d4bfc35285435d6d183c56731e3cf6ece6c6a83662416d1b0a625afbff"
+   },
+   {
+    "path": "artifacts/scanner_v2/rounding_family/rounding_tops/db_active/events.csv",
+    "mtime": "2026-08-15 22:36:25",
+    "rows": 246,
+    "sha256": "af2756ba7e6c12380066537902581e57cf68648de6b3c4703cdc8b5b6ea7eeb1"
+   },
+   {
+    "path": "artifacts/scanner_v2/scallop_family/scallops_ascending/db_active/events.csv",
+    "mtime": "2026-08-15 22:37:31",
+    "rows": 920,
+    "sha256": "756408844e4744a7a30eb7f3554b2f2fe13075b16a718b9af5691725161cb98f"
+   },
+   {
+    "path": "artifacts/scanner_v2/scallop_family/scallops_ascending_inverted/db_active/events.csv",
+    "mtime": "2026-08-15 22:38:36",
+    "rows": 829,
+    "sha256": "01343c630ffdaa51f4cedd199fd1a26f3aeb95bc7c2489de4f0c02e27e53c69f"
+   },
+   {
+    "path": "artifacts/scanner_v2/scallop_family/scallops_descending/db_active/events.csv",
+    "mtime": "2026-08-15 22:39:43",
+    "rows": 1134,
+    "sha256": "bdc39d1ea1f8b5daf333975eeb82a29a7b8c4d5cc909918c574441594f13ebc1"
+   },
+   {
+    "path": "artifacts/scanner_v2/scallop_family/scallops_descending_inverted/db_active/events.csv",
+    "mtime": "2026-08-15 22:40:44",
+    "rows": 447,
+    "sha256": "315d5fd4977fcf08612cfa0e1883c2f43ee5400846feb4d8d6bd9df201bbd686"
+   },
+   {
+    "path": "artifacts/scanner_v2/symmetrical_triangles_db_source_parity/db_active/events.csv",
+    "mtime": "2026-08-16 00:00:26",
+    "rows": 4219,
+    "sha256": "0f6d60f6460f4e507cca67dbf08acc9288227f99b99e1cf6042f1171b95955c2"
+   },
+   {
+    "path": "artifacts/scanner_v2/three_methods_family/falling_three_methods/db_active/events.csv",
+    "mtime": "2026-08-15 23:47:04",
+    "rows": 231,
+    "sha256": "5af3ab1f0ead89604bddc4dea42c7ff9aaa6a529cd2058d0ad03dfdf48fe6c26"
+   },
+   {
+    "path": "artifacts/scanner_v2/three_methods_family/rising_three_methods/db_active/events.csv",
+    "mtime": "2026-08-15 23:46:45",
+    "rows": 476,
+    "sha256": "6a411b33ad7b62fcdbbb966d2a54343e5653b5a931e28f4c6c6f719f93b3c9bf"
+   },
+   {
+    "path": "artifacts/scanner_v2/three_peaks_valleys_family/three_falling_peaks/db_active/events.csv",
+    "mtime": "2026-08-15 23:47:55",
+    "rows": 494,
+    "sha256": "490b97c1159898fe80f57b8f0ffd5ce40b83386f2cfb289c9fadaec6c82127cc"
+   },
+   {
+    "path": "artifacts/scanner_v2/three_peaks_valleys_family/three_rising_valleys/db_active/events.csv",
+    "mtime": "2026-08-15 23:48:45",
+    "rows": 469,
+    "sha256": "99d8a3792f937b2bb3debd96c548d2775359339426899ba93de1fad6ec4fcb15"
+   },
+   {
+    "path": "artifacts/scanner_v2/triple_family/triple_bottoms/db_active/events.csv",
+    "mtime": "2026-08-15 23:46:22",
+    "rows": 96,
+    "sha256": "c00cf54a9f6407e9d6cf169c4ef7b1a8512251fc3db091337e49f51ef4c55cd3"
+   },
+   {
+    "path": "artifacts/scanner_v2/triple_family/triple_tops/db_active/events.csv",
+    "mtime": "2026-08-15 23:45:35",
+    "rows": 82,
+    "sha256": "683653e83e9f23f314991b6a7e9422e1fd63806aa59552f40711f81dfe602bac"
+   },
+   {
+    "path": "artifacts/scanner_v2/wedge_family/falling_wedges/db_active/events.csv",
+    "mtime": "2026-08-15 23:52:29",
+    "rows": 1796,
+    "sha256": "87ddbe73f989b012766168fdeb53e96a022ea3565b27f16583243d77de158224"
+   },
+   {
+    "path": "artifacts/scanner_v2/wedge_family/rising_wedges/db_active/events.csv",
+    "mtime": "2026-08-15 23:54:10",
+    "rows": 1268,
+    "sha256": "4b7cb8a38c1edc66ea7a16a49847c48d66f5061e18f3f22acd0d640c557a7001"
+   }
+  ],
+  "file_count": 57,
+  "pattern_level_count": 55
+ },
+ "rescan_barr_dotc": {
+  "window": "2026-08-16 08:10-08:11 (đợt C, cùng snapshot)",
+  "files": [
+   {
+    "path": "artifacts/scanner_v2/bump_and_run_family/bump_and_run_reversal_bottoms/db_active/events.csv",
+    "mtime": "2026-08-16 08:10:14",
+    "rows": 1447,
+    "sha256": "3eda6fd2a4161c65f991dc8da97a390ba78a3b12df692bf0d84b30e38d8fe700"
+   },
+   {
+    "path": "artifacts/scanner_v2/bump_and_run_family/bump_and_run_reversal_tops/db_active/events.csv",
+    "mtime": "2026-08-16 08:11:41",
+    "rows": 1819,
+    "sha256": "6aebda078cf26cfb02e05621f5f3c8e41ab16a00bbc2e0677b9645cd0af0379f"
+   }
+  ]
+ },
+ "module_reconstruction": {
+  "note": "Ánh xạ dir artifact → module detector; đếm module có artifact đổi trong 2 cửa sổ.",
+  "modules": {
+   "scanner.v2.ascending_triangles": [
+    "artifacts/scanner_v2/ascending_triangles_db_source_parity/db_active/events.csv"
+   ],
+   "scanner.v2.bear_flags": [
+    "artifacts/scanner_v2/bear_flags_db_source_parity/db_active/events.csv"
+   ],
+   "scanner.v2.broadening_patterns": [
+    "artifacts/scanner_v2/broadening_family/broadening_bottoms/db_active/events.csv",
+    "artifacts/scanner_v2/broadening_family/broadening_formations_right_angled_ascending/db_active/events.csv",
+    "artifacts/scanner_v2/broadening_family/broadening_formations_right_angled_descending/db_active/events.csv",
+    "artifacts/scanner_v2/broadening_family/broadening_tops/db_active/events.csv",
+    "artifacts/scanner_v2/broadening_family/broadening_wedges_ascending/db_active/events.csv",
+    "artifacts/scanner_v2/broadening_family/broadening_wedges_descending/db_active/events.csv"
+   ],
+   "scanner.v2.bull_flags": [
+    "artifacts/scanner_v2/bull_flags_db_source_parity/db_active/events.csv"
+   ],
+   "scanner.v2.bump_and_run": [
+    "artifacts/scanner_v2/bump_and_run_family/bump_and_run_reversal_bottoms/db_active/events.csv",
+    "artifacts/scanner_v2/bump_and_run_family/bump_and_run_reversal_tops/db_active/events.csv"
+   ],
+   "scanner.v2.cup_with_handle": [
+    "artifacts/scanner_v2/cup_with_handle_family/cup_with_handle/db_active/events.csv",
+    "artifacts/scanner_v2/cup_with_handle_family/cup_with_handle_inverted/db_active/events.csv"
+   ],
+   "scanner.v2.dead_cat_bounce": [
+    "artifacts/scanner_v2/dead_cat_bounce_family/dead_cat_bounce/db_active/events.csv",
+    "artifacts/scanner_v2/dead_cat_bounce_family/dead_cat_bounce_inverted/db_active/events.csv"
+   ],
+   "scanner.v2.descending_triangles": [
+    "artifacts/scanner_v2/descending_triangles_db_source_parity/db_active/events.csv"
+   ],
+   "scanner.v2.diamonds": [
+    "artifacts/scanner_v2/diamond_family/diamond_bottoms/db_active/events.csv",
+    "artifacts/scanner_v2/diamond_family/diamond_tops/db_active/events.csv"
+   ],
+   "scanner.v2.double_patterns": [
+    "artifacts/scanner_v2/double_pattern_family/double_bottoms/db_active/events.csv",
+    "artifacts/scanner_v2/double_pattern_family/double_tops/db_active/events.csv"
+   ],
+   "scanner.v2.falling_wedges": [
+    "artifacts/scanner_v2/wedge_family/falling_wedges/db_active/events.csv"
+   ],
+   "scanner.v2.gaps": [
+    "artifacts/scanner_v2/gap_family/area_gaps/db_active/events.csv",
+    "artifacts/scanner_v2/gap_family/breakaway_gaps/db_active/events.csv",
+    "artifacts/scanner_v2/gap_family/continuation_gaps/db_active/events.csv",
+    "artifacts/scanner_v2/gap_family/exhaustion_gaps/db_active/events.csv"
+   ],
+   "scanner.v2.harami": [
+    "artifacts/scanner_v2/harami_family/harami/db_active/events.csv"
+   ],
+   "scanner.v2.head_shoulders": [
+    "artifacts/scanner_v2/head_shoulders_family/head_and_shoulders_bottoms/db_active/events.csv",
+    "artifacts/scanner_v2/head_shoulders_family/head_and_shoulders_bottoms_complex/db_active/events.csv",
+    "artifacts/scanner_v2/head_shoulders_family/head_and_shoulders_tops/db_active/events.csv",
+    "artifacts/scanner_v2/head_shoulders_family/head_and_shoulders_tops_complex/db_active/events.csv"
+   ],
+   "scanner.v2.high_tight_flags": [
+    "artifacts/scanner_v2/high_tight_flags/events.csv"
+   ],
+   "scanner.v2.horns": [
+    "artifacts/scanner_v2/horn_family/horn_bottoms/db_active/events.csv",
+    "artifacts/scanner_v2/horn_family/horn_tops/db_active/events.csv"
+   ],
+   "scanner.v2.inside_days": [
+    "artifacts/scanner_v2/inside_day_family/inside_day/db_active/events.csv"
+   ],
+   "scanner.v2.islands": [
+    "artifacts/scanner_v2/island_family/island_reversals/db_active/events.csv",
+    "artifacts/scanner_v2/island_family/islands_long/db_active/events.csv"
+   ],
+   "scanner.v2.measured_moves": [
+    "artifacts/scanner_v2/measured_move_family/measured_move_down/db_active/events.csv",
+    "artifacts/scanner_v2/measured_move_family/measured_move_up/db_active/events.csv"
+   ],
+   "scanner.v2.pennants": [
+    "artifacts/scanner_v2/pennants/events.csv"
+   ],
+   "scanner.v2.pipes": [
+    "artifacts/scanner_v2/pipe_family/pipe_bottoms/db_active/events.csv",
+    "artifacts/scanner_v2/pipe_family/pipe_tops/db_active/events.csv"
+   ],
+   "scanner.v2.rectangles": [
+    "artifacts/scanner_v2/rectangle_family/rectangle_bottoms/db_active/events.csv",
+    "artifacts/scanner_v2/rectangle_family/rectangle_tops/db_active/events.csv"
+   ],
+   "scanner.v2.rising_wedges": [
+    "artifacts/scanner_v2/wedge_family/rising_wedges/db_active/events.csv"
+   ],
+   "scanner.v2.rounding": [
+    "artifacts/scanner_v2/rounding_family/rounding_bottoms/db_active/events.csv",
+    "artifacts/scanner_v2/rounding_family/rounding_tops/db_active/events.csv"
+   ],
+   "scanner.v2.scallops": [
+    "artifacts/scanner_v2/scallop_family/scallops_ascending/db_active/events.csv",
+    "artifacts/scanner_v2/scallop_family/scallops_ascending_inverted/db_active/events.csv",
+    "artifacts/scanner_v2/scallop_family/scallops_descending/db_active/events.csv",
+    "artifacts/scanner_v2/scallop_family/scallops_descending_inverted/db_active/events.csv"
+   ],
+   "scanner.v2.symmetrical_triangles": [
+    "artifacts/scanner_v2/symmetrical_triangles_db_source_parity/db_active/events.csv"
+   ],
+   "scanner.v2.three_methods": [
+    "artifacts/scanner_v2/three_methods_family/falling_three_methods/db_active/events.csv",
+    "artifacts/scanner_v2/three_methods_family/rising_three_methods/db_active/events.csv"
+   ],
+   "scanner.v2.three_peaks_valleys": [
+    "artifacts/scanner_v2/three_peaks_valleys_family/three_falling_peaks/db_active/events.csv",
+    "artifacts/scanner_v2/three_peaks_valleys_family/three_rising_valleys/db_active/events.csv"
+   ],
+   "scanner.v2.triple_patterns": [
+    "artifacts/scanner_v2/triple_family/triple_bottoms/db_active/events.csv",
+    "artifacts/scanner_v2/triple_family/triple_tops/db_active/events.csv"
+   ]
+  },
+  "module_count": 29
+ },
+ "chapter_refresh_40_dotc": {
+  "window": "2026-08-16 04:50 → 10:08 (giữa đợt B kết thúc 04:50 và build PDF 10:07:59)",
+  "evidence": "mtime ai/refined/run_meta.json của từng chương (bản ghi lần AI-refresh cuối)",
+  "count": 40,
+  "chapters": [
+   {
+    "pattern_id": "bump_and_run_reversal_bottoms",
+    "family": "bump_and_run_family",
+    "run_meta_mtime": "2026-08-16 08:42:31",
+    "final_pdf": "artifacts/final_chapters/bump_and_run_family/bump_and_run_reversal_bottoms_final.pdf",
+    "final_pdf_mtime": "2026-08-16 01:31:59",
+    "final_pdf_sha256": "cca9595db7c21c521a551e342d9d2f9fe6ee52ee57477ba3fab54e5a4cb74cb9"
+   },
+   {
+    "pattern_id": "cup_with_handle",
+    "family": "cup_handle_family",
+    "run_meta_mtime": "2026-08-16 08:45:30",
+    "final_pdf": "artifacts/final_chapters/cup_handle_family/cup_with_handle_final.pdf",
+    "final_pdf_mtime": "2026-08-16 03:30:09",
+    "final_pdf_sha256": "7edebaf54c346683b928b4edfa7183a36f480b12d3d2c28d0be3556a2b385a7c"
+   },
+   {
+    "pattern_id": "cup_with_handle_inverted",
+    "family": "cup_handle_family",
+    "run_meta_mtime": "2026-08-16 08:48:15",
+    "final_pdf": "artifacts/final_chapters/cup_handle_family/inverted_cup_with_handle_final.pdf",
+    "final_pdf_mtime": "2026-08-16 02:25:52",
+    "final_pdf_sha256": "82511ea54affe2cb393ee9a827626a7a14b094f1cb92221bf1afb522af4169c6"
+   },
+   {
+    "pattern_id": "dead_cat_bounce",
+    "family": "dead_cat_bounce_family",
+    "run_meta_mtime": "2026-08-16 08:49:37",
+    "final_pdf": "artifacts/final_chapters/dead_cat_bounce_family/dead_cat_bounce_final.pdf",
+    "final_pdf_mtime": "2026-08-16 03:18:38",
+    "final_pdf_sha256": "a2076ac0144ee2614e84d8004d3c53913539160cc63f18c76f69ca9f71c090c1"
+   },
+   {
+    "pattern_id": "dead_cat_bounce_inverted",
+    "family": "dead_cat_bounce_family",
+    "run_meta_mtime": "2026-08-16 08:50:38",
+    "final_pdf": "artifacts/final_chapters/dead_cat_bounce_family/dead_cat_bounce_inverted_final.pdf",
+    "final_pdf_mtime": "2026-08-16 03:20:27",
+    "final_pdf_sha256": "e932826c12aee7e1f94d9132f978b93d2af55355f46b04a25fc64cf3fe71f8dc"
+   },
+   {
+    "pattern_id": "diamond_bottoms",
+    "family": "diamond_family",
+    "run_meta_mtime": "2026-08-16 08:53:38",
+    "final_pdf": "artifacts/final_chapters/diamond_family/diamond_bottoms_final.pdf",
+    "final_pdf_mtime": "2026-08-16 00:34:42",
+    "final_pdf_sha256": "ad9b66c3dbf57e951a7e6b753a73fb055a6b22ff171bd7c7ee8204711c1198e8"
+   },
+   {
+    "pattern_id": "diamond_tops",
+    "family": "diamond_family",
+    "run_meta_mtime": "2026-08-16 08:54:55",
+    "final_pdf": "artifacts/final_chapters/diamond_family/diamond_tops_final.pdf",
+    "final_pdf_mtime": "2026-08-16 00:38:13",
+    "final_pdf_sha256": "2c12725d651e80f675791f314d7d16a1281014b283577fff07cc082b992ca0b0"
+   },
+   {
+    "pattern_id": "double_bottoms_adam_adam",
+    "family": "double_pattern_family",
+    "run_meta_mtime": "2026-08-16 08:55:58",
+    "final_pdf": "artifacts/final_chapters/double_pattern_family/double_bottoms_adam_adam_final.pdf",
+    "final_pdf_mtime": "2026-08-16 02:19:32",
+    "final_pdf_sha256": "7ff16ab280d820a896ff9ca8c6fd95dfeb25303ceab04dceba01bc281be8dbae"
+   },
+   {
+    "pattern_id": "double_bottoms_adam_eve",
+    "family": "double_pattern_family",
+    "run_meta_mtime": "2026-08-16 08:58:38",
+    "final_pdf": "artifacts/final_chapters/double_pattern_family/double_bottoms_adam_eve_final.pdf",
+    "final_pdf_mtime": "2026-08-16 01:42:35",
+    "final_pdf_sha256": "1d194be9b90f116a96fca8db5750123c5e5633e1882b1aabd8185df6fa2b65ab"
+   },
+   {
+    "pattern_id": "double_bottoms_eve_adam",
+    "family": "double_pattern_family",
+    "run_meta_mtime": "2026-08-16 09:01:35",
+    "final_pdf": "artifacts/final_chapters/double_pattern_family/double_bottoms_eve_adam_final.pdf",
+    "final_pdf_mtime": "2026-08-16 02:33:04",
+    "final_pdf_sha256": "8c4293dec12aa4c3971a94e4b9139534457ad80ba7ea074ac4fb20247d084a2e"
+   },
+   {
+    "pattern_id": "double_bottoms_eve_eve",
+    "family": "double_pattern_family",
+    "run_meta_mtime": "2026-08-16 09:03:08",
+    "final_pdf": "artifacts/final_chapters/double_pattern_family/double_bottoms_eve_eve_final.pdf",
+    "final_pdf_mtime": "2026-08-16 02:36:26",
+    "final_pdf_sha256": "c93efdf6e420d9cfc5babcf8bf7db225388f09a91eb0b04fe4f65c7327d17311"
+   },
+   {
+    "pattern_id": "double_tops_adam_adam",
+    "family": "double_pattern_family",
+    "run_meta_mtime": "2026-08-16 09:06:25",
+    "final_pdf": "artifacts/final_chapters/double_pattern_family/double_tops_adam_adam_final.pdf",
+    "final_pdf_mtime": "2026-08-16 03:58:15",
+    "final_pdf_sha256": "14b1b41d64dd5e2992c734aa518c5b919c2078ac36baaccdfb572b6ba29174ac"
+   },
+   {
+    "pattern_id": "double_tops_adam_eve",
+    "family": "double_pattern_family",
+    "run_meta_mtime": "2026-08-16 09:09:14",
+    "final_pdf": "artifacts/final_chapters/double_pattern_family/double_tops_adam_eve_final.pdf",
+    "final_pdf_mtime": "2026-08-16 03:42:00",
+    "final_pdf_sha256": "f8d88362fc6b0730867ff1b832030cc20a754b0afcd7f31080943586ab55b83d"
+   },
+   {
+    "pattern_id": "double_tops_eve_adam",
+    "family": "double_pattern_family",
+    "run_meta_mtime": "2026-08-16 09:10:39",
+    "final_pdf": "artifacts/final_chapters/double_pattern_family/double_tops_eve_adam_final.pdf",
+    "final_pdf_mtime": "2026-08-16 00:55:21",
+    "final_pdf_sha256": "11d55cfe37ba36fcb3b9a1fd64ab182a097560e10a28aa773ac147fca0a3319e"
+   },
+   {
+    "pattern_id": "double_tops_eve_eve",
+    "family": "double_pattern_family",
+    "run_meta_mtime": "2026-08-16 09:12:39",
+    "final_pdf": "artifacts/final_chapters/double_pattern_family/double_tops_eve_eve_final.pdf",
+    "final_pdf_mtime": "2026-08-16 00:53:49",
+    "final_pdf_sha256": "85d68b480ccef595bb5b0249af22ff0033d744099f3ada0340b8780f65acf8c7"
+   },
+   {
+    "pattern_id": "bear_pennants",
+    "family": "flag_family",
+    "run_meta_mtime": "2026-08-16 10:05:12",
+    "final_pdf": "artifacts/final_chapters/flag_family/bear_pennant_final.pdf",
+    "final_pdf_mtime": "2026-08-16 10:05:13",
+    "final_pdf_sha256": "5dd8e8988f4045a3fa2ad8c0b8490ae6740721f1add208261f7802a17521496b"
+   },
+   {
+    "pattern_id": "bull_pennants",
+    "family": "flag_family",
+    "run_meta_mtime": "2026-08-16 08:39:51",
+    "final_pdf": "artifacts/final_chapters/flag_family/bull_pennant_final.pdf",
+    "final_pdf_mtime": "2026-08-16 01:56:06",
+    "final_pdf_sha256": "43cb83ed0b5d355c14aac0aa1e37c1054c035b4a8f9fe086a781a954002040ce"
+   },
+   {
+    "pattern_id": "high_tight_flags",
+    "family": "flag_family",
+    "run_meta_mtime": "2026-08-16 09:18:02",
+    "final_pdf": "artifacts/final_chapters/flag_family/high_tight_flag_final.pdf",
+    "final_pdf_mtime": "2026-08-16 02:18:06",
+    "final_pdf_sha256": "870d827279e8a71673ccb679d3c8ed85dd94b1f2dae2bf500b51c7e6288f2ed5"
+   },
+   {
+    "pattern_id": "harami",
+    "family": "harami_family",
+    "run_meta_mtime": "2026-08-16 09:15:09",
+    "final_pdf": "artifacts/final_chapters/harami_family/harami_final.pdf",
+    "final_pdf_mtime": "2026-08-16 01:29:07",
+    "final_pdf_sha256": "6dfb27ec79e63462ce5dd3753e50a6aa2634030749e9352912590c06cf283bba"
+   },
+   {
+    "pattern_id": "horn_bottoms",
+    "family": "horn_family",
+    "run_meta_mtime": "2026-08-16 09:21:09",
+    "final_pdf": "artifacts/final_chapters/horn_family/horn_bottoms_final.pdf",
+    "final_pdf_mtime": "2026-08-16 03:49:41",
+    "final_pdf_sha256": "84705af199baf827bd2ad4fef428070aea1667ac2677f1be1d63d45435504d75"
+   },
+   {
+    "pattern_id": "horn_tops",
+    "family": "horn_family",
+    "run_meta_mtime": "2026-08-16 09:23:03",
+    "final_pdf": "artifacts/final_chapters/horn_family/horn_tops_final.pdf",
+    "final_pdf_mtime": "2026-08-16 01:38:58",
+    "final_pdf_sha256": "e3a29bf97b87403bceea14f59ba8b5ae4f236a651f1ea2b7c50ab103e78c8c8a"
+   },
+   {
+    "pattern_id": "inside_day",
+    "family": "inside_day_family",
+    "run_meta_mtime": "2026-08-16 09:24:51",
+    "final_pdf": "artifacts/final_chapters/inside_day_family/inside_day_final.pdf",
+    "final_pdf_mtime": "2026-08-16 02:28:48",
+    "final_pdf_sha256": "bc78de56ddc364d47f413303e3b0c47123149d374a019f02b147adaf40c4b4db"
+   },
+   {
+    "pattern_id": "islands_long",
+    "family": "island_family",
+    "run_meta_mtime": "2026-08-16 09:26:16",
+    "final_pdf": "artifacts/final_chapters/island_family/islands_long_final.pdf",
+    "final_pdf_mtime": "2026-08-16 01:43:58",
+    "final_pdf_sha256": "476c1694c30e75debeb91c73e807d8135b33875b589899d4fd5ca374198b4639"
+   },
+   {
+    "pattern_id": "measured_move_down",
+    "family": "measured_move_family",
+    "run_meta_mtime": "2026-08-16 09:27:50",
+    "final_pdf": "artifacts/final_chapters/measured_move_family/measured_move_down_final.pdf",
+    "final_pdf_mtime": "2026-08-16 04:10:11",
+    "final_pdf_sha256": "a10a424e217da2c2ddbd0bc3a4775779828844f4a0e0395bd3131c4c6a83cc6d"
+   },
+   {
+    "pattern_id": "measured_move_up",
+    "family": "measured_move_family",
+    "run_meta_mtime": "2026-08-16 09:30:22",
+    "final_pdf": "artifacts/final_chapters/measured_move_family/measured_move_up_final.pdf",
+    "final_pdf_mtime": "2026-08-16 01:22:06",
+    "final_pdf_sha256": "71f131b83f23cb4ab3204b990685c95e34c3aaeebb0ddf6bf785fb8f93c5d4b3"
+   },
+   {
+    "pattern_id": "pipe_bottoms",
+    "family": "pipe_family",
+    "run_meta_mtime": "2026-08-16 09:31:41",
+    "final_pdf": "artifacts/final_chapters/pipe_family/pipe_bottoms_final.pdf",
+    "final_pdf_mtime": "2026-08-16 02:11:50",
+    "final_pdf_sha256": "562b696ea04cd26cc1450dadfef91a42042cc10873ec68113539da59fbb072f3"
+   },
+   {
+    "pattern_id": "pipe_tops",
+    "family": "pipe_family",
+    "run_meta_mtime": "2026-08-16 09:34:15",
+    "final_pdf": "artifacts/final_chapters/pipe_family/pipe_tops_final.pdf",
+    "final_pdf_mtime": "2026-08-16 02:15:04",
+    "final_pdf_sha256": "f39199dc62c143779f5a8168c5731288c468a27cfdca0f5993c78e163a29ac41"
+   },
+   {
+    "pattern_id": "rectangle_bottoms",
+    "family": "rectangle_family",
+    "run_meta_mtime": "2026-08-16 09:35:13",
+    "final_pdf": "artifacts/final_chapters/rectangle_family/rectangle_bottoms_final.pdf",
+    "final_pdf_mtime": "2026-08-16 00:28:56",
+    "final_pdf_sha256": "6c20c9c111f95e1b81c28cdbd291f1272f371374931cabb1d6b6e223e0d66d14"
+   },
+   {
+    "pattern_id": "rectangle_tops",
+    "family": "rectangle_family",
+    "run_meta_mtime": "2026-08-16 09:40:49",
+    "final_pdf": "artifacts/final_chapters/rectangle_family/rectangle_tops_final.pdf",
+    "final_pdf_mtime": "2026-08-16 01:13:03",
+    "final_pdf_sha256": "f47ca2518a52cee5f0c21387e5aa35df4adfbdbe41568cd838c3a5188353d45d"
+   },
+   {
+    "pattern_id": "scallops_ascending",
+    "family": "scallop_family",
+    "run_meta_mtime": "2026-08-16 09:45:12",
+    "final_pdf": "artifacts/final_chapters/scallop_family/scallops_ascending_final.pdf",
+    "final_pdf_mtime": "2026-08-16 03:16:45",
+    "final_pdf_sha256": "8d7a4d310da4e2b07e42130c49416d1e10a0cd2035740c55277b20b8e187e455"
+   },
+   {
+    "pattern_id": "scallops_ascending_inverted",
+    "family": "scallop_family",
+    "run_meta_mtime": "2026-08-16 09:46:49",
+    "final_pdf": "artifacts/final_chapters/scallop_family/scallops_ascending_inverted_final.pdf",
+    "final_pdf_mtime": "2026-08-16 02:04:13",
+    "final_pdf_sha256": "386a36ea499993875d74a8dde3703762b85996c3bc3c0dbf74fef89b340ece89"
+   },
+   {
+    "pattern_id": "scallops_descending",
+    "family": "scallop_family",
+    "run_meta_mtime": "2026-08-16 09:49:17",
+    "final_pdf": "artifacts/final_chapters/scallop_family/scallops_descending_final.pdf",
+    "final_pdf_mtime": "2026-08-16 03:46:59",
+    "final_pdf_sha256": "33815be6319c3fb553143d9859643a569b3a8e85f0ffb75375778b07d66f1a9c"
+   },
+   {
+    "pattern_id": "scallops_descending_inverted",
+    "family": "scallop_family",
+    "run_meta_mtime": "2026-08-16 09:50:27",
+    "final_pdf": "artifacts/final_chapters/scallop_family/scallops_descending_inverted_final.pdf",
+    "final_pdf_mtime": "2026-08-16 02:13:21",
+    "final_pdf_sha256": "dd41dd70146792e56ae23bca7391acf20ffd9027c002369c468fc8089ff71eb4"
+   },
+   {
+    "pattern_id": "falling_three_methods",
+    "family": "three_methods_family",
+    "run_meta_mtime": "2026-08-16 09:14:15",
+    "final_pdf": "artifacts/final_chapters/three_methods_family/falling_three_methods_final.pdf",
+    "final_pdf_mtime": "2026-08-16 00:51:23",
+    "final_pdf_sha256": "447e5e0b3157911ee631b427cab4368ba71d8dcbc15ed008130ec1bc4d610e7e"
+   },
+   {
+    "pattern_id": "rising_three_methods",
+    "family": "three_methods_family",
+    "run_meta_mtime": "2026-08-16 09:42:10",
+    "final_pdf": "artifacts/final_chapters/three_methods_family/rising_three_methods_final.pdf",
+    "final_pdf_mtime": "2026-08-16 00:56:56",
+    "final_pdf_sha256": "ed4c143a1bb6086be7d86b50b8489dccbed3da4f30da733f0635b2904ebd7e33"
+   },
+   {
+    "pattern_id": "triangles_ascending",
+    "family": "triangle_family",
+    "run_meta_mtime": "2026-08-16 09:52:24",
+    "final_pdf": "artifacts/final_chapters/triangle_family/ascending_triangle_final.pdf",
+    "final_pdf_mtime": "2026-08-16 02:05:21",
+    "final_pdf_sha256": "96a93be587d07b5130060d1d24674853240b23147182e0b6c2e24a520a2ae355"
+   },
+   {
+    "pattern_id": "triangles_descending",
+    "family": "triangle_family",
+    "run_meta_mtime": "2026-08-16 09:55:22",
+    "final_pdf": "artifacts/final_chapters/triangle_family/descending_triangle_final.pdf",
+    "final_pdf_mtime": "2026-08-16 02:51:25",
+    "final_pdf_sha256": "34619a91eb562dbc31415b225c924c7ad4111e308dc7307d7af9654faed94d5d"
+   },
+   {
+    "pattern_id": "triangles_symmetrical",
+    "family": "triangle_family",
+    "run_meta_mtime": "2026-08-16 09:59:01",
+    "final_pdf": "artifacts/final_chapters/triangle_family/symmetrical_triangle_final.pdf",
+    "final_pdf_mtime": "2026-08-16 03:09:11",
+    "final_pdf_sha256": "8910ff7f10ee6bc12d16388511d52189a77177389c419a198e712b753729af37"
+   },
+   {
+    "pattern_id": "wedges_falling",
+    "family": "wedge_family",
+    "run_meta_mtime": "2026-08-16 10:02:39",
+    "final_pdf": "artifacts/final_chapters/wedge_family/falling_wedge_final.pdf",
+    "final_pdf_mtime": "2026-08-16 00:41:40",
+    "final_pdf_sha256": "5a4142d39090fbd65d9772c37e9f39ef1e780af05c86caaee88951ce232d1d37"
+   },
+   {
+    "pattern_id": "wedges_rising",
+    "family": "wedge_family",
+    "run_meta_mtime": "2026-08-16 10:04:16",
+    "final_pdf": "artifacts/final_chapters/wedge_family/rising_wedge_final.pdf",
+    "final_pdf_mtime": "2026-08-16 10:04:17",
+    "final_pdf_sha256": "d1d52932a1072543a2f81b464075d536c4c5bcaaf520a7379e140daff5f37af0"
+   }
+  ]
+ },
+ "cross_check": {
+  "manifest_chapters": 64,
+  "refreshed": 40,
+  "field_only_no_refresh": [
+   "area_gaps",
+   "breakaway_gaps",
+   "bump_and_run_reversal_tops",
+   "continuation_gaps",
+   "exhaustion_gaps",
+   "island_reversals",
+   "rounding_bottoms",
+   "rounding_tops",
+   "three_falling_peaks",
+   "three_rising_valleys",
+   "triple_bottoms",
+   "triple_tops"
+  ],
+  "field_only_count": 12,
+  "field_only_note": "Chỉ thêm field n_scoped/n_excluded vào payload — số không đổi, không AI-refresh (note đợt C gọi là nhóm B).",
+  "clean_no_refresh": [
+   "bear_flags",
+   "broadening_bottoms",
+   "broadening_formations_right_angled_ascending",
+   "broadening_formations_right_angled_descending",
+   "broadening_tops",
+   "broadening_wedges_ascending",
+   "broadening_wedges_descending",
+   "bull_flags",
+   "head_and_shoulders_bottoms",
+   "head_and_shoulders_bottoms_complex",
+   "head_and_shoulders_tops",
+   "head_and_shoulders_tops_complex"
+  ],
+  "clean_count": 12,
+  "clean_note": "Payload không đổi số (broadening/HS/flags) — bỏ refresh theo note đợt C.",
+  "sum_check": "40 + 12 + 12 = 64"
+ }
+}
