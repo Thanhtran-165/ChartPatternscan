@@ -1,9 +1,9 @@
 # ISS-001 — Full-reload không thay thế hàng cũ (stale rows) trong latest.sqlite
 
-- **Trạng thái:** RESOLVED 16/08/2026 — vá `--replace` + guard mất dữ liệu, 5/5 test đơn vị PASS (chi tiết cuối file)
+- **Trạng thái:** OPEN — chặn refresh kế tiếp của `latest.sqlite`
 - **Phát hiện:** 16/08/2026 (đợt B, theo điều kiện Sol HIGH-3 / db_manifest)
 - **Mức độ:** HIGH (toàn vẹn dữ liệu nguồn cho mọi bộ scan xuất bản)
-- **Liên quan:** `artifacts/scanner_v2/db_manifest.json` (mục `open_issues` — bản ghi giữ nguyên trạng thái mở TẠI THỜI ĐIỂM xuất bản; đóng dấu tại đây)
+- **Liên quan:** `artifacts/scanner_v2/db_manifest.json` (mục `open_issues`)
 
 ## Hiện tượng
 
@@ -58,23 +58,3 @@ Cơ chế này **chỉ thêm/cập nhật**, không bao giờ **xóa**:
 ## Lịch sử
 
 - 16/08/2026: mở issue (đợt B — GLM-5.3), ghi vào `db_manifest.json`.
-- 16/08/2026 chiều: **RESOLVED** — anh duyệt xử lý trước đợt nạp dữ liệu mới.
-
-## Cách đã xử lý (16/08/2026)
-
-Sửa `market_stats/update_latest_stock_ohlcv.py` (repo `~/dev/market_stats_v2`, branch v3/main):
-
-1. **Hàm `replace_symbol_rows`** — DELETE toàn bộ hàng cũ của từng mã rồi INSERT lại, trong MỘT transaction (đứt giữa chừng rollback, không mất dữ liệu cũ). Áp dụng cho **đường nạp lại toàn bộ (ADJUST)** — nơi stale sinh ra: UPSERT dồn khiến hàng bị nguồn thu hồi nằm lại mãi.
-2. **Guard mất dữ liệu `REPLACE_MIN_RATIO = 0.5`** — nguồn trả <50% số hàng hiện có của một mã → nghi provider lỗi/thiếu dữ liệu → giữ nguyên UPSERT cho mã đó + báo `REPLACE-SKIP` qua stderr (chống kịch bản xóa sạch vì nguồn hụt).
-3. **Cờ `--replace` opt-in, mặc định TẮT** — hành vi refresh hằng ngày qua server 8766 KHÔNG đổi. Đợt nạp dữ liệu chủ đích kế tiếp chạy trực tiếp với `--replace` để dọn stale.
-4. **Audit**: stats JSON ghi thêm `replace_symbols` / `replace_deleted_rows` / `replace_skipped` (số mã đã thay, tổng hàng cũ bị dọn, số mã bị guard chặn) — meta `market_stats_latest_refresh` trong DB đọc được từ UI refresh-status.
-
-**Test đơn vị 5/5 PASS** (DB giả /tmp, không đụng DB sống): T1 replace dọn 2 hàng stale + mã khác nguyên vẹn · T2 guard từ chối khi nguồn trả 30/100, UPSERT giữ 130 · T3 rollback khi dữ liệu có ngày trùng · T4 rows rỗng · T5 mã mới (old=0) replace bình thường.
-
-**Quyết định hàng close<=0 (đề xuất 3):** GIỮ NGUYÊN trong DB (đóng vai dấu delisted/halted của nguồn), detector lọc tại chỗ khi đọc — duy trì hiện trạng như `db_manifest.json` mục `close_zero_handling` đã kê khai với Sol. Backup trước vá: `update_latest_stock_ohlcv.py.bak_pre_iss001_20260816`.
-
-**Lệnh chạy đợt nạp kế tiếp (chủ đích):**
-```bash
-cd ~/dev/market_stats_v2 && .venv-vnstock-sponsor311/bin/python -m market_stats.update_latest_stock_ohlcv --replace
-# hoặc qua server: thêm --replace khi gọi trực tiếp updater; job daily-refresh (qua API, không cờ) giữ hành vi cũ
-```
