@@ -323,7 +323,20 @@ def _example_caption(
     # Bài học BID area_gaps (15/08, vision worker phát hiện): câu lead middle_case cố định
     # "có đi thuận lợi" sai ngôn ngữ khi mfe gần 0 (trung vị area_gaps = 0%) — đổi lead
     # theo mfe: < 1% thì đường đi chủ yếu đi ngang hoặc ngược hướng, không phải "có thuận lợi".
-    lead = str(fallback)
+    # Caption prose is rendered alongside the locked event metadata.  A prior
+    # AI caption can outlive a rescan and name a different ticker/date than the
+    # chart currently selected; never carry that stale lead into the public PDF.
+    # Keep the lead deterministic and event-bound, while retaining the
+    # event-level facts and role-specific lesson below.
+    pattern_title = str(spec.get("title") or "mẫu hình").strip()
+    if key == "textbook_success":
+        lead = f"Ví dụ đạt mục tiêu của {pattern_title} trên {symbol}."
+    elif key == "middle_case":
+        lead = f"Ví dụ trung vị của {pattern_title} trên {symbol}."
+    elif key == "failure":
+        lead = f"Ví dụ thất bại của {pattern_title} trên {symbol}."
+    else:
+        lead = f"Ví dụ minh họa {pattern_title} trên {symbol}."
     if key == "middle_case":
         try:
             if float(event.get("mfe_pct")) < 1.0:

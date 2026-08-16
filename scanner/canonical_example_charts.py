@@ -125,8 +125,17 @@ def _slice_window(df: pd.DataFrame, event: Mapping[str, Any], *, pre_bars: int =
     start_idx = int(df["date"].searchsorted(fs, side="left"))
     end_anchor = bd or fe or fs
     end_idx = int(df["date"].searchsorted(end_anchor, side="left"))
+    # A fixed 45-bar tail can end before a selected textbook-success event
+    # reaches its target, making the image contradict its own caption.  Keep a
+    # readable minimum tail, but extend it past the locked evaluation horizon
+    # and (when available) the first target hit plus a small visual margin.
+    evaluated_bars = _num(event.get("evaluated_bars")) or 0.0
+    days_to_target = _num(event.get("days_to_target"))
+    dynamic_tail = max(float(post_bars), evaluated_bars + 5.0)
+    if _truthy(event.get("target_hit")) and days_to_target is not None:
+        dynamic_tail = max(dynamic_tail, days_to_target + 5.0)
     w0 = max(0, start_idx - int(pre_bars))
-    w1 = min(len(df), max(end_idx + int(post_bars) + 1, start_idx + 2))
+    w1 = min(len(df), max(end_idx + int(math.ceil(dynamic_tail)) + 1, start_idx + 2))
     return df.iloc[w0:w1].copy().reset_index(drop=True), w0
 
 
@@ -686,11 +695,10 @@ def _label_inside_day(ax: Any, df: pd.DataFrame, event: Mapping[str, Any]) -> bo
     ax.axhline(mother_low, color="#7f7f7f", linestyle=":", linewidth=0.95, alpha=0.75, zorder=4)
     ax.axhline(inside_high, color="#245b5a", linestyle="-", linewidth=1.1, alpha=0.9, zorder=5)
     ax.axhline(inside_low, color="#245b5a", linestyle="-", linewidth=1.1, alpha=0.9, zorder=5)
-    _annotate(ax, fs + 0.12, mother_high, "biên nến mẹ", "#7f7f7f")
-    _annotate(ax, fe + 0.12, inside_high, "đỉnh nến trong", "#245b5a")
-    _annotate(ax, fe + 0.12, inside_low, "đáy nến trong", "#245b5a")
-    ax.text(fs, float(df["low"].min()), "nến mẹ", ha="center", va="bottom", fontsize=7.5, color="#377aa3", zorder=8)
-    ax.text(fe, float(df["low"].min()), "nến trong", ha="center", va="bottom", fontsize=7.5, color="#245b5a", zorder=8)
+    _annotate(ax, max(0.5, fs - 2.0), mother_high, "biên nến mẹ", "#7f7f7f")
+    _annotate(ax, min(len(df) - 2.0, fe + 0.8), inside_high, "đỉnh nến trong", "#245b5a")
+    _annotate(ax, min(len(df) - 2.0, fe + 0.8), inside_low, "đáy nến trong", "#245b5a")
+    ax.text(0.02, 0.96, "Nến mẹ = dải xám; nến trong = dải xanh", transform=ax.transAxes, ha="left", va="top", fontsize=7.2, color="#245b5a", bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.72, "pad": 1.2}, zorder=8)
     return True
 
 
@@ -710,9 +718,7 @@ def _label_three_methods(ax: Any, df: pd.DataFrame, event: Mapping[str, Any], pa
     ax.axhline(first_high, color="#245b5a", linestyle="--", linewidth=1.0, alpha=0.82, zorder=5)
     ax.axhline(first_low, color="#245b5a", linestyle="--", linewidth=1.0, alpha=0.82, zorder=5)
     _annotate(ax, fs + 0.15, first_high, "biên nến đầu", "#245b5a")
-    ax.text(fs, float(df["low"].min()), "nến đầu", ha="center", va="bottom", fontsize=7.5, color="#245b5a", zorder=8)
-    ax.text((fs + fe) / 2, float(df["low"].min()), "3 nến nghỉ", ha="center", va="bottom", fontsize=7.5, color="#377aa3", zorder=8)
-    ax.text(fe, float(df["low"].min()), "xác nhận", ha="center", va="bottom", fontsize=7.5, color="#7A5195", zorder=8)
+    ax.text(0.02, 0.96, "Trình tự vùng: nến đầu → 3 nến nghỉ → xác nhận", transform=ax.transAxes, ha="left", va="top", fontsize=7.2, color="#245b5a", bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.72, "pad": 1.2}, zorder=8)
     label = "đóng cửa vượt biên trên" if pattern_id == "rising_three_methods" else "đóng cửa vượt biên dưới"
     y = first_high if pattern_id == "rising_three_methods" else first_low
     _annotate(ax, fe + 0.12, y, label, "#7A5195")
@@ -725,6 +731,15 @@ def _draw_geometry(ax: Any, df: pd.DataFrame, event: Mapping[str, Any], pattern_
             return
     if pattern_id == "inside_day":
         if _label_inside_day(ax, df, event):
+            return
+    if pattern_id in {"island_reversals", "islands_long"}:
+        fs = _nearest_idx(df, _date(event.get("formation_start_date")))
+        fe = _nearest_idx(df, _date(event.get("formation_end_date")))
+        if fs is not None and fe is not None and fe >= fs:
+            ax.axvline(fs, color="#245b5a", linestyle=":", linewidth=1.1, alpha=0.85, zorder=5)
+            ax.axvline(fe, color="#245b5a", linestyle=":", linewidth=1.1, alpha=0.85, zorder=5)
+            ax.annotate("gap vào", xy=(fs, float(df.iloc[fs]["high"])), xytext=(fs - 3, float(df["high"].max())), fontsize=7.2, color="#245b5a", arrowprops={"arrowstyle": "->", "color": "#245b5a", "lw": 0.8}, zorder=8)
+            ax.annotate("gap ra", xy=(fe, float(df.iloc[fe]["high"])), xytext=(fe + 1, float(df["high"].max())), fontsize=7.2, color="#245b5a", arrowprops={"arrowstyle": "->", "color": "#245b5a", "lw": 0.8}, zorder=8)
             return
     if "dead_cat_bounce" in pattern_id:
         if _label_dead_cat(ax, df, event, pattern_id, offset):
@@ -790,6 +805,22 @@ def render_canonical_example_chart(*, price_db: Path, event: Mapping[str, Any], 
     if ib is not None:
         ax.axvline(ib, color="#7A5195", linewidth=1.25, alpha=0.95, zorder=6)
         ax.text(ib + 0.25, float(df["high"].max()), "phá vỡ lên" if direction == "up" else "phá vỡ xuống" if direction == "down" else "phá vỡ", fontsize=8, color="#7A5195", va="bottom", zorder=8)
+        evaluation_bars = _num(event.get("evaluated_bars"))
+        if evaluation_bars is not None and evaluation_bars > 0:
+            cutoff = ib + int(round(evaluation_bars))
+            if 0 <= cutoff < len(df):
+                ax.axvline(cutoff, color="#777777", linestyle="--", linewidth=0.9, alpha=0.85, zorder=5)
+                near_right_edge = cutoff > len(df) - 14
+                ax.text(
+                    cutoff - 0.25 if near_right_edge else cutoff + 0.25,
+                    float(df["high"].max()),
+                    "hết cửa sổ đo",
+                    fontsize=7.2,
+                    color="#666666",
+                    va="top",
+                    ha="right" if near_right_edge else "left",
+                    zorder=8,
+                )
     breakout_price, target_price = _num(event.get("breakout_price")), _num(event.get("target_price"))
     if breakout_price is not None:
         ax.axhline(breakout_price, color="#245b5a", linestyle="--", linewidth=0.95, alpha=0.85, zorder=4)
