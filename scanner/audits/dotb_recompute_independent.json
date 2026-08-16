@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-16T01:27:55.359425+00:00",
+  "generated_at": "2026-08-16T03:52:22.325189+00:00",
   "method": "Recompute độc lập từ snapshot DB giá raw (latest.sqlite.dotb_20260815, SHA trong db_manifest) — không dùng post_breakout_path.csv hay cột target_hit; cửa sổ forward theo evaluated_bars của từng event (trần measurement_registry); chương tuần (horn) resample W-FRI đúng detector; failure_5pct = MFE full < 5.0.",
   "chapters": [
     {
