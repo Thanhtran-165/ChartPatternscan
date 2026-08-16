@@ -42,9 +42,15 @@ def _sha256(path: Path, chunk: int = 1 << 20) -> str:
 
 
 def _git(field: str) -> str | None:
+    # dotC (16/08/2026, Sol SAI LỆCH HỒ SƠ): trước đây truyền nguyên chuỗi
+    # `field` ("rev-parse --abbrev-ref HEAD") thành MỘT argument duy nhất → git
+    # trả lỗi/đầu rỗng → branch/commit trong manifest luôn null. Tách bằng
+    # shlex để git nhận đúng argv.
+    import shlex
+
     try:
         out = subprocess.run(
-            ["git", f"--git-dir={ROOT / '.git'}", field],
+            ["git", f"--git-dir={ROOT / '.git'}", *shlex.split(field)],
             capture_output=True, text=True, timeout=10,
         )
         return out.stdout.strip() or None
@@ -57,8 +63,14 @@ def build_manifest(db_path: Path) -> dict:
     try:
         rows = conn.execute("SELECT COUNT(*), COUNT(DISTINCT symbol), MIN(time), MAX(time) FROM stock_price_history").fetchone()
         n_rows, n_symbols, min_date, max_date = rows
-        n_zero = conn.execute("SELECT COUNT(*) FROM stock_price_history WHERE close IS NULL OR close <= 0").fetchone()[0]
+        # dotC (16/08/2026): đo TÁCH BẠCH 2 cách — (a) strictly close<=0,
+        # (b) tính thêm close IS NULL. Bản cũ trộn NULL vào rows nhưng không vào
+        # symbols (5.026/242 sai lệch nội bộ); snapshot đo thật: 4.556/223 + 11 NULL.
+        n_zero = conn.execute("SELECT COUNT(*) FROM stock_price_history WHERE close <= 0").fetchone()[0]
         n_zero_symbols = conn.execute("SELECT COUNT(DISTINCT symbol) FROM stock_price_history WHERE close <= 0").fetchone()[0]
+        n_null = conn.execute("SELECT COUNT(*) FROM stock_price_history WHERE close IS NULL").fetchone()[0]
+        n_zero_or_null = n_zero + n_null
+        n_zero_or_null_symbols = conn.execute("SELECT COUNT(DISTINCT symbol) FROM stock_price_history WHERE close IS NULL OR close <= 0").fetchone()[0]
         refresh_raw = None
         try:
             refresh_raw = conn.execute("SELECT value FROM stock_ohlcv_meta WHERE key='market_stats_latest_refresh'").fetchone()[0]
@@ -128,9 +140,13 @@ def build_manifest(db_path: Path) -> dict:
             ],
         },
         "close_zero_handling": {
+            "measurement_note": "Đo trực tiếp từ snapshot sqlite (dotC Sol SAI LỆCH HỒ SƠ — bản cũ 5.026/242 đo trộn NULL, không khớp snapshot).",
             "rows_close_le_zero": int(n_zero),
-            "symbols_affected": int(n_zero_symbols),
-            "treatment": "Hàng close<=0 (đánh dấu delisted/halted của nguồn) bị các detector loại tại chỗ khi đọc chuỗi giá (vd gaps.py close<=0, inside_days prev_close==0); không đi vào events xuất bản.",
+            "symbols_affected_close_le_zero": int(n_zero_symbols),
+            "rows_close_is_null": int(n_null),
+            "rows_close_le_zero_or_null": int(n_zero_or_null),
+            "symbols_affected_close_le_zero_or_null": int(n_zero_or_null_symbols),
+            "treatment": "Hàng close<=0 (đánh dấu delisted/halted của nguồn) bị các detector loại tại chỗ khi đọc chuỗi giá (vd gaps.py close<=0, inside_days prev_close==0); không đi vào events xuất bản. Hàng close IS NULL cũng bị loại cùng cơ chế (dropna khi chuẩn hoá chuỗi).",
         },
         "open_issues": [
             {
@@ -142,8 +158,8 @@ def build_manifest(db_path: Path) -> dict:
         ],
         "rescan_context": {
             "branch": _git("rev-parse --abbrev-ref HEAD"),
-            "commit": _git("rev-parse --short HEAD"),
-            "note": "Đợt B rescan toàn thị trường bằng code mới (target_hit_core full precision) — mọi events.csv xuất bản tái sinh từ DB ở trên.",
+            "commit_full": _git("rev-parse HEAD"),
+            "note": "dotC (16/08/2026): mọi đợt scan xuất bản chạy trên SNAPSHOT đóng băng read-only (ISS-002), không quét trên latest.sqlite sống. Commit bind FULL hash của nhánh tạo artifacts.",
         },
     }
 

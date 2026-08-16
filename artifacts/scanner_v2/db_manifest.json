@@ -1,0 +1,112 @@
+{
+  "manifest_version": "db_manifest_v1",
+  "generated_at": "2026-08-16T01:09:50.710410+00:00",
+  "purpose": "Khai báo phạm vi dữ liệu nguồn của bộ scan xuất bản (Sol HIGH-3) — mọi phát biểu về dữ liệu trong sách phải không rộng hơn manifest này",
+  "database": {
+    "path": "/Users/bobo/dev/market_stats_v2/market_cache/stock_ohlcv/latest.sqlite.dotb_20260815",
+    "file_size_bytes": 1213865984,
+    "sha256": "9c0164b01ac9d7bf48d31284a2a57ce78799e84590734ce6a678483470ca535d",
+    "symbols": 1599,
+    "rows": 4255894,
+    "min_date": "2002-05-02",
+    "max_date": "2026-08-14"
+  },
+  "source_provider": {
+    "library": "vnstock_data (Market Quote)",
+    "primary_source": "VCI",
+    "fallback_sources": [
+      "VND",
+      "KBS",
+      "MAS"
+    ],
+    "sample_source_tags": [
+      {
+        "source": "VCI:HTV",
+        "rows": 5041
+      },
+      {
+        "source": "VCI:STP",
+        "rows": 4890
+      },
+      {
+        "source": "VCI:DTT",
+        "rows": 4877
+      },
+      {
+        "source": "VCI:S55",
+        "rows": 4841
+      },
+      {
+        "source": "VCI:NST",
+        "rows": 4827
+      }
+    ],
+    "last_refresh_meta": {
+      "symbols": 1348,
+      "rows": 191678,
+      "empty": 0,
+      "errors": 0,
+      "adjust_reloads": 73,
+      "start": "2026-08-08",
+      "end": "2026-08-15",
+      "source": "VCI",
+      "sources": [
+        "VCI",
+        "VND",
+        "KBS",
+        "MAS"
+      ],
+      "latest_before": "2026-08-14",
+      "reference_date": "2026-08-07",
+      "reference_symbol_count": 1228,
+      "source_hits": {
+        "VCI": 15,
+        "VND": 1333
+      },
+      "source_fail_counts": {
+        "VCI": 0,
+        "VND": 0,
+        "KBS": 0,
+        "MAS": 0
+      },
+      "status": "success",
+      "error_count": 0,
+      "error_symbols_sample": []
+    },
+    "updater": "market_stats/update_latest_stock_ohlcv.py (repo ~/dev/market_stats_v2)"
+  },
+  "adjusted_claim_allowed": {
+    "claim": "OHLCV do nhà cung cấp mô tả là ĐÃ ĐIỀU CHỈNH toàn tuyến (provider-adjusted); dự án KHÔNG có factor audit độc lập để kiểm chứng hệ số điều chỉnh",
+    "price_basis": "provider_adjusted_ohlcv",
+    "adjustment_status": "provider_adjusted_without_factor_audit",
+    "guardrail": "OHLCV lấy từ vnstock_data; nguồn mô tả dữ liệu đã điều chỉnh nhưng không trả kèm hệ số kiểm chứng.",
+    "point_in_time_universe": "current_snapshot",
+    "downgraded_statements_required": [
+      "KHÔNG nói 'full-reload toàn bộ lịch sử adjusted cho mọi mã' — refresh gần nhất chỉ chạm 1.348/1.599 mã (xem last_refresh_meta).",
+      "KHÔNG nói 'toàn bộ dữ liệu đã kiểm chứng điều chỉnh' — chỉ provider-adjusted chưa audit factor.",
+      "Universe là available-series descriptive + membership snapshot hiện tại, không phải point-in-time."
+    ]
+  },
+  "close_zero_handling": {
+    "measurement_note": "Đo trực tiếp từ snapshot sqlite (dotC Sol SAI LỆCH HỒ SƠ — bản cũ 5.026/242 đo trộn NULL, không khớp snapshot).",
+    "rows_close_le_zero": 4556,
+    "symbols_affected_close_le_zero": 223,
+    "rows_close_is_null": 11,
+    "rows_close_le_zero_or_null": 4567,
+    "symbols_affected_close_le_zero_or_null": 223,
+    "treatment": "Hàng close<=0 (đánh dấu delisted/halted của nguồn) bị các detector loại tại chỗ khi đọc chuỗi giá (vd gaps.py close<=0, inside_days prev_close==0); không đi vào events xuất bản. Hàng close IS NULL cũng bị loại cùng cơ chế (dropna khi chuẩn hoá chuỗi)."
+  },
+  "open_issues": [
+    {
+      "id": "ISS-001",
+      "title": "update_latest_stock_ohlcv.py chỉ UPSERT, không DELETE hàng cũ",
+      "path": "scanner/issues/ISS-001-full-reload-replace-stale-rows.md",
+      "impact": "Hàng lỗi/quá hạn có thể tồn tại sau refresh; CHẶN refresh kế tiếp cho tới khi xử lí xong."
+    }
+  ],
+  "rescan_context": {
+    "branch": "fix/measure-rule-sol-round2",
+    "commit_full": "0fdb9e5108bcad5470dfea41cac73baf2659913b",
+    "note": "dotC (16/08/2026): mọi đợt scan xuất bản chạy trên SNAPSHOT đóng băng read-only (ISS-002), không quét trên latest.sqlite sống. Commit bind FULL hash của nhánh tạo artifacts."
+  }
+}
