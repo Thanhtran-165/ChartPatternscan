@@ -532,6 +532,24 @@ def _build_front_matter(items: list[BookItem], output: Path) -> int:
         "Cuốn sách không thay người đọc ra quyết định đầu tư. Nó cung cấp một bản đồ xác suất để người đọc hiểu mẫu hình nào đáng quan sát, mẫu nào chỉ nên dùng để cảnh báo rủi ro, và mẫu nào cần được đọc thận trọng vì dữ liệu hoặc đường đi sau xác nhận chưa đủ vững.",
     ]:
         story.append(_p(paragraph, styles["Body"]))
+    if EDITION_ID.endswith("_2"):
+        story.append(_p("Đội ngũ hoàn thiện ấn bản 2", styles["H2"]))
+        story.append(
+            _p(
+                "Edition 2 được hoàn thiện qua quy trình phối hợp và kiểm tra chéo của DeepSeek V4 Pro, GLM 5.3, GPT-5.6 Sol và GPT-5.6 Luna. Các model tham gia vào những phần khác nhau của quy trình: thi công và làm mới bộ quét, rà soát độc lập công thức đo, kiểm tra số liệu, biên tập diễn giải và kiểm tra chất lượng bản in. Quyết định phát hành chỉ được đưa ra sau khi mã nguồn, dữ liệu, ví dụ, PDF và các phép kiểm độc lập cùng đạt yêu cầu.",
+                styles["Body"],
+            )
+        )
+        story.append(_p("Cải tiến chính so với Edition 1", styles["H2"]))
+        improvement_rows = [
+            ["Hạng mục", "Edition 2"],
+            ["Bộ quét", "39/39 detector được rà soát lại; bổ sung Harami và thống nhất đường tính mục tiêu."],
+            ["Đo lường", "Sửa các measure rule lệch sách, neo lại Double Tops và BARR Bottoms, dùng phép tính full precision."],
+            ["Dữ liệu", "Dùng snapshot giá chung đã điều chỉnh, có manifest nguồn, phạm vi và kiểm tra trùng/thiếu dữ liệu."],
+            ["Ví dụ", "Làm mới biểu đồ đạt mục tiêu, trung vị và thất bại; mỗi chương có kiểm tra hình thái và đường đi sau xác nhận."],
+            ["Xuất bản", "64 chương, số liệu và PDF được rebuild đồng bộ, có audit parity, kiểm tra chất lượng và kiểm tra layout."],
+        ]
+        story.append(_table(improvement_rows, [3.5 * cm, 12.0 * cm], styles))
     info_rows = [
         ["Tên sách", "Bulkowski Việt Nam - Atlas mẫu hình giá trên thị trường chứng khoán Việt Nam"],
         ["Ấn bản", f"Ấn bản {EDITION_ORDINAL}"],
