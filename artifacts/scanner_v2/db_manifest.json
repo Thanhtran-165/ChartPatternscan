@@ -1,6 +1,6 @@
 {
   "manifest_version": "db_manifest_v1",
-  "generated_at": "2026-08-16T01:09:50.710410+00:00",
+  "generated_at": "2026-08-16T03:22:25.446742+00:00",
   "purpose": "Khai báo phạm vi dữ liệu nguồn của bộ scan xuất bản (Sol HIGH-3) — mọi phát biểu về dữ liệu trong sách phải không rộng hơn manifest này",
   "database": {
     "path": "/Users/bobo/dev/market_stats_v2/market_cache/stock_ohlcv/latest.sqlite.dotb_20260815",
@@ -106,7 +106,7 @@
   ],
   "rescan_context": {
     "branch": "fix/measure-rule-sol-round2",
-    "commit_full": "0fdb9e5108bcad5470dfea41cac73baf2659913b",
+    "commit_full": "2f34c7eb9fd14f1de56cd986911bbaf2c663b215",
     "note": "dotC (16/08/2026): mọi đợt scan xuất bản chạy trên SNAPSHOT đóng băng read-only (ISS-002), không quét trên latest.sqlite sống. Commit bind FULL hash của nhánh tạo artifacts."
   }
 }
