@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-15T17:26:39.249790+00:00",
+  "generated_at": "2026-08-16T01:27:55.359425+00:00",
   "method": "Recompute độc lập từ snapshot DB giá raw (latest.sqlite.dotb_20260815, SHA trong db_manifest) — không dùng post_breakout_path.csv hay cột target_hit; cửa sổ forward theo evaluated_bars của từng event (trần measurement_registry); chương tuần (horn) resample W-FRI đúng detector; failure_5pct = MFE full < 5.0.",
   "chapters": [
     {
@@ -34,9 +34,9 @@
           "multiple": 0.5,
           "n_payload": 860,
           "n_recomputed": 860,
-          "payload_hit_rate_pct": 63.84,
+          "payload_hit_rate_pct": 64.19,
           "recomputed_hit_rate_pct": 64.19,
-          "abs_diff_pp": 0.35,
+          "abs_diff_pp": 0.0,
           "match": true
         },
         {
@@ -44,9 +44,9 @@
           "multiple": 1.0,
           "n_payload": 860,
           "n_recomputed": 860,
-          "payload_hit_rate_pct": 41.28,
+          "payload_hit_rate_pct": 41.98,
           "recomputed_hit_rate_pct": 41.98,
-          "abs_diff_pp": 0.7,
+          "abs_diff_pp": 0.0,
           "match": true
         }
       ],

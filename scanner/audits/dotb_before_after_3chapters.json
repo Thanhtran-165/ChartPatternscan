@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-15T17:18:20.371339+00:00",
+  "generated_at": "2026-08-16T01:14:59.951690+00:00",
   "purpose": "Bằng chứng đợt B: trước/sau rescan 3 chương Sol đích danh + nhóm BARR dist>110",
   "chapters": [
     {
@@ -9,12 +9,16 @@
       "raw": {
         "before": {
           "n_events": 782,
+          "n_evaluated_events": 782,
+          "n_na_no_forward_bars": 0,
           "target_hit_rate_pct": 50.77,
           "failure_5pct_rate_pct": 40.92,
           "median_target_dist_pct": 6.43
         },
         "after": {
           "n_events": 783,
+          "n_evaluated_events": 783,
+          "n_na_no_forward_bars": 0,
           "target_hit_rate_pct": 69.48,
           "failure_5pct_rate_pct": 40.74,
           "median_target_dist_pct": 3.77
@@ -23,12 +27,16 @@
       "scoped_premium_standard": {
         "before": {
           "n_events": 188,
+          "n_evaluated_events": 188,
+          "n_na_no_forward_bars": 0,
           "target_hit_rate_pct": 70.21,
           "failure_5pct_rate_pct": 20.74,
           "median_target_dist_pct": 7.04
         },
         "after": {
           "n_events": 208,
+          "n_evaluated_events": 208,
+          "n_na_no_forward_bars": 0,
           "target_hit_rate_pct": 84.62,
           "failure_5pct_rate_pct": 22.6,
           "median_target_dist_pct": 4.42
@@ -42,26 +50,34 @@
       "raw": {
         "before": {
           "n_events": 2116,
+          "n_evaluated_events": 2116,
+          "n_na_no_forward_bars": 0,
           "target_hit_rate_pct": 57.37,
           "failure_5pct_rate_pct": 12.29,
           "median_target_dist_pct": 18.59
         },
         "after": {
           "n_events": 1447,
-          "target_hit_rate_pct": 41.05,
-          "failure_5pct_rate_pct": 13.61,
+          "n_evaluated_events": 1445,
+          "n_na_no_forward_bars": 2,
+          "target_hit_rate_pct": 41.11,
+          "failure_5pct_rate_pct": 13.49,
           "median_target_dist_pct": 28.69
         }
       },
       "scoped_premium_standard": {
         "before": {
           "n_events": 1189,
+          "n_evaluated_events": 1189,
+          "n_na_no_forward_bars": 0,
           "target_hit_rate_pct": 56.01,
           "failure_5pct_rate_pct": 11.27,
           "median_target_dist_pct": 18.92
         },
         "after": {
           "n_events": 860,
+          "n_evaluated_events": 860,
+          "n_na_no_forward_bars": 0,
           "target_hit_rate_pct": 41.98,
           "failure_5pct_rate_pct": 11.16,
           "median_target_dist_pct": 28.02
@@ -75,12 +91,16 @@
       "raw": {
         "before": {
           "n_events": 14282,
+          "n_evaluated_events": 14282,
+          "n_na_no_forward_bars": 0,
           "target_hit_rate_pct": 59.0,
           "failure_5pct_rate_pct": 61.74,
           "median_target_dist_pct": 2.38
         },
         "after": {
           "n_events": 14282,
+          "n_evaluated_events": 14281,
+          "n_na_no_forward_bars": 1,
           "target_hit_rate_pct": 58.98,
           "failure_5pct_rate_pct": 61.73,
           "median_target_dist_pct": 2.38
@@ -89,12 +109,16 @@
       "scoped_premium_standard": {
         "before": {
           "n_events": 4442,
+          "n_evaluated_events": 4442,
+          "n_na_no_forward_bars": 0,
           "target_hit_rate_pct": 69.18,
           "failure_5pct_rate_pct": 56.33,
           "median_target_dist_pct": 2.09
         },
         "after": {
           "n_events": 4446,
+          "n_evaluated_events": 4446,
+          "n_na_no_forward_bars": 0,
           "target_hit_rate_pct": 69.14,
           "failure_5pct_rate_pct": 56.34,
           "median_target_dist_pct": 2.09
@@ -110,8 +134,8 @@
     "excluded_tier_distribution": {},
     "excluded_dist_pct_min": null,
     "excluded_dist_pct_max": null,
-    "hit_rate_all_pct": 41.05,
-    "hit_rate_kept_pct": 41.05,
+    "hit_rate_all_pct": 41.11,
+    "hit_rate_kept_pct": 41.11,
     "hit_rate_impact_pp": 0.0,
     "note": "Nhóm dist>110 bị cổng publication loại theo quyết định đợt A2 (target quá xa so khoảng cách đo sách). Ngoài ra events không vào được chuỗi neo pivot lead-in đã bị detector loại TRƯỚC khi ghi events.csv — xem scanner/audits/barr_old_high_audit.json."
   }

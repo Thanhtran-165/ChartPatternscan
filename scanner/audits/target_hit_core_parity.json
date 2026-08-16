@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-15T21:44:59.780373+00:00",
+  "generated_at": "2026-08-16T01:12:48.899506+00:00",
   "artifacts_dir": "/Users/bobo/Library/Mobile Documents/com~apple~CloudDocs/main sonet/Nghiên cứu mô hình nến/artifacts/scanner_v2",
   "published_only": true,
   "pairs_scanned": 57,
@@ -11,293 +11,717 @@
   "skipped_blank_hit": 0,
   "skipped_missing_fields": 0,
   "skipped_unknown_horizon": 0,
+  "skip_outcome_violations": 0,
+  "skip_outcome_policy": "dotC Sol round-2 option a: event không đánh giá được (no_path/thiếu giá) phải có outcome RỖNG (target_hit/failure_5pct/target_first_before_adverse_5pct = None). Skip mà outcome có giá trị → FAIL.",
+  "population": {
+    "total_events": 164016,
+    "compared": 163977,
+    "skipped_total": 39,
+    "skipped_by_reason": {
+      "no_path": 39,
+      "blank_hit_na_no_forward_bars": 0,
+      "missing_fields": 0,
+      "unknown_horizon": 0
+    },
+    "skip_accounting": "population đầy đủ = compared + skipped_total; từng event skip được liệt kê ở skip_details (kèm evaluated_bars và trạng thái outcome)"
+  },
+  "skip_details": [
+    {
+      "dir": "broadening_family/broadening_bottoms/db_active",
+      "event_id": "broadening_bottoms:000580",
+      "symbol": "SHG",
+      "breakout_date": "2026-05-22",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "broadening_family/broadening_formations_right_angled_ascending/db_active",
+      "event_id": "broadening_formations_right_angled_ascending:000756",
+      "symbol": "EVS",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "broadening_family/broadening_formations_right_angled_ascending/db_active",
+      "event_id": "broadening_formations_right_angled_ascending:002567",
+      "symbol": "TOT",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "broadening_family/broadening_wedges_ascending/db_active",
+      "event_id": "broadening_wedges_ascending:001870",
+      "symbol": "DBM",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "broadening_family/broadening_wedges_ascending/db_active",
+      "event_id": "broadening_wedges_ascending:006477",
+      "symbol": "PVL",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "broadening_family/broadening_wedges_ascending/db_active",
+      "event_id": "broadening_wedges_ascending:009846",
+      "symbol": "VPR",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "broadening_family/broadening_wedges_descending/db_active",
+      "event_id": "broadening_wedges_descending:002949",
+      "symbol": "HKB",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "broadening_family/broadening_wedges_descending/db_active",
+      "event_id": "broadening_wedges_descending:003203",
+      "symbol": "HTL",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "broadening_family/broadening_wedges_descending/db_active",
+      "event_id": "broadening_wedges_descending:006158",
+      "symbol": "SDG",
+      "breakout_date": "2026-06-26",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "broadening_family/broadening_wedges_descending/db_active",
+      "event_id": "broadening_wedges_descending:007279",
+      "symbol": "TMS",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "broadening_family/broadening_wedges_descending/db_active",
+      "event_id": "broadening_wedges_descending:007996",
+      "symbol": "VET",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "bump_and_run_family/bump_and_run_reversal_bottoms/db_active",
+      "event_id": "bump_and_run_reversal_bottoms:000345",
+      "symbol": "DXG",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "bump_and_run_family/bump_and_run_reversal_bottoms/db_active",
+      "event_id": "bump_and_run_reversal_bottoms:000505",
+      "symbol": "HSV",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "cup_with_handle_family/cup_with_handle/db_active",
+      "event_id": "cup_with_handle:001233",
+      "symbol": "DNA",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "cup_with_handle_family/cup_with_handle_inverted/db_active",
+      "event_id": "cup_with_handle_inverted:001009",
+      "symbol": "CMW",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "cup_with_handle_family/cup_with_handle_inverted/db_active",
+      "event_id": "cup_with_handle_inverted:004360",
+      "symbol": "PWA",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "cup_with_handle_family/cup_with_handle_inverted/db_active",
+      "event_id": "cup_with_handle_inverted:006526",
+      "symbol": "VPR",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "dead_cat_bounce_family/dead_cat_bounce/db_active",
+      "event_id": "dead_cat_bounce:003344",
+      "symbol": "IN4",
+      "breakout_date": "2026-01-19",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "dead_cat_bounce_family/dead_cat_bounce/db_active",
+      "event_id": "dead_cat_bounce:007021",
+      "symbol": "TSD",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "dead_cat_bounce_family/dead_cat_bounce_inverted/db_active",
+      "event_id": "dead_cat_bounce_inverted:009560",
+      "symbol": "THU",
+      "breakout_date": "2026-06-12",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "harami_family/harami/db_active",
+      "event_id": "harami:004087",
+      "symbol": "DSH",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "horn_family/horn_bottoms/db_active",
+      "event_id": "horn_bottoms:001376",
+      "symbol": "PSP",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "horn_family/horn_bottoms/db_active",
+      "event_id": "horn_bottoms:001742",
+      "symbol": "SVN",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "horn_family/horn_bottoms/db_active",
+      "event_id": "horn_bottoms:001824",
+      "symbol": "TLP",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "horn_family/horn_tops/db_active",
+      "event_id": "horn_tops:001962",
+      "symbol": "VDG",
+      "breakout_date": "2026-06-26",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "inside_day_family/inside_day/db_active",
+      "event_id": "inside_day:009768",
+      "symbol": "SBD",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "island_family/island_reversals/db_active",
+      "event_id": "islands:HC1:1639:1648:island_bottom",
+      "symbol": "HC1",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "island_family/islands_long/db_active",
+      "event_id": "islands:PVL:3229:3269:island_top",
+      "symbol": "PVL",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "pipe_family/pipe_bottoms/db_active",
+      "event_id": "pipe_bottoms:000060",
+      "symbol": "APH",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "pipe_family/pipe_tops/db_active",
+      "event_id": "pipe_tops:000633",
+      "symbol": "HTC",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "pipe_family/pipe_tops/db_active",
+      "event_id": "pipe_tops:001513",
+      "symbol": "TOT",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "rectangle_family/rectangle_bottoms/db_active",
+      "event_id": "rectangle_bottoms:002366",
+      "symbol": "PDN",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "rectangle_family/rectangle_tops/db_active",
+      "event_id": "rectangle_tops:002395",
+      "symbol": "NTP",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "rectangle_family/rectangle_tops/db_active",
+      "event_id": "rectangle_tops:004485",
+      "symbol": "XPH",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "rounding_family/rounding_bottoms/db_active",
+      "event_id": "rounding_bottoms:000316",
+      "symbol": "PMJ",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "rounding_family/rounding_tops/db_active",
+      "event_id": "rounding_tops:000155",
+      "symbol": "SBA",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "symmetrical_triangles_db_source_parity/db_active",
+      "event_id": "triangles_symmetrical:000686",
+      "symbol": "CTS",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "symmetrical_triangles_db_source_parity/db_active",
+      "event_id": "triangles_symmetrical:001496",
+      "symbol": "HPX",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    },
+    {
+      "dir": "symmetrical_triangles_db_source_parity/db_active",
+      "event_id": "triangles_symmetrical:002146",
+      "symbol": "MSN",
+      "breakout_date": "2026-08-14",
+      "evaluated_bars": "0",
+      "reason": "no_path",
+      "outcome_columns_filled": []
+    }
+  ],
   "gate": "PASS",
   "sample_mismatches": [],
   "per_dir": {
     "ascending_triangles_db_source_parity/db_active": {
       "events": 1808,
       "compared": 1808,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "bear_flags_db_source_parity/db_active": {
       "events": 132,
       "compared": 132,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "broadening_family/broadening_bottoms/db_active": {
       "events": 817,
       "compared": 816,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 1
     },
     "broadening_family/broadening_formations_right_angled_ascending/db_active": {
       "events": 3044,
       "compared": 3042,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 2
     },
     "broadening_family/broadening_formations_right_angled_descending/db_active": {
       "events": 2448,
       "compared": 2448,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "broadening_family/broadening_tops/db_active": {
       "events": 1131,
       "compared": 1131,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "broadening_family/broadening_wedges_ascending/db_active": {
       "events": 10190,
       "compared": 10187,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 3
     },
     "broadening_family/broadening_wedges_descending/db_active": {
       "events": 8833,
       "compared": 8828,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 5
     },
     "bull_flags_db_source_parity/db_active": {
       "events": 179,
       "compared": 179,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "bump_and_run_family/bump_and_run_reversal_bottoms/db_active": {
       "events": 1447,
       "compared": 1445,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 2
     },
     "bump_and_run_family/bump_and_run_reversal_tops/db_active": {
       "events": 1819,
       "compared": 1819,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "cup_with_handle_family/cup_with_handle/db_active": {
       "events": 5945,
       "compared": 5944,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 1
     },
     "cup_with_handle_family/cup_with_handle_inverted/db_active": {
       "events": 6773,
       "compared": 6770,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 3
     },
     "dead_cat_bounce_family/dead_cat_bounce/db_active": {
       "events": 8336,
       "compared": 8334,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 2
     },
     "dead_cat_bounce_family/dead_cat_bounce_inverted/db_active": {
       "events": 11845,
       "compared": 11844,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 1
     },
     "descending_triangles_db_source_parity/db_active": {
       "events": 1902,
       "compared": 1902,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "diamond_family/diamond_bottoms/db_active": {
       "events": 59,
       "compared": 59,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "diamond_family/diamond_tops/db_active": {
       "events": 68,
       "compared": 68,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "double_pattern_family/double_bottoms/db_active": {
       "events": 1146,
       "compared": 1146,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "double_pattern_family/double_tops/db_active": {
       "events": 783,
       "compared": 783,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "gap_family/area_gaps/db_active": {
       "events": 7902,
       "compared": 7902,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "gap_family/breakaway_gaps/db_active": {
       "events": 2563,
       "compared": 2563,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "gap_family/continuation_gaps/db_active": {
       "events": 1769,
       "compared": 1769,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "gap_family/exhaustion_gaps/db_active": {
       "events": 2671,
       "compared": 2671,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "harami_family/harami/db_active": {
       "events": 17051,
       "compared": 17050,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 1
     },
     "head_shoulders_family/head_and_shoulders_bottoms/db_active": {
       "events": 30,
       "compared": 30,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "head_shoulders_family/head_and_shoulders_bottoms_complex/db_active": {
       "events": 104,
       "compared": 104,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "head_shoulders_family/head_and_shoulders_tops/db_active": {
       "events": 12,
       "compared": 12,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "head_shoulders_family/head_and_shoulders_tops_complex/db_active": {
       "events": 184,
       "compared": 184,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "high_tight_flags": {
       "events": 1428,
       "compared": 1428,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "horn_family/horn_bottoms/db_active": {
       "events": 2226,
       "compared": 2223,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 3
     },
     "horn_family/horn_tops/db_active": {
       "events": 2189,
       "compared": 2188,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 1
     },
     "inside_day_family/inside_day/db_active": {
       "events": 14282,
       "compared": 14281,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 1
     },
     "island_family/island_reversals/db_active": {
       "events": 3831,
       "compared": 3830,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 1
     },
     "island_family/islands_long/db_active": {
       "events": 12170,
       "compared": 12169,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 1
     },
     "measured_move_family/measured_move_down/db_active": {
       "events": 564,
       "compared": 564,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "measured_move_family/measured_move_up/db_active": {
       "events": 426,
       "compared": 426,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "pennants": {
       "events": 553,
       "compared": 553,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "pipe_family/pipe_bottoms/db_active": {
       "events": 1588,
       "compared": 1587,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 1
     },
     "pipe_family/pipe_tops/db_active": {
       "events": 1813,
       "compared": 1811,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 2
     },
     "rectangle_family/rectangle_bottoms/db_active": {
       "events": 4208,
       "compared": 4207,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 1
     },
     "rectangle_family/rectangle_tops/db_active": {
       "events": 4494,
       "compared": 4492,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 2
     },
     "rounding_family/rounding_bottoms/db_active": {
       "events": 546,
       "compared": 545,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 1
     },
     "rounding_family/rounding_tops/db_active": {
       "events": 246,
       "compared": 245,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 1
     },
     "scallop_family/scallops_ascending/db_active": {
       "events": 920,
       "compared": 920,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "scallop_family/scallops_ascending_inverted/db_active": {
       "events": 829,
       "compared": 829,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "scallop_family/scallops_descending/db_active": {
       "events": 1134,
       "compared": 1134,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "scallop_family/scallops_descending_inverted/db_active": {
       "events": 447,
       "compared": 447,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "symmetrical_triangles_db_source_parity/db_active": {
       "events": 4219,
       "compared": 4216,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 3
     },
     "three_methods_family/falling_three_methods/db_active": {
       "events": 231,
       "compared": 231,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "three_methods_family/rising_three_methods/db_active": {
       "events": 476,
       "compared": 476,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "three_peaks_valleys_family/three_falling_peaks/db_active": {
       "events": 494,
       "compared": 494,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "three_peaks_valleys_family/three_rising_valleys/db_active": {
       "events": 469,
       "compared": 469,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "triple_family/triple_bottoms/db_active": {
       "events": 96,
       "compared": 96,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "triple_family/triple_tops/db_active": {
       "events": 82,
       "compared": 82,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "wedge_family/falling_wedges/db_active": {
       "events": 1796,
       "compared": 1796,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     },
     "wedge_family/rising_wedges/db_active": {
       "events": 1268,
       "compared": 1268,
-      "mismatch": 0
+      "mismatch": 0,
+      "skipped": 0
     }
   }
 }
