@@ -9,7 +9,10 @@ measurement_registry), rồi:
 1. Event-level parity: target_hit / failure_5pct tính lại so với cột
    events.csv — mismatch phải = 0.
 2. Payload-level parity: hit-rate theo multiple (base + 1.0x) trên tập scoped
-   của builder so với payload JSON đã xuất bản — lệch tuyệt đối ≤ 0.01pp.
+   của builder so với payload JSON đã xuất bản — KHỚP TUYỆT ĐỐI: lệch 0.00pp,
+   chấp nhận sai số làm tròn hiển thị ≤ 0.01pp (dotC Sol round-2: bỏ ngưỡng
+   khoan dung 1.0pp của đợt B — builder giờ tính qua target_hit_core nên
+   payload/recompute phải trùng số).
 
 5 chương: double_tops, bump_and_run_reversal_bottoms, inside_day,
 area_gaps (builder mới chuyển core đợt B), horn_bottoms (core từ đợt A).
@@ -297,10 +300,10 @@ def main() -> int:
                             "payload_hit_rate_pct": payload_rate,
                             "recomputed_hit_rate_pct": my_rate,
                             "abs_diff_pp": round(abs(float(payload_rate) - my_rate), 2) if payload_rate is not None else None,
-                            # Ngưỡng 1.0pp: builder tính hit-rate từ cột events.csv (target 4dp),
-                            # recompute chạy trực tiếp trên giá raw full precision — chênh thực
-                            # nghiệm ≤ 0.75pp; lệch thật (payload đời cũ) là 9-20pp, tách bạch rõ.
-                            "match": payload_rate is not None and abs(float(payload_rate) - my_rate) <= 1.0,
+                            # dotC (Sol round-2 BLOCKER 1.4): ngưỡng exact — payload phải khớp
+                            # recompute 0.00pp (chấp nhận ≤0.01pp sai số làm tròn hiển thị 2 chữ số).
+                            # Builder đã tính qua target_hit_core cùng nguồn dữ liệu snapshot.
+                            "match": payload_rate is not None and abs(float(payload_rate) - my_rate) <= 0.01,
                         }
                     )
         results.append(
@@ -345,7 +348,7 @@ def main() -> int:
             f"| {r['pattern_id']} | {r['events_total']} | {r['compared']} | {r['event_level_mismatch_target_hit']} | "
             f"{r['event_level_mismatch_failure_5pct']} | {r['event_level_parity']} | {r['my_target_hit_rate_1x_pct']}% |"
         )
-    lines += ["", "## So khớp payload (multiple base + 1.0x; ngưỡng chấp nhận ≤ 1.0pp — builder tính từ cột csv target 4dp, recompute từ giá raw full precision)", "", "| Chương | Hàng multiple | n payload | n recompute | Payload % | Recompute % | Lệch | Kết quả |", "|---|---|---|---|---|---|---|---|"]
+    lines += ["", "## So khớp payload (multiple base + 1.0x; KHỚP TUYỆT ĐỐI — lệch 0.00pp, sai số làm tròn hiển thị tối đa 0.01pp; dotC Sol round-2 bỏ ngưỡng 1.0pp)", "", "| Chương | Hàng multiple | n payload | n recompute | Payload % | Recompute % | Lệch | Kết quả |", "|---|---|---|---|---|---|---|---|"]
     for r in results:
         for c in r["payload_level_checks"]:
             if "skip_reason" in c:

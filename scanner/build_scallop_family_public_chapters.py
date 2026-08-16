@@ -23,7 +23,7 @@ from matplotlib.patches import Rectangle
 
 from scanner.publication_flow_contract import SOURCE_GROUNDED_PUBLICATION_GATE_ID
 from scanner.publication_semantic_contract import PUBLICATION_SEMANTIC_GATE_ID
-from scanner.v2.target_hit_core import target_hit_stats  # noqa: E402
+from scanner.v2.target_hit_core import target_hit_stats, mean_rate_pct  # noqa: E402
 
 
 DEFAULT_OUT_DIR = Path("artifacts/scanner_v2/scallop_family_public_chapters")
@@ -286,7 +286,7 @@ def _metric_for_target(events: pd.DataFrame, path_df: pd.DataFrame, multiple: fl
     # scanner/v2/target_hit_core (target_price 4dp nội suy multiple + high/low path
     # full precision) — bỏ khối vector hóa mfe_pct(2dp) >= target_dist_pct(2dp) và
     # signed_excursion so threshold làm tròn (cùng bug builder island/rounding/gap).
-    hits, firsts, days = target_hit_stats(events, path_df, multiple)
+    hits, firsts, days = target_hit_stats(events, path_df, multiple, missing_as_none=True)  # dotC: N/A (chưa forward bar) loại khỏi mẫu số
     work = events.copy()
     work["mfe_pct"] = pd.to_numeric(work["mfe_pct"], errors="coerce")
     work["mae_pct"] = pd.to_numeric(work["mae_pct"], errors="coerce")
@@ -297,15 +297,17 @@ def _metric_for_target(events: pd.DataFrame, path_df: pd.DataFrame, multiple: fl
         "target_multiple": multiple,
         "target_role": role,
         "target_label": f"{multiple:g}x",
-        "target_hit_rate": round(float(np.mean(hits) * 100.0), 2),
-        "target_first_before_adverse_5pct_rate": round(float(np.mean(firsts) * 100.0), 2),
-        "failure_5pct_rate": round(float(fail.mean() * 100.0), 2),
+        "target_hit_rate": mean_rate_pct(hits, missing_as_none=True),
+        "target_first_before_adverse_5pct_rate": mean_rate_pct(firsts, missing_as_none=True),
+        "failure_5pct_rate": (round(float(sum(1 for v, h in zip(fail, hits) if h is not None and bool(v)) / max(sum(1 for h in hits if h is not None), 1) * 100.0), 2) if any(h is not None for h in hits) else None),
         "median_mfe_pct": round(float(work["mfe_pct"].median()), 2),
         "median_mae_pct": round(float(work["mae_pct"].median()), 2),
         "mfe_mae_median_ratio": round(ratio, 2) if math.isfinite(ratio) else None,
         "median_target_dist_pct": round(float(pd.to_numeric(work["target_dist_pct"], errors="coerce").median() * multiple), 2),
         "median_days_to_target": round(float(hit_days.median()), 1) if not hit_days.empty else None,
-        "n": int(len(work)),
+        "n": int(sum(1 for h in hits if h is not None)),
+        "n_scoped": int(len(work)),
+        "n_excluded_no_forward_bars": int(len(work) - sum(1 for h in hits if h is not None)),
     }
 
 

@@ -31,6 +31,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scanner.run_bear_flag_db_source_parity_audit import DEFAULT_DB  # noqa: E402
+from scanner.v2.target_hit_core import target_hit_stats  # noqa: E402
 
 
 DEFAULT_EVENTS = Path("artifacts/scanner_v2/ascending_triangles_db_source_parity/db_active/events.csv")
@@ -175,39 +176,33 @@ def _load_path(path: Path) -> pd.DataFrame:
 
 
 def _target_path_flags(events: pd.DataFrame, path: pd.DataFrame, *, target_multiple: float, horizon: int = 120) -> pd.DataFrame:
+    """Hit band theo multiple — dotC (16/08/2026, Sol round-2 BLOCKER 1).
+
+    Trước đây: vòng lặp `signed_high_excursion_pct(2dp) >= target_dist_pct(2dp)
+    × multiple`, cắt path cứng horizon=120 — 2 lỗi: (a) 2 lớp làm tròn như bug
+    BARR; (b) horizon 120 ≠ cửa sổ detector (registry triangles 124-185, wedges
+    116) → band tính trên cửa sổ khác events.csv.
+
+    Giờ: HÀM CHUẨN scanner.v2.target_hit_core.target_hit_stats — target nội suy
+    từ breakout_price/target_price 4dp so high/low path full precision, cắt
+    đúng evaluated_bars từng event; missing_as_none=True (Sol option a) — event
+    chưa có forward bar bị LOẠI khỏi mẫu số (fillna False chỉ để giữ shape dòng
+    cho merge, các tỉ lệ tính sau đã lọc None).
+    """
     if events.empty:
         return pd.DataFrame(columns=["event_id", "target_hit_band", "target_first_band", "days_to_target_band"])
-    target_dist = events[["event_id", "target_dist_pct"]].copy()
-    target_dist["target_threshold_pct"] = pd.to_numeric(target_dist["target_dist_pct"], errors="coerce") * float(target_multiple)
-    working = path[path["bar_after_breakout"].between(1, int(horizon), inclusive="both")].merge(target_dist, on="event_id", how="inner")
-    rows: List[Dict[str, Any]] = []
-    for event_id, group in working.groupby("event_id", sort=False):
-        threshold = pd.to_numeric(group["target_threshold_pct"], errors="coerce").dropna()
-        if threshold.empty:
-            continue
-        target_level = float(threshold.iloc[0])
-        days_to_target: Optional[int] = None
-        days_to_adverse: Optional[int] = None
-        for row in group.sort_values("bar_after_breakout").itertuples(index=False):
-            bar = int(getattr(row, "bar_after_breakout"))
-            high_exc = float(getattr(row, "signed_high_excursion_pct"))
-            low_exc = float(getattr(row, "signed_low_excursion_pct"))
-            if days_to_target is None and high_exc >= target_level:
-                days_to_target = bar
-            if days_to_adverse is None and low_exc <= -5.0:
-                days_to_adverse = bar
-        target_hit = days_to_target is not None
-        target_first = bool(target_hit and (days_to_adverse is None or int(days_to_target) < int(days_to_adverse)))
-        rows.append(
-            {
-                "event_id": event_id,
-                "target_hit_band": bool(target_hit),
-                "target_first_band": target_first,
-                "days_to_target_band": int(days_to_target) if days_to_target is not None else None,
-            }
-        )
-    flags = pd.DataFrame(rows)
-    return events[["event_id"]].merge(flags, on="event_id", how="left").fillna({"target_hit_band": False, "target_first_band": False})
+    hits, firsts, days = target_hit_stats(events, path, target_multiple, missing_as_none=True)
+    flags = pd.DataFrame(
+        {
+            "event_id": events["event_id"].astype(str).values,
+            "target_hit_band": [bool(h) if h is not None else False for h in hits],
+            "target_first_band": [bool(f) if f is not None else False for f in firsts],
+            "days_to_target_band": [int(d) if d is not None else None for d in days],
+            "_evaluated": [h is not None for h in hits],
+        }
+    )
+    # N/A (None) không vào mẫu số: đánh dấu _evaluated=False và cho rates lọc sau.
+    return events[["event_id"]].astype({"event_id": str}).merge(flags, on="event_id", how="left")
 
 
 def _target_role(target_multiple: float) -> str:
@@ -224,10 +219,16 @@ def _metrics(events: pd.DataFrame, path: pd.DataFrame, *, target_multiple: float
     events = events.copy()
     flags = _target_path_flags(events, path, target_multiple=target_multiple)
     events = events.merge(flags, on="event_id", how="left")
+    # dotC (Sol option a): N/A (chưa có forward bar) — _evaluated=False — bị LOẠI
+    # khỏi mẫu số mọi tỉ lệ; n báo số event vào mẫu số.
+    if "_evaluated" in events.columns:
+        events = events[events["_evaluated"].fillna(False).astype(bool)]
     n = int(len(events))
     hit = int(events["target_hit_band"].fillna(False).sum()) if "target_hit_band" in events.columns else 0
     first = int(events["target_first_band"].fillna(False).sum()) if "target_first_band" in events.columns else 0
-    failure = int(events.get("failure_5pct", pd.Series(False, index=events.index)).fillna(False).sum())
+    failure_series = events.get("failure_5pct", pd.Series(False, index=events.index))
+    failure = int(failure_series.dropna().fillna(False).sum())
+    failure_n = int(failure_series.dropna().shape[0])
     med_mfe = _median(events.get("mfe_pct", []))
     med_mae = _median(events.get("mae_pct", []))
     return {
@@ -239,7 +240,7 @@ def _metrics(events: pd.DataFrame, path: pd.DataFrame, *, target_multiple: float
         "target_hit_wilson": _wilson_interval(hit, n),
         "target_first_before_adverse_5pct_rate_pct": _pct(first, n),
         "target_first_wilson": _wilson_interval(first, n),
-        "failure_5pct_rate_pct": _pct(failure, n),
+        "failure_5pct_rate_pct": _pct(failure, failure_n),
         "median_mfe_pct": med_mfe,
         "median_mae_pct": med_mae,
         "mfe_mae_median_ratio": round(float(med_mfe) / max(float(med_mae), 1.0), 2) if med_mfe is not None and med_mae is not None else None,
@@ -492,6 +493,9 @@ def _precision_rows(events: pd.DataFrame, path: pd.DataFrame, *, seed: int) -> L
         row = _metrics(subset, path, target_multiple=0.5, row_id=scope)
         flags = _target_path_flags(subset, path, target_multiple=0.5)
         prepared = subset.merge(flags, on="event_id", how="left")
+        # dotC (Sol option a): cluster bootstrap cũng loại N/A khỏi mẫu số.
+        if "_evaluated" in prepared.columns:
+            prepared = prepared[prepared["_evaluated"].fillna(False).astype(bool)]
         row.update(
             {
                 "scope": scope,

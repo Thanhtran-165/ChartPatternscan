@@ -18,7 +18,7 @@ from typing import Any, Mapping
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from scanner.v2.target_hit_core import enrich_events_with_target_hit, target_hit_stats  # noqa: E402
+from scanner.v2.target_hit_core import enrich_events_with_target_hit, target_hit_stats, mean_rate_pct  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -114,7 +114,7 @@ def _metric_for_target(events: pd.DataFrame, path_df: pd.DataFrame, multiple: fl
     # full precision scanner/v2/target_hit_core (target_price 4dp nội suy multiple
     # + high/low path full precision) — bỏ tái lập từ target_dist_pct làm tròn 2dp
     # (bug: rounding luôn làm khoảng cách lớn hơn → Inside Day 66,68% vs raw 69,18%).
-    hits, firsts, days = target_hit_stats(events, path_df, multiple)
+    hits, firsts, days = target_hit_stats(events, path_df, multiple, missing_as_none=True)  # dotC: N/A (chưa forward bar) loại khỏi mẫu số
     mfe = pd.to_numeric(events.get("mfe_pct"), errors="coerce")
     mae = pd.to_numeric(events.get("mae_pct"), errors="coerce")
     fail = events.get("failure_5pct", pd.Series(False, index=events.index)).map(_truthy)
@@ -123,15 +123,17 @@ def _metric_for_target(events: pd.DataFrame, path_df: pd.DataFrame, multiple: fl
         "target_multiple": multiple,
         "target_role": role,
         "target_label": f"{multiple}x",
-        "target_hit_rate": round(float(np.mean(hits) * 100.0), 2),
-        "target_first_before_adverse_5pct_rate": round(float(np.mean(firsts) * 100.0), 2),
-        "failure_5pct_rate": round(float(fail.mean() * 100.0), 2),
+        "target_hit_rate": mean_rate_pct(hits, missing_as_none=True),
+        "target_first_before_adverse_5pct_rate": mean_rate_pct(firsts, missing_as_none=True),
+        "failure_5pct_rate": (round(float(sum(1 for v, h in zip(fail, hits) if h is not None and bool(v)) / max(sum(1 for h in hits if h is not None), 1) * 100.0), 2) if any(h is not None for h in hits) else None),
         "median_mfe_pct": round(float(mfe.median()), 2) if not mfe.dropna().empty else None,
         "median_mae_pct": round(float(mae.median()), 2) if not mae.dropna().empty else None,
         "mfe_mae_median_ratio": round(float(mfe.median() / max(mae.median(), 1.0)), 2) if not mfe.dropna().empty and not mae.dropna().empty else None,
         "median_target_dist_pct": round(float(target_dist.median() * multiple), 2) if not target_dist.dropna().empty else None,
         "median_days_to_target": round(float(pd.Series(days).dropna().median()), 2) if pd.Series(days).dropna().size else None,
-        "n": int(len(events)),
+        "n": int(sum(1 for h in hits if h is not None)),
+        "n_scoped": int(len(events)),
+        "n_excluded_no_forward_bars": int(len(events) - sum(1 for h in hits if h is not None)),
     }
 
 

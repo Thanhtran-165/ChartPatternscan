@@ -13,7 +13,14 @@ core) rồi so với cột `target_hit` trong events.csv. Event thiếu path ho�
 giá được đếm riêng (skipped) — KHÔNG tính mismatch vì events.csv của chúng cũng
 rỗng/None theo cùng quy ước.
 
-Exit code 0 khi mismatch == 0; 1 khi có mismatch (gate FAIL).
+dotC (16/08/2026, Sol round-2 BLOCKER 2 option a): event bị skip mà outcome
+KHÔNG rỗng (target_hit/failure_5pct/target_first_before_adverse_5pct có giá
+trị) là VI PHẠM chính sách N/A → gate FAIL (skip_outcome_violations). Báo cáo
+population đầy đủ: compared + skipped theo từng loại, kèm skip_details từng
+event (symbol, breakout_date, evaluated_bars, trạng thái outcome).
+
+Exit code 0 khi mismatch == 0 VÀ skip_outcome_violations == 0; 1 khi có
+mismatch hoặc violation (gate FAIL).
 Kết quả chi tiết ghi JSON (mặc định scanner/audits/target_hit_core_parity.json).
 
 Chạy:  python3 scanner/audit_target_hit_core_parity.py \
@@ -136,6 +143,37 @@ def run_parity_check(artifacts_dir: Path, published_only: bool = False) -> dict:
     mismatch_reasons: dict[str, int] = {}
     samples: list[dict] = []
     per_dir: dict[str, dict] = {}
+    # dotC (16/08/2026, Sol round-2 BLOCKER 2 option a): event bị skip khỏi so
+    # sánh (no_path / thiếu giá) mà outcome KHÔNG rỗng (target_hit/failure_5pct/
+    # target_first có giá trị) → VI PHẠM chính sách N/A → gate FAIL. Event chưa
+    # có phiên nào sau breakout phải để outcome rỗng, không được gán False/True.
+    skip_outcome_violations = 0
+    skip_details: list[dict] = []
+
+    def _outcome_nonblank(event: pd.Series) -> list[str]:
+        filled = []
+        for col in ("target_hit", "failure_5pct", "target_first_before_adverse_5pct"):
+            val = event.get(col)
+            if val is not None and not pd.isna(val) and str(val).strip() != "":
+                filled.append(col)
+        return filled
+
+    def _record_skip(event: pd.Series, reason: str, rel: str, key_col: str | None) -> None:
+        nonlocal skip_outcome_violations
+        filled = _outcome_nonblank(event)
+        entry = {
+            "dir": rel,
+            "event_id": str(event.get(key_col)) if key_col else "",
+            "symbol": str(event.get("symbol")),
+            "breakout_date": str(event.get("breakout_date")),
+            "evaluated_bars": (None if pd.isna(event.get("evaluated_bars")) else str(event.get("evaluated_bars"))),
+            "reason": reason,
+            "outcome_columns_filled": filled,
+        }
+        if len(skip_details) <= 200:
+            skip_details.append(entry)
+        if filled:
+            skip_outcome_violations += 1
 
     for events_path, path_csv in pairs:
         rel = str(events_path.parent.relative_to(artifacts_dir))
@@ -146,7 +184,7 @@ def run_parity_check(artifacts_dir: Path, published_only: bool = False) -> dict:
             for event_id, group in path_df.groupby("event_id"):
                 grouped[str(event_id)] = group.sort_values("bar_after_breakout")
         key_col = "event_id" if "event_id" in events.columns else ("detection_id" if "detection_id" in events.columns else None)
-        dir_stat = {"events": 0, "compared": 0, "mismatch": 0}
+        dir_stat = {"events": 0, "compared": 0, "mismatch": 0, "skipped": 0}
         for _, event in events.iterrows():
             total_events += 1
             dir_stat["events"] += 1
@@ -154,19 +192,27 @@ def run_parity_check(artifacts_dir: Path, published_only: bool = False) -> dict:
             raw_hit = event.get("target_hit")
             if pd.isna(bp) or pd.isna(tp):
                 skipped_missing_fields += 1
+                dir_stat["skipped"] += 1
+                _record_skip(event, "missing_fields", rel, key_col)
                 continue
             group = grouped.get(str(event.get(key_col))) if key_col else None
             if group is None or group.empty:
                 skipped_no_path += 1
+                dir_stat["skipped"] += 1
+                _record_skip(event, "no_path", rel, key_col)
                 continue
             if pd.isna(raw_hit):
                 skipped_blank_hit += 1
+                dir_stat["skipped"] += 1
+                _record_skip(event, "blank_hit_na_no_forward_bars", rel, key_col)
                 continue
             horizon, horizon_src = _horizon_of(event, group, pattern_key=key_by_path.get(events_path.resolve()))
             bars = pd.to_numeric(group["bar_after_breakout"], errors="coerce")
             window = group[bars <= horizon]
             if window.empty:
                 skipped_unknown_horizon += 1
+                dir_stat["skipped"] += 1
+                _record_skip(event, "unknown_horizon", rel, key_col)
                 continue
             core = evaluate_target_hit(
                 pd.to_numeric(window["high"], errors="coerce").to_numpy(),
@@ -213,6 +259,18 @@ def run_parity_check(artifacts_dir: Path, published_only: bool = False) -> dict:
         if dir_stat["events"]:
             per_dir[rel] = dir_stat
 
+    population = {
+        "total_events": total_events,
+        "compared": compared,
+        "skipped_total": skipped_no_path + skipped_blank_hit + skipped_missing_fields + skipped_unknown_horizon,
+        "skipped_by_reason": {
+            "no_path": skipped_no_path,
+            "blank_hit_na_no_forward_bars": skipped_blank_hit,
+            "missing_fields": skipped_missing_fields,
+            "unknown_horizon": skipped_unknown_horizon,
+        },
+        "skip_accounting": "population đầy đủ = compared + skipped_total; từng event skip được liệt kê ở skip_details (kèm evaluated_bars và trạng thái outcome)",
+    }
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "artifacts_dir": str(artifacts_dir),
@@ -226,7 +284,14 @@ def run_parity_check(artifacts_dir: Path, published_only: bool = False) -> dict:
         "skipped_blank_hit": skipped_blank_hit,
         "skipped_missing_fields": skipped_missing_fields,
         "skipped_unknown_horizon": skipped_unknown_horizon,
-        "gate": "PASS" if mismatch == 0 else "FAIL",
+        "skip_outcome_violations": skip_outcome_violations,
+        "skip_outcome_policy": (
+            "dotC Sol round-2 option a: event không đánh giá được (no_path/thiếu giá) phải có outcome RỖNG "
+            "(target_hit/failure_5pct/target_first_before_adverse_5pct = None). Skip mà outcome có giá trị → FAIL."
+        ),
+        "population": population,
+        "skip_details": skip_details,
+        "gate": "PASS" if (mismatch == 0 and skip_outcome_violations == 0) else "FAIL",
         "sample_mismatches": samples,
         "per_dir": per_dir,
     }
@@ -249,15 +314,19 @@ def main(argv: list[str] | None = None) -> int:
     out.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
 
     print(f"[parity] scanned {summary['pairs_scanned']} cặp events+path · {summary['total_events']} events")
-    print(f"[parity] compared={summary['compared']} · mismatch={summary['mismatch']} "
-          f"(skip: no_path={summary['skipped_no_path']}, blank_hit={summary['skipped_blank_hit']}, "
-          f"missing_fields={summary['skipped_missing_fields']}, unknown_horizon={summary['skipped_unknown_horizon']})")
-    if summary["mismatch"]:
-        print(f"[parity] GATE FAIL — {summary['mismatch']} event lệch. Chi tiết: {out}")
+    print(f"[parity] population: compared={summary['compared']} + skipped={summary['population']['skipped_total']} "
+          f"= {summary['compared'] + summary['population']['skipped_total']} (no_path={summary['skipped_no_path']}, "
+          f"blank_hit_N/A={summary['skipped_blank_hit']}, missing_fields={summary['skipped_missing_fields']}, "
+          f"unknown_horizon={summary['skipped_unknown_horizon']})")
+    print(f"[parity] mismatch={summary['mismatch']} · skip_mang_outcome={summary['skip_outcome_violations']} (police N/A option a)")
+    if summary["mismatch"] or summary["skip_outcome_violations"]:
+        print(f"[parity] GATE FAIL — {summary['mismatch']} event lệch · {summary['skip_outcome_violations']} skip mang outcome. Chi tiết: {out}")
         for s in summary["sample_mismatches"][:10]:
             print(f"  {s['dir']} · {s['symbol']} · event {s['event_id']}: csv={s['csv_target_hit']} core={s['core_target_hit']}")
+        for s in [d for d in summary["skip_details"] if d["outcome_columns_filled"]][:10]:
+            print(f"  [skip-outcome] {s['dir']} · {s['symbol']} · {s['breakout_date']} · {s['reason']} · filled={s['outcome_columns_filled']}")
         return 1
-    print(f"[parity] GATE PASS — mismatch = 0. Chi tiết: {out}")
+    print(f"[parity] GATE PASS — mismatch = 0, không có skip mang outcome. Chi tiết: {out}")
     return 0
 
 

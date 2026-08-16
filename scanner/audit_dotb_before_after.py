@@ -46,15 +46,26 @@ def _truthy(s: pd.Series) -> pd.Series:
     return s.astype(str).str.strip().str.lower().isin(["true", "1", "1.0", "yes"])
 
 
+def _evaluated(series: pd.Series) -> pd.Series:
+    """dotC (Sol round-2 option a): mask dòng outcome CÓ giá trị — dòng rỗng
+    (N/A, chưa có forward bar sau breakout) bị loại khỏi mẫu số mọi tỉ lệ."""
+    raw = series.dropna()
+    return raw[~raw.astype(str).str.strip().isin(["", "None", "nan"])]
+
+
 def _stats(df: pd.DataFrame) -> dict:
     n = int(len(df))
-    hit = _truthy(df.get("target_hit", pd.Series(False, index=df.index)))
-    fail = _truthy(df.get("failure_5pct", pd.Series(False, index=df.index)))
+    hit_eval = _evaluated(df.get("target_hit", pd.Series(dtype=object)))
+    fail_eval = _evaluated(df.get("failure_5pct", pd.Series(dtype=object)))
+    hit = _truthy(hit_eval)
+    fail = _truthy(fail_eval)
     dist = pd.to_numeric(df.get("target_dist_pct"), errors="coerce")
     return {
         "n_events": n,
-        "target_hit_rate_pct": round(float(hit.mean() * 100.0), 2) if n else None,
-        "failure_5pct_rate_pct": round(float(fail.mean() * 100.0), 2) if n else None,
+        "n_evaluated_events": int(len(hit_eval)),
+        "n_na_no_forward_bars": int(n - len(hit_eval)),
+        "target_hit_rate_pct": round(float(hit.mean() * 100.0), 2) if len(hit_eval) else None,
+        "failure_5pct_rate_pct": round(float(fail.mean() * 100.0), 2) if len(fail_eval) else None,
         "median_target_dist_pct": round(float(dist.median()), 2) if dist.notna().any() else None,
     }
 
@@ -109,8 +120,9 @@ def _barr_block() -> dict:
         if "publication_quality_tier" in excluded.columns
         else {}
     )
-    hit_kept = _truthy(kept.get("target_hit", pd.Series(False, index=kept.index)))
-    hit_all = _truthy(df.get("target_hit", pd.Series(False, index=df.index)))
+    # dotC (option a): tỉ lệ hit tính trên nhóm outcome CÓ giá trị (loại N/A).
+    hit_kept = _truthy(_evaluated(kept.get("target_hit", pd.Series(dtype=object))))
+    hit_all = _truthy(_evaluated(df.get("target_hit", pd.Series(dtype=object))))
     return {
         "barr_bottoms_total_events": int(len(df)),
         "gate_dist_pct": BARR_GATE_PCT,
