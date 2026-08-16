@@ -109,6 +109,13 @@ FORBIDDEN_PUBLIC_TERMS = (
     "branch_id",
     "regime",
     "bucket",
+    "conservative_half_",
+    "source_full_",
+    "textbook_success",
+    "middle_case",
+    "layer missing",
+    "zero and stale",
+    "failure 5pct",
 )
 
 CANONICAL_EDITORIAL_CONTRACT = {

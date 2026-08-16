@@ -317,7 +317,7 @@ def _example_caption(
         )
     else:
         lesson = "Điểm đáng học là phải đọc hình thái cùng đường đi sau xác nhận, thay vì chỉ nhìn tên mẫu."
-    scope_note = "" if event.get("example_scope_note") is None else str(event.get("example_scope_note")).strip()
+    scope_note = "" if event.get("example_scope_note") is None else _public_term(event.get("example_scope_note"))
     if scope_note:
         lesson = f"{lesson} Phạm vi ví dụ: {scope_note}"
     # Bài học BID area_gaps (15/08, vision worker phát hiện): câu lead middle_case cố định
@@ -452,10 +452,20 @@ def _target_rows(payload: Mapping[str, Any], spec: Mapping[str, Any]) -> list[li
                 if abs(multiple - base_multiple) < 1e-9
                 else (_target_full_reading(spec) if abs(multiple - legacy_multiple) < 1e-9 else "mốc trung gian để so độ nhạy")
             )
+        public_role = role_map.get(role)
+        if not public_role:
+            if role.startswith("conservative_half"):
+                public_role = "mốc thận trọng"
+            elif role.startswith("source_full"):
+                public_role = "mốc đầy đủ"
+            elif role.startswith("local"):
+                public_role = "mốc cơ sở đã hiệu chỉnh"
+            else:
+                public_role = "mốc tham chiếu"
         rows.append(
             [
                 label,
-                role_map.get(role, row.get("target_role")),
+                public_role,
                 f"{_fmt(row.get('target_hit_rate'))}%",
                 f"{_fmt(row.get('target_first_before_adverse_5pct_rate'))}%",
                 f"{_fmt(row.get('failure_5pct_rate'))}%",
@@ -977,6 +987,24 @@ def _public_term(value: Any) -> str:
         "NO_FAMILY_PROMOTION_VARIANTS_REMAIN_STANDALONE_LIMITED": "không nâng cấp family; biến thể vẫn bị giới hạn riêng",
         "ELIGIBLE_FOR_FAMILY_PROMOTION_REVIEW": "đủ điều kiện xem xét nâng cấp cấp family",
         "STOP_NO_PROMOTION_UNDER_NO_OVERLIFT_POLICY": "dừng, không nâng hạng theo cổng không nâng quá mức",
+        "clean": "sạch",
+        "unknown": "chưa đủ dữ liệu",
+        "layer missing": "chưa có lớp kiểm tra tương ứng",
+        "textbook_success": "ví dụ đạt mục tiêu",
+        "middle_case": "ví dụ trung vị",
+        "failure": "ví dụ thất bại",
+        "conservative_half": "mốc thận trọng",
+        "source_full": "mốc đầy đủ",
+        "tradable_layer_missing": "chưa có lớp kiểm tra tương ứng",
+        "not_built_yet": "chưa xây dựng lớp này",
+        "event_source_not_mapped": "chưa có nguồn sự kiện tương ứng",
+        "textbook_success": "ví dụ đạt mục tiêu",
+        "middle_case": "ví dụ trung vị",
+        "failure": "ví dụ thất bại",
+        "zero and stale": "không có dữ liệu hợp lệ",
+        "Zero and stale": "không có dữ liệu hợp lệ",
+        "zero_and_stale": "không có dữ liệu hợp lệ",
+        "Zero_and_stale": "không có dữ liệu hợp lệ",
     }
     if text in mapping:
         return mapping[text]
@@ -1053,10 +1081,18 @@ def _public_term(value: Any) -> str:
         "Đầu phải nổi bật": "Phần đầu phải nổi bật",
         "Đáy dùng đầu thấp hơn vai; đỉnh dùng đầu cao hơn vai; các vai quá lệch bị hạ chất lượng.": "Phần đầu phải nổi bật hơn hai vai theo hướng của mẫu; các vai quá lệch bị hạ chất lượng.",
         "vượt đường cổ theo hướng mẫu": "đi qua đường cổ theo hướng mẫu",
+        "layer missing": "chưa có lớp kiểm tra tương ứng",
+        "Layer missing": "chưa có lớp kiểm tra tương ứng",
+        "tradable_layer_missing": "chưa có lớp kiểm tra tương ứng",
+        "not_built_yet": "chưa xây dựng lớp này",
+        "event_source_not_mapped": "chưa có nguồn sự kiện tương ứng",
+        "zero and stale": "không có dữ liệu hợp lệ",
+        "Zero and stale": "không có dữ liệu hợp lệ",
     }
     out = text
     for source, target in replacements.items():
         out = out.replace(source, target)
+    out = re.sub(r"\b(?:conservative_half|source_full)_[A-Za-z0-9_]+\b", "mốc tham chiếu", out)
     return out.replace("_", " ")
 
 
@@ -1236,22 +1272,23 @@ def build_pattern_story(
         story.append(_p(_public_paragraph(paragraph), _STYLES["Body"]))
     example_validation = ref.get("example_visual_validation") if isinstance(ref.get("example_visual_validation"), Mapping) else {}
     if example_validation:
-        failure_review = (
-            "có ví dụ thất bại riêng"
-            if example_validation.get("failure_example_reviewed")
-            else "chưa có biểu đồ thất bại đủ điều kiện để in riêng"
-        )
+        reviewed_n = example_validation.get("reviewed_n")
+        scored = str(example_validation.get("status") or "").upper() == "SCORED" and bool(reviewed_n)
+        failure_review = "có ví dụ thất bại riêng" if example_validation.get("failure_example_reviewed") else "có khung thất bại để đọc riêng"
+        if scored:
+            validation_line = (
+                f"Đã kiểm tra {int(reviewed_n)} biểu đồ ví dụ; in {len(distinct_example_charts)} biểu đồ không trùng lặp; "
+                f"tỷ lệ đạt {_fmt_public(example_validation.get('manual_pass_rate_pct'), suffix='%')}; {failure_review}."
+            )
+        else:
+            validation_line = (
+                f"Đã dựng {len(distinct_example_charts)} biểu đồ minh họa không trùng lặp; "
+                f"chưa có chấm thủ công chính thức; {failure_review}."
+            )
         story.append(
             _callout(
-                "Ví dụ đã được kiểm tra bằng mắt",
-                [
-                    (
-                        f"Đã kiểm tra {example_validation.get('reviewed_n')} biểu đồ ví dụ; "
-                        f"in {len(distinct_example_charts)} biểu đồ không trùng lặp; "
-                        f"tỷ lệ đạt {_fmt_public(example_validation.get('manual_pass_rate_pct'), suffix='%')}; "
-                        f"{failure_review}."
-                    )
-                ],
+                "Ví dụ minh họa và kiểm tra hiển thị",
+                [validation_line],
             )
         )
     for key, heading, fallback in distinct_example_charts:

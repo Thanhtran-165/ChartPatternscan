@@ -43,6 +43,8 @@ GLOBAL_FORBIDDEN_PATTERNS = {
     "internal_branch": re.compile(r"\bbranch_id\b|\bdata_limited\b|publication_quality_tier", re.IGNORECASE),
     "internal_review_pack": re.compile(r"formal human|external publication|review pack generated", re.IGNORECASE),
     "internal_contract": re.compile(r"Contract nhân rộng|Release gate|Scope headline", re.IGNORECASE),
+    "internal_measure_role": re.compile(r"conservative_half_|source_full_|textbook_success|middle_case|layer missing|zero and stale|failure 5pct", re.IGNORECASE),
+    "stale_visual_count": re.compile(r"Đã kiểm tra\s+0\s+biểu đồ", re.IGNORECASE),
     "no_executable_english": re.compile(r"No executable entry/exit/cost/sizing/OOS", re.IGNORECASE),
 }
 
