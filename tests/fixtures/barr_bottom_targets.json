@@ -1,9 +1,9 @@
 {
  "_meta": {
   "source_events": "artifacts/scanner_v2/bump_and_run_family/bump_and_run_reversal_bottoms/db_active/events.csv",
-  "source_db": "market_cache/stock_ohlcv/latest.sqlite (1.599 symbols, 4.249.160 rows, max_date 2026-08-14)",
+  "source_db": "market_cache/stock_ohlcv/latest.sqlite (1.599 symbols, 4.255.894 rows, max_date 2026-08-14)",
   "book_rule": "ECP Table 7.8 — 'The highest high in the pattern is the target'; pattern starts at old high ('the old high (which is the start of the formation)')",
-  "mechanism": "BLOCKER 1 (đợt A2 16/08/2026): old high = pivot HIGH intermediate GẦN NHẤT trước lead_start neo được vào đường lead-in — fit mở rộng [pivot, lead_end] trên close đạt slope<0 và r2>=0.32 (lead_in_min_r2); duyệt gần→xa; cap 250 bars chỉ là search cap kỹ thuật, KHÔNG phải định nghĩa. Không pivot hợp lệ → event BỊ LOẠI (không thay bằng cực đại cửa sổ). Đo 2.116 events: 1.484 giữ (70,13%), 632 loại — chi tiết scanner/audits/barr_old_high_audit.json",
+  "mechanism": "BLOCKER 1 (đợt A2 16/08/2026): old high = pivot HIGH intermediate GẦN NHẤT trước lead_start neo được vào đường lead-in — fit mở rộng [pivot, lead_end] trên close đạt slope<0 và r2>=0.32 (lead_in_min_r2); duyệt gần→xa; cap 250 bars chỉ là search cap kỹ thuật, KHÔNG phải định nghĩa. Không pivot hợp lệ → event BỊ LOẠI (không thay bằng cực đại cửa sổ). Đo trên baseline 2.116 events (audit đợt C chạy lại trên snapshot đóng băng): 1.482 giữ (70,04%), 634 loại — chi tiết scanner/audits/barr_old_high_audit.json",
   "created": "2026-08-16 đợt A2 — Sol conditional-GO BLOCKER 1"
  },
  "events": [

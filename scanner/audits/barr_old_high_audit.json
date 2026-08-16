@@ -5,6 +5,8 @@
   "reason_loi_not_mark": "Chọn LOẠI thay vì đánh dấu: measure rule sách không xác định được khi thiếu old high — event không đo được target thì không thuộc population target_hit; đánh dấu sẽ đòi target=None xuyên suốt evaluate/builder (phá vỡ nhiều điểm chạm hơn).",
   "pattern": "bump_and_run_reversal_bottoms",
   "events_source": "artifacts/scanner_v2/bump_and_run_family/bump_and_run_reversal_bottoms/db_active/events.csv.bak_pre_dotb",
+  "events_baseline_sha256": "b79c3bb950f15f86fafe3e89e2fa1914367b90fe14e170d21adafa5fa40ec7f9",
+  "measurement_layering": "Giá trị population (kept 1482/dropped 634) là phép đo PHÂN TÍCH trên đúng events_source nêu trên — BASELINE 2.116 events đời cũ (events.csv.bak_pre_dotb, SHA-256 kèm; 2.116 dòng dữ liệu + header) — phục vụ quyết định cap + so sánh trước/sau. KHÔNG phải đếm dòng trực tiếp trên events.csv hiện tại sau rescan (1.447 events, tầng detector output khác; rescan sau đó áp cùng cơ chế tại detection nên event hợp lệ đã được lọc sẵn từ đầu — xem dotb_before_after_3chapters).",
   "db_source": "/Users/bobo/dev/market_stats_v2/market_cache/stock_ohlcv/latest.sqlite.dotb_20260815",
   "db_rows_meta": "1599 symbols / 4255894 rows / 2002-05-02 → 2026-08-14 (đo trực tiếp từ db_source lần chạy này)"
  },

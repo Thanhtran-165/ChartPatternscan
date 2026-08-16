@@ -32,10 +32,13 @@ Cơ chế này **chỉ thêm/cập nhật**, không bao giờ **xóa**:
 
 - Mọi thống kê sách Edition 2 quét từ `latest.sqlite` có thể chứa hàng không
   còn được nguồn xác nhận.
-- Đã kiểm 16/08/2026: DB hiện có 5.026 hàng `close<=0` trên 242 mã (đánh dấu
+- Đã kiểm 16/08/2026, đo trực tiếp trên snapshot đóng băng `latest.sqlite.dotb_20260815`
+  (SHA-256 `9c0164b01ac9d7bf48d31284a2a57ce78799e84590734ce6a678483470ca535d`,
+  1.599 mã / 4.255.894 rows): DB có **4.556 hàng `close<=0` trên 223 mã** (đánh dấu
   delisted/halted của nguồn) — các detector loại tại chỗ khi đọc, không nhiễm
   events xuất bản; nhưng đây là bằng chứng các hàng "không còn giá trị giao
-  dịch" vẫn tồn tại trong DB.
+  dịch" vẫn tồn tại trong DB. (Số cũ 5.026/242 là bản đo trộn NULL trên DB sống
+  trước khi chốt snapshot — xem `db_manifest.json` mục `close_zero_handling`.)
 
 ## Ràng buộc đặt ra
 

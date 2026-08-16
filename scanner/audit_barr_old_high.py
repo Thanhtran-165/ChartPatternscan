@@ -19,6 +19,7 @@ Không cần cwd repo (đường dẫn resolve từ vị trí file này).
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sqlite3
 import sys
@@ -27,6 +28,15 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+
+def _file_sha256(path: Path) -> str:
+    """SHA-256 của input baseline — bind phép đo với đúng bytes đã đo (điều kiện Sol vòng 3)."""
+    digest = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 REPO = Path(__file__).resolve().parents[1]
 if str(REPO) not in sys.path:
@@ -167,6 +177,13 @@ def main() -> int:
             ),
             "pattern": BARR_BOTTOMS,
             "events_source": str(args.events.relative_to(REPO)) if args.events.is_relative_to(REPO) else str(args.events),
+            "events_baseline_sha256": _file_sha256(args.events),
+            "measurement_layering": (
+                "Giá trị population (kept/dropped) là phép đo PHÂN TÍCH trên đúng events_source nêu trên "
+                "(baseline đời cũ, SHA-256 kèm) phục vụ quyết định cap + so sánh trước/sau — KHÔNG phải "
+                "đếm dòng trực tiếp trên events.csv hiện tại sau rescan (tầng detector output; rescan sau "
+                "đó áp cùng cơ chế tại detection nên event hợp lệ đã được lọc sẵn từ đầu)."
+            ),
             "db_source": str(args.db),
             # dotC: đo thẳng DB truyền vào (--db) — không hardcode số của bản trước
             # snapshot nữa (bản cũ ghi 4.249.160 rows của latest.sqlite sống).

@@ -52,9 +52,10 @@ DEFAULT_OUT_DIR = Path("artifacts/scanner_v2/bump_and_run_family")
 # duyệt có điều kiện). KHÔNG PHẢI ĐỊNH NGHĨA "old high" — chỉ là giới hạn kỹ
 # thuật của bước dò (tránh quét nửa lịch sử). Định nghĩa: pivot HIGH GẦN NHẤT
 # trước lead_start neo được vào CÙNG đường lead-in. Chọn 250 bars: ~2× chiều
-# dài formation tối đa (lead_in_max 95 + bump_max 95 ≈ 190) + biên; đo 2.116
-# events: cap 250 phủ 1.484/1.552 events có pivot hợp lệ (95,6%), p95 phân
-# phối dist = 234. Chi tiết: scanner/audits/barr_old_high_audit.json.
+# dài formation tối đa (lead_in_max 95 + bump_max 95 ≈ 190) + biên. Đo trên
+# baseline 2.116 events (audit chạy lại trên snapshot đóng băng, đợt C):
+# 1.482 giữ / 634 loại (70,04%), p95 phân phối dist = 161. Chi tiết:
+# scanner/audits/barr_old_high_audit.json.
 BARR_OLD_HIGH_SEARCH_CAP_BARS = 250
 
 
