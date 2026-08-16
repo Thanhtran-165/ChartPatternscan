@@ -1,0 +1,154 @@
+{
+  "_meta": {
+    "created": "2026-08-16T12:07:41",
+    "purpose": "Dossier phát hành Edition 2 — điều kiện 3 Sol vòng 3: gom SHA-256 toàn bộ tài sản đóng dấu sau đợt D (rebuild front matter nhãn Edition 2 + đồng bộ số hồ sơ + inventory).",
+    "branch": "fix/measure-rule-sol-round2",
+    "head_at_dossier_write": "463cab46853a16cf19600393f5d6800208d62f2d",
+    "dotd_commits": [
+      {
+        "short": "031da62",
+        "full": "031da62e3fdaaeaefaf564915871369e24015ea6",
+        "what": "tham số hóa nhãn edition trong builder (điều kiện 1)"
+      },
+      {
+        "short": "6c4f7fb",
+        "full": "6c4f7fbc82e41c51aa8d949c6a1de083ffc1c598",
+        "what": "đồng bộ số cũ hồ sơ old-high/DB + audit baseline SHA (điều kiện 2)"
+      },
+      {
+        "short": "463cab4",
+        "full": "463cab46853a16cf19600393f5d6800208d62f2d",
+        "what": "inventory rescan + 40 chương refresh (điều kiện 3)"
+      }
+    ],
+    "git_binding_note": "Dossier này được commit SAU head_at_dossier_write (self-reference không khả thi trong git); HEAD cuối cùng của đợt D nằm trong session note bàn giao.",
+    "constraints": "KHÔNG rescan, KHÔNG rebuild payload/40 chương, KHÔNG merge/deploy/đóng dấu, KHÔNG push (main agent push sau nghiệm thu)."
+  },
+  "book_pdf": {
+    "path": "artifacts/book_level/edition_2/bulkowski_vietnam_edition_2.pdf",
+    "sha256": "2971126d9a62da0a7c390471aea19fdf4f2bd17c62662cee2e37ce1c0a365788",
+    "md5": "71c43017a52a0d4850c60f4981920f92",
+    "bytes": 229814480,
+    "total_pages": 488,
+    "chapters": 64,
+    "commit_note": "PDF 229,8MB vượt GitHub 100MB/file — không commit, SHA bind tại đây",
+    "superseded_candidate_sha256": "ff10ab30c26eaec5f934ca87bfd8ecb6a0520b32ce6610dfcc1d7d1b4f97a7a4",
+    "front_matter_verification": {
+      "method": "pdftotext -f 1 -l 6 | grep -c",
+      "edition_1_occurrences": 0,
+      "edition_2_occurrences": 5,
+      "metadata_title": "Bulkowski Việt Nam - Edition 2"
+    }
+  },
+  "book_manifest": {
+    "path": "artifacts/book_level/edition_2/bulkowski_vietnam_edition_2_manifest.json",
+    "sha256": "b03f5e3bf40d8552953efa1eb31b53e046ae3b89badce028538ed3bff1f76370",
+    "bytes": 22558
+  },
+  "qa_audits": {
+    "note": "3 QA chạy lại sau rebuild PDF đợt D — toàn bộ PASS; file json nằm trong artifacts/governance (gitignored) nên SHA ghi đây làm mốc.",
+    "audit_publication_entrypoints": {
+      "result": "PASS (rc=0)",
+      "path": "artifacts/governance/final_chapters/governance/publication_entrypoint_guard_audit.json",
+      "sha256": "4c418d1f3316957a65448b299d92f1c4fbc4ba29f2399ef0c5371eac313c370f",
+      "bytes": 811
+    },
+    "audit_canonical_publication_flow": {
+      "result": "PASS (rc=0, 64/64 chương)",
+      "path": "artifacts/governance/final_chapters/governance/canonical_publication_flow_audit.json",
+      "sha256": "18b5f6b86297b3a6b9062cc391a8d091657491fae93b4fdb64c99ccb32102f55",
+      "bytes": 29889
+    },
+    "audit_final_chapter_crosscheck_skip_realtime_watchlist": {
+      "result": "PASS (rc=0, 64 chương, 0 fail)",
+      "path": "artifacts/governance/final_chapters/governance/final_chapter_crosscheck_audit.json",
+      "sha256": "70ee86df864a03bd24bef56dde8ec728e8918b5b87d20384da0c04f284facee4",
+      "bytes": 34132
+    }
+  },
+  "db_snapshot": {
+    "path": "/Users/bobo/dev/market_stats_v2/market_cache/stock_ohlcv/latest.sqlite.dotb_20260815",
+    "sha256": "9c0164b01ac9d7bf48d31284a2a57ce78799e84590734ce6a678483470ca535d",
+    "rows": 4255894,
+    "symbols": 1599,
+    "date_range": "2002-05-02 → 2026-08-14",
+    "commit_note": "1,2GB — không commit; đây là snapshot đóng băng mọi đợt scan đợt B/C/D (ISS-002)"
+  },
+  "barr_old_high_baseline_input": {
+    "path": "artifacts/scanner_v2/bump_and_run_family/bump_and_run_reversal_bottoms/db_active/events.csv.bak_pre_dotb",
+    "sha256": "b79c3bb950f15f86fafe3e89e2fa1914367b90fe14e170d21adafa5fa40ec7f9",
+    "verification": "shasum -a 256 chạy lại độc lập đợt D — khớp giá trị Sol cung cấp",
+    "rows": 2116
+  },
+  "evidence_files": {
+    "scanner/audits/edition2_book_pdf_hash.json": {
+      "path": "scanner/audits/edition2_book_pdf_hash.json",
+      "sha256": "48efe09a8a78cf0ea00652667202261a0aad3cc4eae2a95366d5f101db4f31e8",
+      "bytes": 2012
+    },
+    "scanner/audits/edition2_refresh_inventory.json": {
+      "path": "scanner/audits/edition2_refresh_inventory.json",
+      "sha256": "cc0710320174b38ebf535e54ec284435e408a30d4024f455fa968c92f84a1f13",
+      "bytes": 37123
+    },
+    "scanner/audits/barr_old_high_audit.json": {
+      "path": "scanner/audits/barr_old_high_audit.json",
+      "sha256": "aa336cef2d71536dffea656ce862e6381f1814f9699505c36f9325328423e2ee",
+      "bytes": 3952
+    },
+    "scanner/audits/barr_old_high_audit.detail.csv": {
+      "path": "scanner/audits/barr_old_high_audit.detail.csv",
+      "sha256": "ad3fb994974a6f67dfd4ffbbdd3fa00084bf548b4bdf0fc6e9760ae030e7a826",
+      "bytes": 176891
+    },
+    "scanner/audits/dotb_before_after_3chapters.json": {
+      "path": "scanner/audits/dotb_before_after_3chapters.json",
+      "sha256": "ec65938b12bf844ff5cef945728498d0406ca75adf3b5eb2d5f97f174b5ba43d",
+      "bytes": 4866
+    },
+    "scanner/audits/dotb_before_after_3chapters.md": {
+      "path": "scanner/audits/dotb_before_after_3chapters.md",
+      "sha256": "14b7ba865ce28be2ab3da002c8dc56b22641b66cb30216eb56b4b098ec2c1184",
+      "bytes": 2081
+    },
+    "scanner/audits/dotb_recompute_independent.json": {
+      "path": "scanner/audits/dotb_recompute_independent.json",
+      "sha256": "05587c53fc427532af97ad398ced9f8199b1c8b45e3857a2e890b068c819584d",
+      "bytes": 4919
+    },
+    "scanner/audits/dotb_recompute_independent.md": {
+      "path": "scanner/audits/dotb_recompute_independent.md",
+      "sha256": "8485fdc6ea08583942c7e637004266deb7da03b6b01c8db0ad3b91031b2995ae",
+      "bytes": 2188
+    },
+    "scanner/audits/target_hit_core_parity.json": {
+      "path": "scanner/audits/target_hit_core_parity.json",
+      "sha256": "97e38d0ca012819c82f8db07dedea4d3df3ad192d25254f40c4667f7b87218a5",
+      "bytes": 20468
+    },
+    "artifacts/scanner_v2/db_manifest.json": {
+      "path": "artifacts/scanner_v2/db_manifest.json",
+      "sha256": "8d501956c686e7d041891702242922692e5662fb828ec1616964d801aa09172b",
+      "bytes": 4353
+    },
+    "artifacts/book_level/edition_2/bulkowski_vietnam_edition_2_manifest.json": {
+      "path": "artifacts/book_level/edition_2/bulkowski_vietnam_edition_2_manifest.json",
+      "sha256": "b03f5e3bf40d8552953efa1eb31b53e046ae3b89badce028538ed3bff1f76370",
+      "bytes": 22558
+    },
+    "tests/fixtures/barr_bottom_targets.json": {
+      "path": "tests/fixtures/barr_bottom_targets.json",
+      "sha256": "6be5223a217e1fa27c1e9b1a05a9679598cfdacc868fb58f641e2c339ea3b03d",
+      "bytes": 262401
+    },
+    "scanner/issues/ISS-001-full-reload-replace-stale-rows.md": {
+      "path": "scanner/issues/ISS-001-full-reload-replace-stale-rows.md",
+      "sha256": "e996ec9b2eaf88d577f6d00be0109b1430c2ea3b5f9b0632696309c873b7aaca",
+      "bytes": 3359
+    }
+  },
+  "inventory_pointer": {
+    "path": "scanner/audits/edition2_refresh_inventory.json",
+    "summary": "57 events.csv rescan đợt B (55 pattern-level + 2 db_all) + 2 BARR đợt C; 40 chương AI-refresh đợt C; 40+12+12=64 khớp manifest; khai trung thực phần runner 31 lệnh không tái lập nguyên văn"
+  }
+}

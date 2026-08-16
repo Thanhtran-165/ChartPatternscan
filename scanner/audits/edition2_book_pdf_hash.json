@@ -1,19 +1,31 @@
 {
-  "generated_at": "2026-08-16T03:22:00.430721+00:00",
-  "note": "dotC Sol round-2 — bằng chứng đóng sách sau refresh 40 chương đổi số (core target_hit + N/A option a). PDF 229,8MB vượt limit GitHub 100MB nên KHÔNG commit — SHA-256 dưới đây là mốc bind.",
+  "generated_at": "2026-08-16T12:07:41",
+  "note": "dotD (điều kiện 1 Sol vòng 3): rebuild CHỈ front matter + merge lại sách (không rescan, không rebuild payload/40 chương) sau khi tham số hóa nhãn edition — hết 5 dòng footer 'Edition 1' trên 6 trang front matter, metadata /Title = 'Bulkowski Việt Nam - Edition 2'. PDF 229,8MB vượt limit GitHub 100MB nên KHÔNG commit — SHA-256 dưới đây là mốc bind. Hash ff10ab30… của bản 10:07 (đợt C) là ỨNG VIÊN BỊ LOẠI (footer tự nhận Edition 1) — không dùng làm hash đóng dấu.",
+  "superseded_candidate": {
+    "pdf_sha256": "ff10ab30c26eaec5f934ca87bfd8ecb6a0520b32ce6610dfcc1d7d1b4f97a7a4",
+    "pdf_md5": "87b6abf5ef94e5832dac691314537ac6",
+    "reason": "6 trang front matter có 5 dòng footer 'Bulkowski Việt Nam - Edition 1' + appendix_policy manifest ghi 'merged Edition 1 PDF' — Sol điều kiện 1 vòng 3."
+  },
   "pdf_path": "artifacts/book_level/edition_2/bulkowski_vietnam_edition_2.pdf",
-  "pdf_sha256": "ff10ab30c26eaec5f934ca87bfd8ecb6a0520b32ce6610dfcc1d7d1b4f97a7a4",
-  "pdf_md5": "87b6abf5ef94e5832dac691314537ac6",
+  "pdf_sha256": "2971126d9a62da0a7c390471aea19fdf4f2bd17c62662cee2e37ce1c0a365788",
+  "pdf_md5": "71c43017a52a0d4850c60f4981920f92",
   "pdf_bytes": 229814480,
   "total_pages": 488,
   "chapters": 64,
+  "front_matter_check": {
+    "method": "pdftotext -f 1 -l 6 | grep -c",
+    "edition_1_occurrences": 0,
+    "edition_2_occurrences": 5,
+    "metadata_title": "Bulkowski Việt Nam - Edition 2"
+  },
   "qa_audits": {
     "audit_publication_entrypoints": "PASS (rc=0)",
-    "audit_canonical_publication_flow": "PASS (rc=0, 64 chương)",
-    "audit_final_chapter_crosscheck --skip-realtime-watchlist": "PASS (rc=0, status PASS, 64 chương)"
+    "audit_canonical_publication_flow": "PASS (rc=0, 64/64 chương)",
+    "audit_final_chapter_crosscheck --skip-realtime-watchlist": "PASS (rc=0, 64 chương, 0 fail)"
   },
-  "git_commit_code_final": "2f34c7eb9fd14f1de56cd986911bbaf2c663b215",
   "git_branch": "fix/measure-rule-sol-round2",
   "db_snapshot_sha256": "9c0164b01ac9d7bf48d31284a2a57ce78799e84590734ce6a678483470ca535d",
-  "db_snapshot_path": "/Users/bobo/dev/market_stats_v2/market_cache/stock_ohlcv/latest.sqlite.dotb_20260815 (không commit — 1,2GB)"
+  "db_snapshot_path": "/Users/bobo/dev/market_stats_v2/market_cache/stock_ohlcv/latest.sqlite.dotb_20260815 (không commit — 1,2GB)",
+  "pdf_built_at_commit": "031da62e3fdaaeaefaf564915871369e24015ea6 (rebuild chạy đúng sau commit tham số hóa nhãn edition; chương PDF nguồn không đổi sau đó)",
+  "evidence_bound_at_head": "463cab46853a16cf19600393f5d6800208d62f2d"
 }
