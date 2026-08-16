@@ -28,6 +28,7 @@ if str(ROOT) not in sys.path:
 from scanner.publication_example_support import _load_ohlcv, load_public_editorial_sections, plot_event_chart, slice_around_event  # noqa: E402
 from scanner.double_pattern_family_public_chapter_factory import FACTORY_ID, build_double_pattern_public_chapter  # noqa: E402
 from scanner.v2.bull_flags_monograph import DEFAULT_MARKET_STATS_JSON, _load_active_symbols  # noqa: E402
+from scanner.v2.target_hit_core import target_hit_stats  # noqa: E402
 from scanner.v2.double_patterns import DEFAULT_OUT_DIR as DEFAULT_SCAN_OUT_DIR  # noqa: E402
 from scanner.v2.double_patterns import scan_double_patterns_db  # noqa: E402
 from scanner.v2.flags_experiment import DEFAULT_INDEX_DB  # noqa: E402
@@ -77,9 +78,13 @@ def _public_events(events: pd.DataFrame) -> pd.DataFrame:
 
 
 def _rate(series: pd.Series) -> float | None:
-    if series.empty:
+    # dotC (Sol round-2 option a): dòng rỗng/NaN (N/A — chưa có forward bar)
+    # bị LOẠI khỏi mẫu số, không đếm là False.
+    vals = series.dropna()
+    vals = vals[~vals.astype(str).str.strip().isin(["", "None", "nan"])]
+    if vals.empty:
         return None
-    return round(float(series.map(_truthy).mean() * 100.0), 2)
+    return round(float(vals.map(_truthy).mean() * 100.0), 2)
 
 
 def _wilson(successes: int, n: int, z: float = 1.96) -> dict[str, float | None]:
@@ -96,36 +101,57 @@ def _wilson(successes: int, n: int, z: float = 1.96) -> dict[str, float | None]:
     }
 
 
-def _target_row(events: pd.DataFrame, multiple: float, role: str) -> dict[str, Any]:
+def _target_row(events: pd.DataFrame, multiple: float, role: str, path_df: pd.DataFrame | None = None) -> dict[str, Any]:
     if events.empty:
         return {"target_multiple": multiple, "target_role": role, "n": 0}
     mfe = pd.to_numeric(events["mfe_pct"], errors="coerce")
     mae = pd.to_numeric(events["mae_pct"], errors="coerce")
-    target = pd.to_numeric(events["target_dist_pct"], errors="coerce") * float(multiple)
-    ok = mfe.notna() & target.notna()
-    subset = events[ok].copy()
-    hit = (mfe[ok] >= target[ok])
-    target_first = subset["target_first_before_adverse_5pct"].map(_truthy) if "target_first_before_adverse_5pct" in subset.columns else pd.Series(dtype=bool)
-    failure = subset["failure_5pct"].map(_truthy) if "failure_5pct" in subset.columns else pd.Series(dtype=bool)
-    n = int(len(subset))
+    # dotC (16/08/2026, Sol round-2 BLOCKER 1): hit qua HÀM CHUẨN
+    # scanner.v2.target_hit_core (target 4dp nội suy multiple so high/low path
+    # full precision, cắt evaluated_bars) — bỏ `mfe_pct(2dp) >=
+    # target_dist_pct(2dp) × multiple` (2 lớp làm tròn, cùng họ bug BARR).
+    # missing_as_none=True (Sol option a): event chưa có forward bar → N/A,
+    # loại khỏi mẫu số. path_df=None (dự phòng caller cũ) → fallback mfe 2dp.
+    if path_df is not None and "breakout_price" in events.columns and "target_price" in events.columns:
+        hits, firsts, days = target_hit_stats(events, path_df, multiple, missing_as_none=True)
+        ok = pd.Series([h is not None for h in hits], index=events.index)
+        n = int(ok.sum())
+        hit_sum = sum(1 for h in hits if h is True)
+        target_first = pd.Series([bool(f) for f, h in zip(firsts, hits) if h is not None], dtype=bool)
+        failure = pd.Series(
+            [bool(v) for v, h in zip(events["failure_5pct"].map(_truthy), hits) if h is not None],
+            dtype=bool,
+        )
+        median_days = round(float(pd.Series([d for d in days if d is not None]).median()), 2) if any(d is not None for d in days) else None
+    else:
+        target = pd.to_numeric(events["target_dist_pct"], errors="coerce") * float(multiple)
+        ok = mfe.notna() & target.notna()
+        hit = (mfe[ok] >= target[ok])
+        hits, firsts, days = list(hit), None, None
+        n = int(ok.sum())
+        hit_sum = int(hit.sum())
+        target_first = events.loc[ok, "target_first_before_adverse_5pct"].map(_truthy) if "target_first_before_adverse_5pct" in events.columns else pd.Series(dtype=bool)
+        failure = events.loc[ok, "failure_5pct"].map(_truthy) if "failure_5pct" in events.columns else pd.Series(dtype=bool)
+        median_days = None
     return {
         "target_multiple": float(multiple),
         "target_role": role,
         "n": n,
-        "target_hit_rate": round(float(hit.mean() * 100.0), 2) if n else None,
-        "target_hit_wilson": _wilson(int(hit.sum()), n),
+        "target_hit_rate": round(float(hit_sum / n * 100.0), 2) if n else None,
+        "target_hit_wilson": _wilson(hit_sum, n),
         "target_first_before_adverse_5pct_rate": round(float(target_first.mean() * 100.0), 2) if len(target_first) else None,
         "target_first_wilson": _wilson(int(target_first.sum()), int(len(target_first))) if len(target_first) else None,
         "failure_5pct_rate": round(float(failure.mean() * 100.0), 2) if len(failure) else None,
+        "median_days_to_target": median_days,
         "median_mfe_pct": round(float(mfe[ok].median()), 2) if n else None,
         "median_mae_pct": round(float(mae[ok].median()), 2) if n else None,
-        "mfe_mae_median_ratio": round(float(mfe[ok].median()) / max(float(mae[ok].median()), 1.0), 2) if n else None,
+        "mfe_mae_median_ratio": round(float(mfe[ok].median()) / max(float(mfe[ok].median()), 1.0), 2) if n else None,
     }
 
 
-def _audit(events: pd.DataFrame, all_events: pd.DataFrame, *, focus_multiple: float = 0.5) -> dict[str, Any]:
+def _audit(events: pd.DataFrame, all_events: pd.DataFrame, *, focus_multiple: float = 0.5, path_df: pd.DataFrame | None = None) -> dict[str, Any]:
     public = _public_events(all_events)
-    base = _target_row(public, focus_multiple, "source_full_height" if focus_multiple == 1.0 else "local_caution")
+    base = _target_row(public, focus_multiple, "source_full_height" if focus_multiple == 1.0 else "local_caution", path_df=path_df)
     return {
         "events": int(len(public)),
         "all_scanner_events": int(len(all_events)),
@@ -191,14 +217,14 @@ def _interaction_rows(events: pd.DataFrame) -> list[dict[str, Any]]:
     return rows
 
 
-def _publication_payload(pattern_id: str, stats: Mapping[str, Any], events: pd.DataFrame, all_events: pd.DataFrame) -> dict[str, Any]:
+def _publication_payload(pattern_id: str, stats: Mapping[str, Any], events: pd.DataFrame, all_events: pd.DataFrame, path_df: pd.DataFrame | None = None) -> dict[str, Any]:
     is_bottom = pattern_id == "double_bottoms"
-    caution = _target_row(events, 0.5, "local_caution")
-    stretch = _target_row(events, 0.75, "local_stretch")
-    full = _target_row(events, 1.0, "source_full_height" if is_bottom else "legacy_full_height")
+    caution = _target_row(events, 0.5, "local_caution", path_df=path_df)
+    stretch = _target_row(events, 0.75, "local_stretch", path_df=path_df)
+    full = _target_row(events, 1.0, "source_full_height" if is_bottom else "legacy_full_height", path_df=path_df)
     base = full if is_bottom else caution
     legacy = full
-    audit = _audit(events, all_events, focus_multiple=1.0 if is_bottom else 0.5)
+    audit = _audit(events, all_events, focus_multiple=1.0 if is_bottom else 0.5, path_df=path_df)
     classification = (
         "watchlist-reference candidate under available-series scope"
         if pattern_id == "double_bottoms"
@@ -469,7 +495,7 @@ def _build_one(
         raise SystemExit(f"No public events available for {pattern_id}")
     path_df = pd.read_csv(scan_dir / "post_breakout_path.csv")
     stats = _read_json(scan_dir / "statistics.json")
-    payload = _publication_payload(pattern_id, stats, events, all_events)
+    payload = _publication_payload(pattern_id, stats, events, all_events, path_df=path_df)
     editorial_sections, editorial_source_path = _load_required_editorial(ai_sections_path)
     payload["editorial_sections"] = editorial_sections
     payload["editorial_source_path"] = editorial_source_path

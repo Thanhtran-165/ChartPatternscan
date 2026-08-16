@@ -499,7 +499,9 @@ def build_double_pattern_variant_public_chapter(
     variant_pattern_id = _variant_pattern_id(base_pattern, variant)
     chapter_dir = out_dir / variant_pattern_id
 
-    payload = _publication_payload(base_pattern, stats, events, variant_all)
+    # dotC (Sol round-2 BLOCKER 1): path_df lọc theo event_ids của variant truyền
+    # vào _publication_payload → hit-rate qua target_hit_core (bỏ mfe>=dist 2dp).
+    payload = _publication_payload(base_pattern, stats, events, variant_all, path_df=path_df)
     publication_spec = (
         build_double_bottom_variant_publication_spec(variant, n_events=len(events))
         if base_pattern == "double_bottoms"

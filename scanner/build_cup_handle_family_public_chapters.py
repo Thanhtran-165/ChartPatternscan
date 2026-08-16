@@ -291,47 +291,36 @@ def _metric_for_target(events: pd.DataFrame, path_df: pd.DataFrame, multiple: fl
         return {"target_multiple": multiple, "target_role": role, "n": 0}
     if "event_id" not in events.columns:
         events = events.assign(event_id=events["detection_id"])
-    grouped = {str(event_id): group.copy() for event_id, group in path_df.groupby("event_id")}
-    hits: list[bool] = []
-    firsts: list[bool] = []
-    days: list[float] = []
-    for _, event in events.iterrows():
-        try:
-            distance = float(event.get("target_dist_pct")) * multiple
-        except (TypeError, ValueError):
-            distance = float("nan")
-        group = grouped.get(str(event.get("event_id")))
-        if group is None or group.empty or not math.isfinite(distance):
-            hits.append(False)
-            firsts.append(False)
-            days.append(float("nan"))
-            continue
-        favorable = pd.to_numeric(group["signed_high_excursion_pct"], errors="coerce")
-        adverse = pd.to_numeric(group["signed_low_excursion_pct"], errors="coerce")
-        bars = pd.to_numeric(group["bar_after_breakout"], errors="coerce")
-        target_bars = bars[favorable >= distance]
-        adverse_bars = bars[adverse <= -5.0]
-        hit_day = float(target_bars.min()) if not target_bars.empty else float("nan")
-        adverse_day = float(adverse_bars.min()) if not adverse_bars.empty else float("inf")
-        hit = math.isfinite(hit_day)
-        hits.append(hit)
-        firsts.append(bool(hit and hit_day < adverse_day))
-        days.append(hit_day if hit else float("nan"))
+    # dotC (16/08/2026, Sol round-2 BLOCKER 1): hits/firsts/days qua HÀM CHUẨN
+    # scanner.v2.target_hit_core (target 4dp nội suy multiple so high/low path
+    # full precision, cắt evaluated_bars) — bỏ vòng lặp cũ
+    # `target_dist_pct(2dp) × multiple` so signed excursion (2dp) — cùng họ bug
+    # BARR (2 lớp làm tròn lệch hệ thống). missing_as_none=True (Sol option a):
+    # event chưa có forward bar → N/A, loại khỏi mẫu số.
+    hits, firsts, days = target_hit_stats(events, path_df, multiple, missing_as_none=True)
+    n_evaluated = sum(1 for h in hits if h is not None)
     mfe = pd.to_numeric(events.get("mfe_pct"), errors="coerce")
     mae = pd.to_numeric(events.get("mae_pct"), errors="coerce")
     fail = events.get("failure_5pct", pd.Series(False, index=events.index)).map(_truthy)
+    fail_evaluated = [bool(v) for v, h in zip(fail, hits) if h is not None and v is not None]
+    target_dist = pd.to_numeric(events.get("target_dist_pct"), errors="coerce")
+    hit_rate = round(float(sum(1 for h in hits if h is True) / n_evaluated * 100.0), 2) if n_evaluated else None
+    first_vals = [bool(f) for f in firsts if f is not None]
     return {
         "target_multiple": multiple,
         "target_role": role,
         "target_label": f"{multiple}x",
-        "target_hit_rate": round(float(np.mean(hits) * 100.0), 2),
-        "target_first_before_adverse_5pct_rate": round(float(np.mean(firsts) * 100.0), 2),
-        "failure_5pct_rate": round(float(fail.mean() * 100.0), 2),
+        "target_hit_rate": hit_rate,
+        "target_first_before_adverse_5pct_rate": round(float(sum(first_vals) / len(first_vals) * 100.0), 2) if first_vals else None,
+        "failure_5pct_rate": round(float(sum(fail_evaluated) / len(fail_evaluated) * 100.0), 2) if fail_evaluated else None,
         "median_mfe_pct": round(float(mfe.median()), 2) if not mfe.dropna().empty else None,
         "median_mae_pct": round(float(mae.median()), 2) if not mae.dropna().empty else None,
         "mfe_mae_median_ratio": round(float(mfe.median() / max(mae.median(), 1.0)), 2) if not mfe.dropna().empty and not mae.dropna().empty else None,
-        "median_target_dist_pct": round(float(pd.to_numeric(events.get("target_dist_pct"), errors="coerce").median() * multiple), 2),
-        "n": int(len(events)),
+        "median_target_dist_pct": round(float(target_dist.median() * multiple), 2) if not target_dist.dropna().empty else None,
+        "median_days_to_target": round(float(pd.Series([d for d in days if d is not None]).median()), 2) if any(d is not None for d in days) else None,
+        "n": int(n_evaluated),
+        "n_scoped": int(len(events)),
+        "n_excluded_no_forward_bars": int(len(events) - n_evaluated),
     }
 
 

@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.patches import Rectangle
+from scanner.v2.target_hit_core import enrich_events_with_target_hit  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -311,36 +312,11 @@ def _events_for_scope(events: pd.DataFrame, scope_tier: str) -> pd.DataFrame:
 
 
 def _enrich_base_target_flags(events: pd.DataFrame, path_df: pd.DataFrame, *, base_multiple: float = 0.5) -> pd.DataFrame:
-    events = events.copy()
-    if "event_id" not in events.columns:
-        events["event_id"] = events["detection_id"]
-    grouped = {event_id: group.copy() for event_id, group in path_df.groupby("event_id")}
-    hits: list[bool] = []
-    target_first: list[bool] = []
-    days: list[float] = []
-    for _, event in events.iterrows():
-        target = float(event.get("target_dist_pct") or 0.0) * base_multiple
-        group = grouped.get(str(event.get("event_id")))
-        if group is None or group.empty or not math.isfinite(target):
-            hits.append(False)
-            target_first.append(False)
-            days.append(float("nan"))
-            continue
-        favorable = pd.to_numeric(group["signed_high_excursion_pct"], errors="coerce")
-        adverse = pd.to_numeric(group["signed_low_excursion_pct"], errors="coerce")
-        bars = pd.to_numeric(group["bar_after_breakout"], errors="coerce")
-        target_bars = bars[favorable >= target]
-        adverse_bars = bars[adverse <= -5.0]
-        hit_day = float(target_bars.min()) if not target_bars.empty else float("nan")
-        adverse_day = float(adverse_bars.min()) if not adverse_bars.empty else float("inf")
-        hit = math.isfinite(hit_day)
-        hits.append(hit)
-        target_first.append(bool(hit and hit_day < adverse_day))
-        days.append(hit_day if hit else float("nan"))
-    events["target_hit"] = hits
-    events["target_first_before_adverse_5pct"] = target_first
-    events["days_to_target"] = days
-    return events
+    # dotC (16/08/2026, Sol round-2 BLOCKER 1): delegate HÀM CHUẨN full precision
+    # scanner/v2/target_hit_core — cùng 3 cột đầu ra; bỏ vòng lặp cũ
+    # `target_dist_pct(2dp) × base_multiple` so signed excursion (2dp) — cùng họ
+    # bug BARR (2 lớp làm tròn làm lệch chọn ví dụ + quantile days_to_target).
+    return enrich_events_with_target_hit(events, path_df, base_multiple)
 
 
 def _formation_extreme(price_db: Path, cache: dict[str, pd.DataFrame], event: Mapping[str, Any], *, high: bool) -> float:
