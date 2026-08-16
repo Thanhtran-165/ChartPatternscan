@@ -420,16 +420,24 @@ def _evaluate_detection(df: pd.DataFrame, det: Mapping[str, Any], horizon: Optio
     direction = 1 if det["breakout_direction"] == "up" else -1
     forward = df.iloc[breakout_idx + 1 : min(len(df), breakout_idx + 1 + horizon)].copy()
     if forward.empty or breakout_price <= 0:
+        # dotC (16/08/2026, Sol round-2 BLOCKER 2 — chính sách option a): event chưa
+        # có PHIÊN NÀO sau breakout (breakout ngày cuối snapshot, vd DXG/HSV
+        # 2026-08-14) → outcome N/A (None), KHÔNG PHẢI False/True — gán
+        # failure_5pct=True cho event chưa đi hết 1 phiên là vô lý. Đồng bộ với
+        # pipes.py và các detector khác; _rate loại None khỏi mẫu số mọi thống kê.
         return {
             "mfe_pct": None,
             "mae_pct": None,
             "mfe_pct_full": None,
             "mae_pct_full": None,
-            "target_hit": False,
-            "failure_5pct": True,
+            "target_hit": None,
+            "failure_5pct": None,
             "weak_move_5pct": None,
             "failure_busted": None,
             "days_to_bust": None,
+            "target_first_before_adverse_5pct": None,
+            "days_to_target": None,
+            "throwback_pullback_30d": None,
             "evaluated_bars": 0,
         }
     if direction == 1:

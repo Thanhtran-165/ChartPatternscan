@@ -18,6 +18,11 @@ from typing import Any, Mapping
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scanner.v2.target_hit_core import (
+    enrich_events_with_target_hit,
+    mean_rate_pct,
+    target_hit_stats,
+)  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -105,80 +110,44 @@ def _target_metric(events: pd.DataFrame, path_df: pd.DataFrame, multiple: float,
         return {"target_multiple": multiple, "target_role": role, "n": 0}
     if "event_id" not in events.columns:
         events = events.assign(event_id=events["detection_id"])
-    grouped = {str(event_id): group.copy() for event_id, group in path_df.groupby("event_id")}
-    hits: list[bool] = []
-    firsts: list[bool] = []
-    days: list[float] = []
-    for _, event in events.iterrows():
-        distance = float(event.get("target_dist_pct") or 0.0) * multiple
-        group = grouped.get(str(event.get("event_id")))
-        if group is None or group.empty:
-            hits.append(False)
-            firsts.append(False)
-            days.append(float("nan"))
-            continue
-        favorable = pd.to_numeric(group["signed_high_excursion_pct"], errors="coerce")
-        adverse = pd.to_numeric(group["signed_low_excursion_pct"], errors="coerce")
-        bars = pd.to_numeric(group["bar_after_breakout"], errors="coerce")
-        target_bars = bars[favorable >= distance]
-        adverse_bars = bars[adverse <= -5.0]
-        hit_day = float(target_bars.min()) if not target_bars.empty else float("nan")
-        adverse_day = float(adverse_bars.min()) if not adverse_bars.empty else float("inf")
-        hit = math.isfinite(hit_day)
-        hits.append(hit)
-        firsts.append(bool(hit and hit_day < adverse_day))
-        days.append(hit_day if hit else float("nan"))
+    # dotC (16/08/2026, Sol round-2 BLOCKER 1): hits/firsts/days qua HÀM CHUẨN
+    # scanner/v2/target_hit_core — mốc target nội suy từ breakout_price/target_price
+    # (4dp) so high/low path FULL PRECISION, cắt đúng evaluated_bars. Bỏ cơ chế cũ
+    # `target_dist_pct(2dp) × multiple` so signed excursion (2dp) — làm tròn 2 lớp
+    # làm lệch hệ thống (payload 0,5x 63,84% vs recompute 64,19%; 1,0x 41,28% vs
+    # 41,98% — dotb_recompute_independent.json).
+    # missing_as_none=True (Sol option a): event chưa có forward bar (evaluated_bars=0)
+    # → N/A, LOẠI khỏi mẫu số mọi tỉ lệ — không đếm là miss.
+    hits, firsts, days = target_hit_stats(events, path_df, multiple, missing_as_none=True)
+    n_evaluated = sum(1 for h in hits if h is not None)
     mfe = pd.to_numeric(events.get("mfe_pct"), errors="coerce")
     mae = pd.to_numeric(events.get("mae_pct"), errors="coerce")
     fail = events.get("failure_5pct", pd.Series(False, index=events.index)).map(_truthy)
+    fail_evaluated = [bool(v) for v, h in zip(fail, hits) if h is not None and v is not None]
     target_dist = pd.to_numeric(events.get("target_dist_pct"), errors="coerce")
     return {
         "target_multiple": multiple,
         "target_role": role,
         "target_label": f"{multiple}x",
-        "target_hit_rate": round(float(np.mean(hits) * 100.0), 2),
-        "target_first_before_adverse_5pct_rate": round(float(np.mean(firsts) * 100.0), 2),
-        "failure_5pct_rate": round(float(fail.mean() * 100.0), 2),
+        "target_hit_rate": mean_rate_pct(hits, missing_as_none=True),
+        "target_first_before_adverse_5pct_rate": mean_rate_pct(firsts, missing_as_none=True),
+        "failure_5pct_rate": round(float(sum(fail_evaluated) / len(fail_evaluated) * 100.0), 2) if fail_evaluated else None,
         "median_mfe_pct": round(float(mfe.median()), 2) if not mfe.dropna().empty else None,
         "median_mae_pct": round(float(mae.median()), 2) if not mae.dropna().empty else None,
         "mfe_mae_median_ratio": round(float(mfe.median() / max(mae.median(), 1.0)), 2) if not mfe.dropna().empty and not mae.dropna().empty else None,
         "median_target_dist_pct": round(float(target_dist.median() * multiple), 2) if not target_dist.dropna().empty else None,
         "median_days_to_target": round(float(pd.Series(days).dropna().median()), 2) if pd.Series(days).dropna().size else None,
-        "n": int(len(events)),
+        "n": int(n_evaluated),
+        "n_scoped": int(len(events)),
+        "n_excluded_no_forward_bars": int(len(events) - n_evaluated),
     }
 
 
 def _enrich_events(events: pd.DataFrame, path_df: pd.DataFrame, multiple: float) -> pd.DataFrame:
-    events = events.copy()
-    if "event_id" not in events.columns:
-        events["event_id"] = events["detection_id"]
-    grouped = {str(event_id): group.copy() for event_id, group in path_df.groupby("event_id")}
-    hits: list[bool] = []
-    firsts: list[bool] = []
-    days: list[float] = []
-    for _, event in events.iterrows():
-        distance = float(event.get("target_dist_pct") or 0.0) * multiple
-        group = grouped.get(str(event.get("event_id")))
-        if group is None or group.empty:
-            hits.append(False)
-            firsts.append(False)
-            days.append(float("nan"))
-            continue
-        favorable = pd.to_numeric(group["signed_high_excursion_pct"], errors="coerce")
-        adverse = pd.to_numeric(group["signed_low_excursion_pct"], errors="coerce")
-        bars = pd.to_numeric(group["bar_after_breakout"], errors="coerce")
-        target_bars = bars[favorable >= distance]
-        adverse_bars = bars[adverse <= -5.0]
-        hit_day = float(target_bars.min()) if not target_bars.empty else float("nan")
-        adverse_day = float(adverse_bars.min()) if not adverse_bars.empty else float("inf")
-        hit = math.isfinite(hit_day)
-        hits.append(hit)
-        firsts.append(bool(hit and hit_day < adverse_day))
-        days.append(hit_day if hit else float("nan"))
-    events["target_hit"] = hits
-    events["target_first_before_adverse_5pct"] = firsts
-    events["days_to_target"] = days
-    return events
+    # dotC (16/08/2026, Sol round-2 BLOCKER 1): delegate hàm chuẩn full precision
+    # scanner/v2/target_hit_core — cùng 3 cột đầu ra; bỏ vòng lặp
+    # target_dist_pct(2dp) × multiple của bản cũ.
+    return enrich_events_with_target_hit(events, path_df, multiple)
 
 
 def _plot_schematic(out_path: Path, *, pattern_id: str) -> None:

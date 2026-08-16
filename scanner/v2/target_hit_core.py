@@ -120,13 +120,19 @@ def target_hit_stats(
     multiple: float = 1.0,
     *,
     adverse_pct: float = 5.0,
-) -> Tuple[List[bool], List[bool], List[Optional[float]]]:
+    missing_as_none: bool = False,
+) -> Tuple[List[Optional[bool]], List[Optional[bool]], List[Optional[float]]]:
     """Tính (hits, firsts, days) cho TỪNG event theo thứ tự `events`.
 
     events cần: event_id (hoặc detection_id), breakout_price, target_price,
     breakout_direction. path_df cần: event_id, bar_after_breakout, high, low
-    (giá full precision). Event thiếu path hoặc thiếu giá → (False, False, NaN)
-    — giữ hành vi các builder trước đây.
+    (giá full precision). Event thiếu path hoặc thiếu giá → mặc định
+    (False, False, NaN) — giữ hành vi các builder trước đây.
+
+    missing_as_none=True (dotC 16/08/2026, Sol round-2 BLOCKER 2 option a):
+    event KHÔNG ĐÁNH GIÁ ĐƯỢC (không path / thiếu giá / evaluated_bars=0) trả
+    (None, None, None) — None = N/A, caller PHẢI loại khỏi mẫu số mọi thống kê
+    (không đếm là miss). Dùng cho payload công bố của builder.
 
     Đợt B (15/08/2026, gate parity Sol): nếu events có cột `evaluated_bars`
     (số bars detector thực sự đánh giá — ghi tại detection), path được CẮT
@@ -140,8 +146,8 @@ def target_hit_stats(
         for event_id, group in path_df.groupby("event_id"):
             grouped[str(event_id)] = group.sort_values("bar_after_breakout")
     has_evaluated_bars = "evaluated_bars" in getattr(events, "columns", [])
-    hits: List[bool] = []
-    firsts: List[bool] = []
+    hits: List[Optional[bool]] = []
+    firsts: List[Optional[bool]] = []
     days: List[Optional[float]] = []
     has_event_id = "event_id" in events.columns or "detection_id" in events.columns
     for _, event in events.iterrows():
@@ -149,10 +155,22 @@ def target_hit_stats(
         group = grouped.get(eid)
         bp = event.get("breakout_price")
         tp = event.get("target_price")
-        if group is None or group.empty or pd.isna(bp) or pd.isna(tp):
-            hits.append(False)
-            firsts.append(False)
-            days.append(float("nan"))
+        eb_zero = False
+        if missing_as_none and has_evaluated_bars:
+            eb = event.get("evaluated_bars")
+            try:
+                eb_zero = eb is None or pd.isna(eb) or int(eb) <= 0
+            except (TypeError, ValueError):
+                eb_zero = True
+        if group is None or group.empty or pd.isna(bp) or pd.isna(tp) or eb_zero:
+            if missing_as_none:
+                hits.append(None)
+                firsts.append(None)
+                days.append(None)
+            else:
+                hits.append(False)
+                firsts.append(False)
+                days.append(float("nan"))
             continue
         if has_evaluated_bars:
             eb = event.get("evaluated_bars")
@@ -178,6 +196,21 @@ def target_hit_stats(
         firsts.append(bool(res["target_first_before_adverse"]))
         days.append(float(res["days_to_target"]) if res["days_to_target"] is not None else float("nan"))
     return hits, firsts, days
+
+
+def mean_rate_pct(values: Any, *, missing_as_none: bool = False) -> Optional[float]:
+    """Tỉ lệ % trên danh sách bool (hoặc None khi missing_as_none).
+
+    None (N/A — event chưa có forward bar, Sol round-2 option a) được LOẠI
+    khỏi mẫu số, không đếm là False. Danh sách rỗng sau khi lọc → None.
+    """
+    if missing_as_none:
+        vals = [bool(v) for v in values if v is not None]
+    else:
+        vals = [bool(v) for v in values]
+    if not vals:
+        return None
+    return round(float(sum(vals) / len(vals) * 100.0), 2)
 
 
 def enrich_events_with_target_hit(
