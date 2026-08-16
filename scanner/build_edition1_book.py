@@ -40,6 +40,15 @@ COVER_PDF = OUT_DIR / "edition_1_cover.pdf"
 EDITION_ID = "bulkowski_vietnam_edition_1"
 EDITION_LABEL = "Ấn bản 1"
 EDITION_ORDINAL = "thứ nhất"
+
+
+def _edition_name() -> str:
+    """Tên ấn bản cho footer/title trang front matter (vd "Bulkowski Việt Nam - Edition 2").
+
+    Đọc EDITION_ID tại thời điểm gọi để wrapper Edition 2 (build_edition2_book.py
+    override base.EDITION_ID sau import) nhận đúng nhãn — không hardcode "Edition 1".
+    """
+    return f"Bulkowski Việt Nam - Edition {EDITION_ID.rsplit('_', 1)[-1]}"
 ASSETS_DIR = ROOT / "assets"
 DEFAULT_BOOK_LOGO = ASSETS_DIR / "book_logo.png"
 INCLUDE_INTERNAL_RANKING_IN_PUBLIC_BOOK = False
@@ -402,7 +411,7 @@ def _build_cover_pdf(output: Path, chapter_count: int, family_count: int) -> Non
     pdf.drawCentredString(0, 0, "BULKOWSKI VIỆT NAM")
     pdf.restoreState()
 
-    pdf.setTitle("Bulkowski Việt Nam - Edition 1 Cover")
+    pdf.setTitle(f"{_edition_name()} Cover")
     pdf.save()
 
 
@@ -502,7 +511,7 @@ def _assign_pages(items: list[BookItem], front_count: int) -> None:
 def _build_front_matter(items: list[BookItem], output: Path) -> int:
     font_regular, font_bold = _register_fonts()
     styles = _styles(font_regular, font_bold)
-    body_pdf = output.with_name("edition_1_front_matter_body.pdf")
+    body_pdf = output.with_name(f"{output.stem}_body.pdf")
     doc = SimpleDocTemplate(
         str(body_pdf),
         pagesize=A4,
@@ -510,7 +519,7 @@ def _build_front_matter(items: list[BookItem], output: Path) -> int:
         rightMargin=1.45 * cm,
         topMargin=1.35 * cm,
         bottomMargin=1.25 * cm,
-        title="Bulkowski Việt Nam - Edition 1",
+        title=_edition_name(),
         author="Bulkowski Việt Nam",
     )
     story: list[Any] = []
@@ -626,7 +635,7 @@ def _build_front_matter(items: list[BookItem], output: Path) -> int:
     for paragraph in data_limits_paragraphs:
         story.append(_p(paragraph, styles["Body"]))
 
-    footer = _footer("Bulkowski Việt Nam - Edition 1", font_regular)
+    footer = _footer(_edition_name(), font_regular)
     doc.build(story, onFirstPage=footer, onLaterPages=footer)
     chapter_count = sum(1 for item in items if item.kind == "chapter")
     family_count = len({item.family for item in items if item.kind == "chapter"})
@@ -701,7 +710,7 @@ def _append_pdf_pages(
 
 def _title_for_page(book_page: int, front_count: int, items: list[BookItem]) -> str:
     if book_page <= front_count:
-        return "Bulkowski Việt Nam - Edition 1"
+        return _edition_name()
     for item in items:
         if item.start_page <= book_page <= item.end_page:
             return item.title
@@ -758,7 +767,7 @@ def _restamp_book_footers(input_pdf: Path, output_pdf: Path, front_count: int, i
         writer.add_outline_item(item.title, max(0, item.start_page - 1))
     writer.add_metadata(
         {
-            "/Title": f"Bulkowski Việt Nam - Edition {EDITION_ID.rsplit('_', 1)[-1]}",
+            "/Title": _edition_name(),
             "/Author": "Bloger Chim Cut",
             "/Creator": "Bulkowski Việt Nam canonical publication book builder",
             "/Subject": "Atlas mẫu hình giá trên thị trường chứng khoán Việt Nam",
@@ -802,7 +811,7 @@ def build_edition() -> dict[str, Any]:
         )
     writer.add_metadata(
         {
-            "/Title": f"Bulkowski Việt Nam - Edition {EDITION_ID.rsplit('_', 1)[-1]}",
+            "/Title": _edition_name(),
             "/Author": "Bulkowski Việt Nam",
             "/Subject": "Atlas mẫu hình giá Việt Nam",
         }
@@ -826,7 +835,12 @@ def build_edition() -> dict[str, Any]:
         "chapter_count": sum(1 for item in items if item.kind == "chapter"),
         "ranking_pages": sum(item.included_pages for item in items if item.kind == "ranking"),
         "ranking_policy": "Popularity and scanner-priority rankings are kept as internal artifacts and excluded from the public book.",
-        "appendix_policy": "Technical appendices and internal publication-gate assessment sections are omitted from the merged Edition 1 PDF.",
+        "appendix_policy": (
+            "Technical appendices and internal publication-gate assessment sections are omitted from the "
+            f"merged {_edition_name()} PDF. Merge mechanism: cover + front matter are rebuilt for this "
+            "edition with the edition label, then chapter PDFs are merged as-is (footer band redacted and "
+            "restamped with per-chapter titles and book page numbers)."
+        ),
         "book_logo": str(_resolve_book_logo().relative_to(ROOT)) if _resolve_book_logo() else None,
         "items": [
             {
