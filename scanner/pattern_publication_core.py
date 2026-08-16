@@ -1280,9 +1280,14 @@ def build_pattern_story(
         if any(key == "failure" for key, _, _ in distinct_example_charts)
         else "Các ví dụ đủ điều kiện minh họa hình thái"
     )
-    story.append(_section_title("3", "Ví dụ minh họa", example_subtitle))
+    # Giữ banner của mục đi cùng biểu đồ đầu tiên. Trước đây tiêu đề có thể
+    # nằm cuối trang còn ví dụ bị đẩy sang trang sau, tạo một trang chỉ có
+    # banner. Biểu đồ cũng rộng hơn một chút để tận dụng khổ chữ khả dụng.
+    example_header: list[Any] = [
+        _section_title("3", "Ví dụ minh họa", example_subtitle),
+    ]
     for paragraph in spec.get("example_intro", []):
-        story.append(_p(_public_paragraph(paragraph), _STYLES["Body"]))
+        example_header.append(_p(_public_paragraph(paragraph), _STYLES["Body"]))
     example_validation = ref.get("example_visual_validation") if isinstance(ref.get("example_visual_validation"), Mapping) else {}
     if example_validation:
         reviewed_n = example_validation.get("reviewed_n")
@@ -1298,31 +1303,59 @@ def build_pattern_story(
                 f"Đã dựng {len(distinct_example_charts)} biểu đồ minh họa không trùng lặp; "
                 f"chưa có chấm thủ công chính thức; {failure_review}."
             )
-        story.append(
+        example_header.append(
             _callout(
                 "Ví dụ minh họa và kiểm tra hiển thị",
                 [validation_line],
             )
         )
-    for key, heading, fallback in distinct_example_charts:
-        event = examples.get(key, {}) if isinstance(examples, Mapping) else {}
+
+    def _example_chart_block(key: str, heading: str, fallback: str, event: Mapping[str, Any]) -> list[Any]:
+        return [
+            Paragraph(str(heading), _STYLES["H2"]),
+            _image(charts[key], 17.0),
+            _p(
+                _example_caption(
+                    key=key,
+                    fallback=str(fallback),
+                    event=event,
+                    spec=spec,
+                ),
+                _STYLES["Caption"],
+            ),
+        ]
+
+    if distinct_example_charts:
+        first_key, first_heading, first_fallback = distinct_example_charts[0]
+        first_event = examples.get(first_key, {}) if isinstance(examples, Mapping) else {}
         story.append(
             KeepTogether(
-                [
-                    Paragraph(str(heading), _STYLES["H2"]),
-                    _image(charts[key], 16.0),
-                    _p(
-                        _example_caption(
-                            key=key,
-                            fallback=str(fallback),
-                            event=event if isinstance(event, Mapping) else {},
-                            spec=spec,
-                        ),
-                        _STYLES["Caption"],
-                    ),
-                ]
+                example_header
+                + _example_chart_block(
+                    first_key,
+                    first_heading,
+                    first_fallback,
+                    first_event if isinstance(first_event, Mapping) else {},
+                )
             )
         )
+        for key, heading, fallback in distinct_example_charts[1:]:
+            event = examples.get(key, {}) if isinstance(examples, Mapping) else {}
+            story.append(
+                KeepTogether(
+                    _example_chart_block(
+                        key,
+                        heading,
+                        fallback,
+                        event if isinstance(event, Mapping) else {},
+                    )
+                )
+            )
+    else:
+        story.extend(example_header)
+
+    for key, _heading, _fallback in distinct_example_charts:
+        event = examples.get(key, {}) if isinstance(examples, Mapping) else {}
         if isinstance(event, Mapping) and event:
             story.append(Paragraph(_walkthrough_title(event, key), _STYLES["H2"]))
             story.append(_p(_walkthrough_intro(event, key), _STYLES["Body"]))
