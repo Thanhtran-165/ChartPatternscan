@@ -702,6 +702,49 @@ def _label_inside_day(ax: Any, df: pd.DataFrame, event: Mapping[str, Any]) -> bo
     return True
 
 
+def _label_harami(ax: Any, df: pd.DataFrame, event: Mapping[str, Any]) -> bool:
+    """Đánh dấu trực tiếp hai nến và biên containment của Harami."""
+    fs = _nearest_idx(df, _date(event.get("formation_start_date")))
+    fe = _nearest_idx(df, _date(event.get("formation_end_date")))
+    if fs is None or fe is None:
+        return False
+    mother_top = _num(event.get("mother_body_top"))
+    mother_bottom = _num(event.get("mother_body_bottom"))
+    child_top = _num(event.get("child_body_top"))
+    child_bottom = _num(event.get("child_body_bottom"))
+    mother_high = _num(event.get("mother_bar_high"))
+    mother_low = _num(event.get("mother_bar_low"))
+    if None in (mother_top, mother_bottom, child_top, child_bottom):
+        return False
+    ax.axvspan(fs - 0.5, fs + 0.5, color="#9ecae1", alpha=0.16, zorder=0)
+    ax.axvspan(fe - 0.5, fe + 0.5, color="#4C78A8", alpha=0.20, zorder=0)
+    ax.hlines([mother_top, mother_bottom], fs - 0.45, fs + 0.45, color="#7f7f7f", linestyle="--", linewidth=1.1, zorder=5)
+    ax.hlines([child_top, child_bottom], fe - 0.45, fe + 0.45, color="#245b5a", linestyle="-", linewidth=1.2, zorder=6)
+    if mother_high is not None and mother_low is not None:
+        ax.vlines(fs, mother_low, mother_high, color="#7f7f7f", linestyle=":", linewidth=0.9, alpha=0.75, zorder=4)
+    ax.text(0.02, 0.96, "Nến mẹ = dải xám, biên thân nét đứt; nến con = dải xanh, thân nằm trong", transform=ax.transAxes, ha="left", va="top", fontsize=7.0, color="#245b5a", bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.78, "pad": 1.2}, zorder=8)
+    return True
+
+
+def _label_rounding(ax: Any, df: pd.DataFrame, event: Mapping[str, Any], pattern_id: str) -> bool:
+    """Thêm đường xu hướng mượt để người đọc nhận ra dạng bát/đỉnh tròn."""
+    fs = _nearest_idx(df, _date(event.get("formation_start_date")))
+    fe = _nearest_idx(df, _date(event.get("formation_end_date")))
+    if fs is None or fe is None or fe <= fs:
+        return False
+    seg = df.iloc[fs : fe + 1]
+    if seg.empty:
+        return False
+    smooth = seg["close"].rolling(max(5, min(21, len(seg) // 10 or 5)), center=True, min_periods=1).median()
+    x = np.arange(fs, fe + 1, dtype=float)
+    ax.plot(x, smooth.to_numpy(dtype=float), color="#7A5195", linewidth=1.35, linestyle="--", alpha=0.9, zorder=6)
+    is_top = "tops" in pattern_id
+    label = "đường cong đỉnh tròn" if is_top else "đường cong đáy tròn"
+    y_idx = int(np.nanargmax(smooth.to_numpy()) if is_top else np.nanargmin(smooth.to_numpy()))
+    _annotate(ax, float(x[y_idx]) + 0.25, float(smooth.iloc[y_idx]), label, "#7A5195")
+    return True
+
+
 def _label_three_methods(ax: Any, df: pd.DataFrame, event: Mapping[str, Any], pattern_id: str) -> bool:
     fs = _nearest_idx(df, _date(event.get("formation_start_date")))
     fe = _nearest_idx(df, _date(event.get("formation_end_date")))
@@ -731,6 +774,12 @@ def _draw_geometry(ax: Any, df: pd.DataFrame, event: Mapping[str, Any], pattern_
             return
     if pattern_id == "inside_day":
         if _label_inside_day(ax, df, event):
+            return
+    if pattern_id == "harami":
+        if _label_harami(ax, df, event):
+            return
+    if pattern_id in {"rounding_bottoms", "rounding_tops"}:
+        if _label_rounding(ax, df, event, pattern_id):
             return
     if pattern_id in {"island_reversals", "islands_long"}:
         fs = _nearest_idx(df, _date(event.get("formation_start_date")))
