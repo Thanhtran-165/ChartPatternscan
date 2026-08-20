@@ -144,5 +144,17 @@ echo
 
 "${cmd[@]}"
 
+# V3.1 (20/08/2026): chép bản sao summary cho dashboard market_stats
+# (view "Ứng viên quét hôm nay" chỉ đọc bản sao — không phụ thuộc repo này lúc chạy).
+SCAN_DASHBOARD_DIR="/Users/bobo/Library/Mobile Documents/com~apple~CloudDocs/main sonet/market_stats/web/scan"
+SCAN_SUMMARY_SRC="${REPO_ROOT}/artifacts/realtime_scan/latest/email/realtime_scan_email_summary.json"
+if [[ -f "${SCAN_SUMMARY_SRC}" ]]; then
+  mkdir -p "${SCAN_DASHBOARD_DIR}"
+  cp "${SCAN_SUMMARY_SRC}" "${SCAN_DASHBOARD_DIR}/scan_summary.json"
+  echo "Copied scan_summary.json -> ${SCAN_DASHBOARD_DIR}"
+else
+  echo "CẢNH BÁO: không tìm thấy ${SCAN_SUMMARY_SRC} — dashboard sẽ hiển thị dữ liệu quét cũ."
+fi
+
 echo
 echo "Completed: $(date '+%Y-%m-%d %H:%M:%S %Z')"
