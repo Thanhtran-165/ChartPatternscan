@@ -842,8 +842,6 @@ def render_text_email(summary: Mapping[str, Any], *, include_risk_details: bool 
         "",
         "CẢNH BÁO: Đây là quét hình học từ dữ liệu lịch sử, KHÔNG phải khuyến nghị mua bán. Mỗi mẫu hình có tỉ lệ thất bại thực tế kèm theo. Thống kê gồm cả mã đã ngừng giao dịch.",
         "",
-        "⚠️ LƯU Ý: hệ thống đang chuẩn hóa lại số liệu mẫu hình (nâng cấp V3) — các con số thống kê trong mail này là tham khảo tạm, chưa theo chuẩn cuối.",
-        "",
         f"Generated at: {summary['generated_at']}",
         f"Total rows: {summary['total_rows']}",
         f"BUY candidates: {counts['buy_candidates']}",
@@ -1097,7 +1095,6 @@ def render_html_email(summary: Mapping[str, Any], *, include_risk_details: bool 
     <h1>BUY Candidate Scan - VN100 Watchlist</h1>
     <p class="muted">Generated at: {html.escape(str(summary["generated_at"]))}</p>
     <div class="notice"><b>CẢNH BÁO:</b> Đây là quét hình học từ dữ liệu lịch sử, KHÔNG phải khuyến nghị mua bán. Mỗi mẫu hình có tỉ lệ thất bại thực tế kèm theo. Thống kê gồm cả mã đã ngừng giao dịch.</div>
-    <div class="notice"><b>⚠️ Lưu ý:</b> hệ thống đang chuẩn hóa lại số liệu mẫu hình (nâng cấp V3) — các con số thống kê trong mail này là tham khảo tạm, chưa theo chuẩn cuối.</div>
     <div class="notice">Đây là danh sách ứng viên để mở chart kiểm tra, không phải khuyến nghị mua bán.</div>
     <p class="note">Phạm vi bắt buộc: hai nhóm BUY và Watchlist chỉ lấy VN100/VN30; nếu không có mã phù hợp thì để trống. Lợi nhuận tiềm năng và xác suất là thống kê lịch sử của mẫu hình, không phải cam kết cho từng mã.</p>
     <p class="note"><b>Khả năng chạm trước kéo ngược mạnh</b> là tần suất lịch sử mẫu chạm mục tiêu trước khi bị kéo ngược bất lợi 5%. <b>Đã tăng / đã kéo ngược</b> là mức tăng tốt nhất và mức kéo ngược sâu nhất từ ngày xác nhận tới hiện tại.</p>
